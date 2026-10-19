@@ -48,7 +48,9 @@ export function Composer({ value, isSending, onValueChange, onSend, onNotify }: 
           onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={(event) => {
             const isDesktop = window.matchMedia('(min-width: 768px)').matches
-            if (event.key === 'Enter' && !event.shiftKey && isDesktop) {
+            // Pendant une composition (touches mortes, IME), Entrée valide le caractère et ne doit pas envoyer.
+            const isComposing = event.nativeEvent.isComposing || event.keyCode === 229
+            if (event.key === 'Enter' && !event.shiftKey && isDesktop && !isComposing) {
               event.preventDefault()
               submit()
             }

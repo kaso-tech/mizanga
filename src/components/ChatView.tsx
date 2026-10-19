@@ -1,4 +1,5 @@
 import { ArrowUpRight, BookOpenText, Globe2, Sparkles } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import type { ChatMessage as ChatMessageType } from '../domain/types'
 import { suggestions, welcomeText } from '../data/content'
 import { ChatMessage } from './ChatMessage'
@@ -23,6 +24,13 @@ export function ChatView({
   onReport,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
+  const endRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (isEmpty) return
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'end' })
+  }, [messages.length, isGenerating, isEmpty])
 
   return (
     <section className={`conversation-view ${isEmpty ? 'is-empty' : ''}`} aria-label="Conversation">
@@ -65,6 +73,7 @@ export function ChatView({
               <span>Préparation d’un état de démonstration…</span>
             </div>
           )}
+          <div ref={endRef} aria-hidden="true" />
         </div>
       )}
     </section>

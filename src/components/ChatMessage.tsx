@@ -95,7 +95,7 @@ export function ChatMessage({ message, copiedMessageId, onCopy, onFeedback, onRe
           <strong>{isUser ? 'Vous' : 'Mizanga'}</strong>
           {!isUser && message.isDemonstration && <span className="demo-chip">Démonstration</span>}
         </div>
-        <div className="message-bubble"><MessageContent content={message.content} /></div>
+        <div className="message-bubble" lang={message.language}><MessageContent content={message.content} /></div>
 
         {!isUser && (
           <>

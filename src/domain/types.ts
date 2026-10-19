@@ -17,6 +17,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   createdAt: Date
+  /** Code de langue BCP 47 (ex. « fr », « mos » pour le Mooré) quand il est connu ; jamais deviné. */
+  language?: string
   isDemonstration?: boolean
 }
 

@@ -1,4 +1,4 @@
-import { ChevronRight, Languages, Mic2, Moon, ShieldCheck, SunMedium, Volume2 } from 'lucide-react'
+import { Languages, Mic2, Moon, ShieldCheck, SunMedium, Volume2 } from 'lucide-react'
 import type { LinguisticPreferences } from '../domain/types'
 
 interface SettingsViewProps {
@@ -26,7 +26,7 @@ export function SettingsView({ preferences, onChange, onNewConversation, onNotif
         <div className="theme-toggle" role="group" aria-label="Choix du thème"><button className={preferences.theme === 'light' ? 'is-selected' : ''} type="button" onClick={() => onChange({ theme: 'light' })}><SunMedium size={17} /> Clair</button><button className={preferences.theme === 'dark' ? 'is-selected' : ''} type="button" onClick={() => onChange({ theme: 'dark' })}><Moon size={17} /> Sombre</button></div>
       </div>
 
-      <div className="settings-section split-settings"><div className="settings-action-card"><ShieldCheck size={21} /><div><h2>Confidentialité</h2><p>Aucune conversation n’est enregistrée dans cette version. Les règles de stockage seront expliquées avant toute connexion de compte.</p></div><ChevronRight size={18} /></div><div className="settings-action-card is-muted"><Volume2 size={21} /><div><h2>Voix et lecture audio</h2><p>Dictée, lecture, vitesse et variétés vocales seront configurables quand les services seront testés.</p></div><span className="coming-label">Bientôt</span></div></div>
+      <div className="settings-section split-settings"><div className="settings-action-card"><ShieldCheck size={21} /><div><h2>Confidentialité</h2><p>Aucune conversation n’est enregistrée dans cette version. Les règles de stockage seront expliquées avant toute connexion de compte.</p></div></div><div className="settings-action-card is-muted"><Volume2 size={21} /><div><h2>Voix et lecture audio</h2><p>Dictée, lecture, vitesse et variétés vocales seront configurables quand les services seront testés.</p></div><span className="coming-label">Bientôt</span></div></div>
 
       <div className="settings-footer"><button className="secondary-button" type="button" onClick={onNewConversation}>Démarrer une nouvelle conversation</button><button className="text-button" type="button" onClick={() => onNotify('La dictée vocale et la lecture audio ne sont pas encore disponibles.') }><Mic2 size={16} /> En savoir plus sur les fonctions vocales</button></div>
     </section>

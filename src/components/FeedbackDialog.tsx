@@ -1,5 +1,5 @@
 import { AlertCircle, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatMessage, LinguisticFeedback } from '../domain/types'
 
 interface FeedbackDialogProps {
@@ -8,7 +8,47 @@ interface FeedbackDialogProps {
   onSubmit: (feedback: LinguisticFeedback) => void
 }
 
+const focusableSelector = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+
+/** Le parent remonte ce composant (clé) à chaque ouverture : le formulaire repart toujours vide. */
 export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogProps) {
+  const dialogRef = useRef<HTMLElement>(null)
+  const firstFieldRef = useRef<HTMLInputElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    if (!message) return
+    const returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    firstFieldRef.current?.focus()
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      // Garde le focus dans la fenêtre modale.
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector))
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current.contains(document.activeElement))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (returnFocusTo?.isConnected) returnFocusTo.focus()
+    }
+  }, [message])
+
   const [selectedPassage, setSelectedPassage] = useState('')
   const [errorType, setErrorType] = useState<LinguisticFeedback['errorType']>('orthographe')
   const [proposal, setProposal] = useState('')
@@ -25,14 +65,11 @@ export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogPro
       proposal,
       explanation: explanation || undefined,
     })
-    setSelectedPassage('')
-    setProposal('')
-    setExplanation('')
   }
 
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="report-title" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="report-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="dialog-header">
           <div><span className="dialog-icon"><AlertCircle size={19} /></span><div><p className="eyebrow">Qualité linguistique</p><h2 id="report-title">Signaler une erreur en Mooré</h2></div></div>
           <button className="icon-button" type="button" aria-label="Fermer le formulaire" onClick={onClose}><X size={19} /></button>
@@ -40,11 +77,11 @@ export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogPro
         <p className="dialog-description">Cette démonstration prépare votre retour localement, sans l’enregistrer ni le valider. Dans une future version, chaque correction sera vérifiée avant toute utilisation linguistique.</p>
         <blockquote className="reported-message">{message.content}</blockquote>
         <form onSubmit={submit}>
-          <label>Passage à corriger <span>facultatif</span><input value={selectedPassage} onChange={(event) => setSelectedPassage(event.target.value)} placeholder="Copiez le passage concerné" /></label>
+          <label>Passage à corriger <span>facultatif</span><input ref={firstFieldRef} value={selectedPassage} onChange={(event) => setSelectedPassage(event.target.value)} placeholder="Copiez le passage concerné" /></label>
           <label>Type d’erreur<select value={errorType} onChange={(event) => setErrorType(event.target.value as LinguisticFeedback['errorType'])}>
             <option value="orthographe">Orthographe</option><option value="grammaire">Grammaire</option><option value="vocabulaire">Vocabulaire</option><option value="traduction">Traduction</option><option value="expression">Expression idiomatique</option><option value="contexte">Contexte culturel</option><option value="autre">Autre</option>
           </select></label>
-          <label>Proposition de correction<input required value={proposal} onChange={(event) => setProposal(event.target.value)} placeholder="Votre correction proposée" /></label>
+          <label>Proposition de correction<input required lang="mos" value={proposal} onChange={(event) => setProposal(event.target.value)} placeholder="Votre correction proposée" /></label>
           <label>Explication <span>facultatif</span><textarea value={explanation} onChange={(event) => setExplanation(event.target.value)} rows={2} placeholder="Ajoutez un contexte si utile" /></label>
           <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Annuler</button><button type="submit" className="primary-button">Préparer le signalement</button></div>
         </form>
