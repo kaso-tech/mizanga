@@ -1,8 +1,8 @@
-# Plan d’implémentation — Phase 1 de Mooré AI
+# Plan d’implémentation — Phase 1 de Mizanga
 
 ## Portée approuvée
 
-Cette première livraison est une interface web statique, responsive et interactive pour **Mooré AI**. Elle rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité, sans prétendre qu’un moteur comprend le Mooré, sans persistance et sans service externe. Les intégrations IA, recherche, authentification, audio et base de connaissances restent matérialisées par des contrats et états explicitement indisponibles.
+Cette première livraison est une interface web statique, responsive et interactive pour **Mizanga**. Elle rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité, sans prétendre qu’un moteur comprend le Mooré, sans persistance et sans service externe. Les intégrations IA, recherche, authentification, audio et base de connaissances restent matérialisées par des contrats et états explicitement indisponibles.
 
 ## Choix d’implémentation
 
@@ -22,7 +22,7 @@ Cette première livraison est une interface web statique, responsive et interact
 
 - **Mouvement de design :** minimalisme conversationnel africain contemporain, inspiré par le rythme d’une trame, pas par l’imagerie touristique.
 - **Principes :** lisibilité avant décoration ; hiérarchie éditoriale calme ; une interaction par intention ; densité réduite sur mobile.
-- **Philosophie colorielle :** blanc bleuté pour le fond, bleu nuit pour le texte, bleu cobalt pour l’action et bleu clair pour les informations positives. Le bleu cobalt devient la couleur propriétaire de Mooré AI.
+- **Philosophie colorielle :** blanc bleuté pour le fond, bleu nuit pour le texte, bleu cobalt pour l’action et bleu clair pour les informations positives. Le bleu cobalt devient la couleur propriétaire de Mizanga.
 - **Paradigme de mise en page :** une colonne de lecture « carnet » centrée, bordée d’une navigation latérale sur grand écran ; le compositeur de message forme une base stable. La ligne de trame fine guide le regard entre identité, contexte et conversation.
 - **Éléments signatures :** monogramme circulaire composé de deux formes de dialogue ; filet textile ponctué ; badges de statut francs (« Démonstration », « Bientôt disponible »).
 - **Interactions :** actions directes et locales avec retour visuel discret ; tout état non connecté explique son absence au lieu de simuler un service.
@@ -30,7 +30,7 @@ Cette première livraison est une interface web statique, responsive et interact
 - **Typographie :** `system-ui` / `Segoe UI` / `Noto Sans` pour une excellente prise en charge de ɛ, ɩ, ʋ et des diacritiques ; titres légèrement serrés, texte courant généreux.
 - **Essence de marque :** « Une porte de savoir numérique pensée pour le Mooré, avec rigueur linguistique et simplicité. » Personnalité : accueillante, fiable, attentive.
 - **Voix :** claire, jamais emphatique ni trompeuse. Exemples : « Écrivez comme vous le faites habituellement. » et « Le moteur linguistique arrive progressivement ; votre texte reste le vôtre. »
-- **Logo :** symbole de dialogue circulaire bleu cobalt avec un point de diacritique, associé au mot-signe « Mooré AI ».
+- **Logo :** symbole de dialogue circulaire bleu cobalt avec un point de diacritique, associé au mot-signe « Mizanga ».
 - **Couleur de signature :** Bleu du savoir — `#2563D4`.
 
 ## Écrans et parcours de phase 1

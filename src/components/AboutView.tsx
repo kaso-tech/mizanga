@@ -3,7 +3,7 @@ import { BookOpenCheck, Database, HandHeart, ShieldAlert } from 'lucide-react'
 export function AboutView() {
   return (
     <section className="about-view page-view">
-      <div className="page-heading"><p className="eyebrow">À propos du projet</p><h1>Faire grandir le numérique<br />avec le <em>Mooré.</em></h1><p>Mooré AI prépare un accès plus naturel à l’information, à l’apprentissage et aux expressions culturelles dans la langue Mooré.</p></div>
+      <div className="page-heading"><p className="eyebrow">À propos du projet</p><h1>Faire grandir le numérique<br />avec le <em>Mooré.</em></h1><p>Mizanga prépare un accès plus naturel à l’information, à l’apprentissage et aux expressions culturelles dans la langue Mooré.</p></div>
       <div className="principle-grid">
         <article><span><HandHeart size={20} /></span><h2>Rigueur linguistique</h2><p>Les retours et les variantes ne seront jamais considérés comme validés sans vérification.</p></article>
         <article><span><ShieldAlert size={20} /></span><h2>Transparence</h2><p>L’application indique ce qui est connecté, démontré ou encore en préparation.</p></article>

@@ -92,7 +92,7 @@ export function ChatMessage({ message, copiedMessageId, onCopy, onFeedback, onRe
       {!isUser && <span className="assistant-avatar" aria-hidden="true">M</span>}
       <div className="message-block">
         <div className="message-meta">
-          <strong>{isUser ? 'Vous' : 'Mooré AI'}</strong>
+          <strong>{isUser ? 'Vous' : 'Mizanga'}</strong>
           {!isUser && message.isDemonstration && <span className="demo-chip">Démonstration</span>}
         </div>
         <div className="message-bubble"><MessageContent content={message.content} /></div>
