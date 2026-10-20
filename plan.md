@@ -1,5 +1,18 @@
 # Plan d’implémentation — Phase 1 de Mizanga
 
+## Repositionnement (octobre 2026)
+
+Mizanga est un **assistant IA généraliste**, au même titre que Claude, ChatGPT ou Perplexity : rédiger, résumer, expliquer, apprendre, s’organiser. Sa particularité est linguistique : il doit comprendre et répondre en **mooré**, langue encore mal prise en charge par les autres assistants, puis potentiellement dans d’autres langues du Burkina Faso. Le mooré est un atout du produit, pas son unique sujet.
+
+Conséquences sur l’interface (elles remplacent la direction visuelle « Tissage conversationnel discret » décrite plus bas) :
+
+- **Accueil :** salutation simple, zone de saisie au centre, suggestions de tâches variées dont une seule porte sur le mooré.
+- **Langue des réponses :** « Automatique » par défaut (même langue que l’utilisateur), modifiable depuis la zone de saisie et les paramètres.
+- **Conversation :** réponses sans bulle et rendues en Markdown complet, pastille de langue sous chaque réponse, actions en icônes (copier, régénérer, avis) ; « Proposer une correction » seulement sous les réponses en mooré.
+- **Navigation :** barre latérale repliable avec les conversations de la session et une recherche ; paramètres, historique, favoris et À propos dans le menu du compte.
+- **Style :** interface neutre (blancs et gris), Noto Sans embarquée pour un rendu identique de ɛ, ɩ, ʋ et des voyelles nasales, bleu Mizanga réservé aux accents. Les noms de langues s’écrivent en minuscules (« le mooré »).
+- **Honnêteté :** inchangée. Aucune réponse, source ou phrase en mooré n’est inventée ; les textes en mooré seront fournis et validés par des locuteurs.
+
 ## Portée approuvée
 
 Cette première livraison est une interface web statique, responsive et interactive pour **Mizanga**. Elle rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité, sans prétendre qu’un moteur comprend le Mooré, sans persistance et sans service externe. Les intégrations IA, recherche, authentification, audio et base de connaissances restent matérialisées par des contrats et états explicitement indisponibles.

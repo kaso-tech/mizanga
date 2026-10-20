@@ -72,10 +72,10 @@ export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogPro
     <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
       <section ref={dialogRef} className="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="report-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="dialog-header">
-          <div><span className="dialog-icon"><AlertCircle size={19} /></span><div><p className="eyebrow">Qualité linguistique</p><h2 id="report-title">Signaler une erreur en Mooré</h2></div></div>
+          <div><span className="dialog-icon"><AlertCircle size={19} /></span><div><p className="eyebrow">Qualité du mooré</p><h2 id="report-title">Proposer une correction</h2></div></div>
           <button className="icon-button" type="button" aria-label="Fermer le formulaire" onClick={onClose}><X size={19} /></button>
         </div>
-        <p className="dialog-description">Cette démonstration prépare votre retour localement, sans l’enregistrer ni le valider. Dans une future version, chaque correction sera vérifiée avant toute utilisation linguistique.</p>
+        <p className="dialog-description">Votre correction aide Mizanga à mieux parler mooré. Dans cette version, elle reste locale : elle n’est ni enregistrée ni validée. Plus tard, chaque correction sera vérifiée avant toute utilisation.</p>
         <blockquote className="reported-message">{message.content}</blockquote>
         <form onSubmit={submit}>
           <label>Passage à corriger <span>facultatif</span><input ref={firstFieldRef} value={selectedPassage} onChange={(event) => setSelectedPassage(event.target.value)} placeholder="Copiez le passage concerné" /></label>
@@ -83,7 +83,7 @@ export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogPro
             {Object.entries(errorTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Proposition de correction<input required lang="mos" value={proposal} onChange={(event) => setProposal(event.target.value)} placeholder="Votre correction proposée" /></label>
           <label>Explication <span>facultatif</span><textarea value={explanation} onChange={(event) => setExplanation(event.target.value)} rows={2} placeholder="Ajoutez un contexte si utile" /></label>
-          <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Annuler</button><button type="submit" className="primary-button">Préparer le signalement</button></div>
+          <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Annuler</button><button type="submit" className="primary-button">Préparer la correction</button></div>
         </form>
       </section>
     </div>

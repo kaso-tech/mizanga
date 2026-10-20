@@ -30,8 +30,8 @@ const titleByView: Record<AppView, string> = {
 }
 
 const themeColorByTheme: Record<LinguisticPreferences['theme'], string> = {
-  light: '#f4f7fc',
-  dark: '#111b2d',
+  light: '#ffffff',
+  dark: '#141518',
 }
 
 function getViewFromPath(pathname: string): AppView {
@@ -47,6 +47,8 @@ function syncViewFromLocation(): AppView {
   return view
 }
 
+const isMobileLayout = () => window.matchMedia('(max-width: 780px)').matches
+
 type ToastTone = 'success' | 'info'
 
 interface AppProps {
@@ -57,9 +59,11 @@ interface AppProps {
 export function App({ aiService = demoAiService }: AppProps) {
   const [activeView, setActiveView] = useState<AppView>(syncViewFromLocation)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [preferences, setPreferences] = useState<LinguisticPreferences>(defaultPreferences)
-  const { messages, isGenerating, send, stop, reset } = useConversation(aiService, preferences)
+  const conversation = useConversation(aiService, preferences)
   const [draft, setDraft] = useState('')
+  const [focusToken, setFocusToken] = useState(0)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
   const [toast, setToast] = useState<{ message: string; tone: ToastTone }>()
@@ -71,9 +75,11 @@ export function App({ aiService = demoAiService }: AppProps) {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColorByTheme[preferences.theme])
   }, [preferences.theme])
 
+  const conversationTitle = conversation.activeConversation?.title
   useEffect(() => {
-    document.title = `${titleByView[activeView]} — Mizanga`
-  }, [activeView])
+    const pageTitle = activeView === 'chat' ? conversationTitle : titleByView[activeView]
+    document.title = pageTitle ? `${pageTitle} — Mizanga` : 'Mizanga'
+  }, [activeView, conversationTitle])
 
   useEffect(() => {
     const syncPath = () => setActiveView(syncViewFromLocation())
@@ -104,19 +110,25 @@ export function App({ aiService = demoAiService }: AppProps) {
   }
 
   const startNewConversation = () => {
-    reset()
+    conversation.startNew()
     setDraft('')
     navigate('chat')
-    notify('Nouvelle conversation locale prête. Rien n’a été enregistré.', 'success')
+    setFocusToken((token) => token + 1)
+  }
+
+  const selectConversation = (conversationId: string) => {
+    conversation.select(conversationId)
+    navigate('chat')
   }
 
   const sendMessage = (content: string) => {
-    send(content)
+    conversation.send(content)
     setDraft('')
   }
 
+  const stopLabel = aiService.isDemonstration ? 'Arrêter la démonstration' : 'Arrêter la génération'
   const stopGeneration = () => {
-    stop()
+    conversation.stop()
     notify(aiService.isDemonstration ? 'La démonstration a été arrêtée. Aucun appel IA n’était en cours.' : 'Génération arrêtée.')
   }
 
@@ -135,13 +147,35 @@ export function App({ aiService = demoAiService }: AppProps) {
   }
 
   const recordFeedback = (_message: ChatMessage, positive: boolean) => {
-    notify(positive ? 'Merci. Cet avis est local, non enregistré et ne constitue pas une validation linguistique.' : 'Merci pour votre retour. Il reste local : la collecte et la validation ne sont pas encore activées.')
+    notify(positive ? 'Merci. Cet avis reste local : la collecte des retours n’est pas encore activée.' : 'Merci pour votre retour. Il reste local : la collecte des retours n’est pas encore activée.')
   }
 
   const submitReport = (_feedback: LinguisticFeedback) => {
     setReportedMessage(null)
-    notify('Signalement préparé localement : il n’a été ni enregistré ni validé.')
+    notify('Correction préparée localement : elle n’a été ni enregistrée ni validée.')
   }
+
+  const toggleSidebar = () => {
+    if (isMobileLayout()) setDrawerOpen((open) => !open)
+    else setSidebarCollapsed(false)
+  }
+
+  const isEmptyChat = activeView === 'chat' && conversation.messages.length === 0
+  const composer = (
+    <Composer
+      value={draft}
+      placeholder={isEmptyChat ? 'Demandez n’importe quoi à Mizanga…' : 'Répondre à Mizanga…'}
+      isGenerating={conversation.isGenerating}
+      stopLabel={stopLabel}
+      responseLanguage={preferences.responseLanguage}
+      focusToken={focusToken}
+      onValueChange={setDraft}
+      onResponseLanguageChange={(responseLanguage) => updatePreferences({ responseLanguage })}
+      onSend={sendMessage}
+      onStop={stopGeneration}
+      onNotify={notify}
+    />
+  )
 
   const renderView = () => {
     switch (activeView) {
@@ -154,17 +188,55 @@ export function App({ aiService = demoAiService }: AppProps) {
       case 'about':
         return <AboutView />
       default:
-        return <ChatView messages={messages} isGenerating={isGenerating} isDemonstration={aiService.isDemonstration} copiedMessageId={copiedMessageId} onSuggestion={(suggestion) => { setDraft(suggestion); notify('Suggestion ajoutée au champ de saisie.') }} onCopy={copyMessage} onFeedback={recordFeedback} onReport={setReportedMessage} />
+        return (
+          <ChatView
+            messages={conversation.messages}
+            isGenerating={conversation.isGenerating}
+            isDemonstration={aiService.isDemonstration}
+            composer={composer}
+            copiedMessageId={copiedMessageId}
+            onSuggestion={(prompt) => { setDraft(prompt); setFocusToken((token) => token + 1) }}
+            onCopy={copyMessage}
+            onRegenerate={conversation.regenerate}
+            onFeedback={recordFeedback}
+            onReport={setReportedMessage}
+          />
+        )
     }
   }
 
   return (
-    <div className="app-shell">
-      <Sidebar activeView={activeView} isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={navigate} onNewConversation={startNewConversation} onNotify={notify} />
-      <main className="main-area">
-        <Header isDrawerOpen={drawerOpen} preferences={preferences} onMenuToggle={() => setDrawerOpen((open) => !open)} onPreferencesChange={updatePreferences} onOpenSettings={() => navigate('settings')} onNotify={notify} />
+    <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''}`}>
+      <Sidebar
+        activeView={activeView}
+        conversations={conversation.conversations}
+        activeConversationId={conversation.activeConversation?.id}
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onCollapse={() => setSidebarCollapsed(true)}
+        onNavigate={navigate}
+        onNewConversation={startNewConversation}
+        onSelectConversation={selectConversation}
+        onNotify={notify}
+      />
+      <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
+        <Header
+          title={activeView === 'chat' ? conversationTitle ?? 'Mizanga' : titleByView[activeView]}
+          isDrawerOpen={drawerOpen}
+          isSidebarCollapsed={sidebarCollapsed}
+          canShare={activeView === 'chat' && !isEmptyChat}
+          onMenuToggle={toggleSidebar}
+          onExpandSidebar={() => setSidebarCollapsed(false)}
+          onNewConversation={startNewConversation}
+          onNotify={notify}
+        />
         <div className="content-scroll"><div className="content-frame">{renderView()}</div></div>
-        {activeView === 'chat' && <div className="composer-zone"><Composer value={draft} isSending={isGenerating} onValueChange={setDraft} onSend={sendMessage} onNotify={notify} />{isGenerating && <button className="stop-button" type="button" onClick={stopGeneration}>{aiService.isDemonstration ? 'Arrêter la démonstration' : 'Arrêter la génération'}</button>}</div>}
+        {activeView === 'chat' && !isEmptyChat && (
+          <div className="composer-zone">
+            {composer}
+            <p className="disclaimer">Mizanga peut faire des erreurs ; vérifiez les informations importantes.</p>
+          </div>
+        )}
       </main>
       <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
       {/* Zone live permanente : les lecteurs d’écran n’annoncent pas toujours une région créée avec son contenu. */}

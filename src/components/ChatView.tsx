@@ -1,16 +1,29 @@
-import { ArrowUpRight, BookOpenText, Globe2, Sparkles } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { CalendarDays, FileText, GraduationCap, Lightbulb, MessageCircle, PenLine } from 'lucide-react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { suggestions, type SuggestionIcon } from '../data/content'
 import type { ChatMessage as ChatMessageType } from '../domain/types'
-import { suggestions, welcomeText } from '../data/content'
+import { BrandMark } from './Brand'
 import { ChatMessage } from './ChatMessage'
+
+const suggestionIcons: Record<SuggestionIcon, typeof PenLine> = {
+  write: PenLine,
+  summarize: FileText,
+  explain: Lightbulb,
+  plan: CalendarDays,
+  homework: GraduationCap,
+  moore: MessageCircle,
+}
 
 interface ChatViewProps {
   messages: ChatMessageType[]
   isGenerating: boolean
   isDemonstration: boolean
+  /** Zone de saisie affichée au centre de l’écran d’accueil. */
+  composer: ReactNode
   copiedMessageId?: string
-  onSuggestion: (suggestion: string) => void
+  onSuggestion: (prompt: string) => void
   onCopy: (message: ChatMessageType) => void
+  onRegenerate: () => void
   onFeedback: (message: ChatMessageType, positive: boolean) => void
   onReport: (message: ChatMessageType) => void
 }
@@ -19,67 +32,78 @@ export function ChatView({
   messages,
   isGenerating,
   isDemonstration,
+  composer,
   copiedMessageId,
   onSuggestion,
   onCopy,
+  onRegenerate,
   onFeedback,
   onReport,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
+  const lastMessage = messages.at(-1)
   // L’indicateur d’attente disparaît dès que le premier fragment de réponse s’affiche.
-  const isStreaming = messages.at(-1)?.status === 'streaming'
+  const isStreaming = lastMessage?.status === 'streaming'
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isEmpty) return
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'end' })
-  }, [messages.length, isGenerating, isEmpty, messages.at(-1)?.content.length])
+  }, [messages.length, isGenerating, isEmpty, lastMessage?.content.length])
+
+  if (isEmpty) {
+    return (
+      <section className="welcome" aria-labelledby="welcome-title">
+        <div className="welcome-head">
+          <BrandMark size={44} />
+          <h1 id="welcome-title">Bonjour, que puis-je faire pour vous&#8239;?</h1>
+        </div>
+        <div className="welcome-composer">
+          {composer}
+          <p className="disclaimer">
+            {isDemonstration ? 'Version de démonstration — aucun moteur IA n’est encore connecté.' : 'Mizanga peut faire des erreurs ; vérifiez les informations importantes.'}
+          </p>
+        </div>
+        <div className="suggestion-chips" aria-label="Suggestions">
+          {suggestions.map(({ label, prompt, icon, highlight }) => {
+            const Icon = suggestionIcons[icon]
+            return (
+              <button type="button" key={label} className={`suggestion-chip ${highlight ? 'is-highlight' : ''}`} onClick={() => onSuggestion(prompt)}>
+                <Icon size={16} aria-hidden="true" />
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+    )
+  }
 
   return (
-    <section className={`conversation-view ${isEmpty ? 'is-empty' : ''}`} aria-label="Conversation">
-      {isEmpty ? (
-        <div className="welcome-panel">
-          <div className="welcome-kicker"><span><Sparkles size={16} /></span> Comprendre, transmettre, apprendre</div>
-          <h1>Votre espace pour dialoguer<br />dans la richesse du <em>Mooré.</em></h1>
-          <p className="welcome-copy">{welcomeText}</p>
-          <div className="demo-notice">
-            <Globe2 size={18} />
-            <p><strong>Interface en démonstration.</strong> Le moteur de recherche et le moteur linguistique seront connectés progressivement.</p>
+    <section className="conversation-view" aria-label="Conversation">
+      <div className="messages-list">
+        {messages.map((message) => (
+          <ChatMessage
+            key={message.id}
+            message={message}
+            copiedMessageId={copiedMessageId}
+            canRegenerate={message === lastMessage && !isGenerating}
+            onCopy={onCopy}
+            onRegenerate={onRegenerate}
+            onFeedback={onFeedback}
+            onReport={onReport}
+          />
+        ))}
+        {isGenerating && !isStreaming && (
+          <div className="message-row is-assistant generation-indicator" aria-live="polite">
+            <BrandMark size={28} />
+            <span className="typing-dots" aria-hidden="true"><span /><span /><span /></span>
+            <span className="visually-hidden">{isDemonstration ? 'Préparation de la démonstration…' : 'Génération de la réponse…'}</span>
           </div>
-          <div className="suggestion-header"><BookOpenText size={17} /> Commencer avec une idée</div>
-          <div className="suggestion-list">
-            {suggestions.map((suggestion, index) => (
-              <button type="button" key={suggestion} className="suggestion-card" onClick={() => onSuggestion(suggestion)}>
-                <span>0{index + 1}</span>
-                <strong>{suggestion}</strong>
-                <ArrowUpRight size={17} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="messages-list">
-          {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              copiedMessageId={copiedMessageId}
-              onCopy={onCopy}
-              onFeedback={onFeedback}
-              onReport={onReport}
-            />
-          ))}
-          {isGenerating && !isStreaming && (
-            <div className="generation-indicator" aria-live="polite">
-              <span className="assistant-avatar" aria-hidden="true">M</span>
-              <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
-              <span>{isDemonstration ? 'Préparation d’un état de démonstration…' : 'Génération de la réponse…'}</span>
-            </div>
-          )}
-          <div ref={endRef} aria-hidden="true" />
-        </div>
-      )}
+        )}
+        <div ref={endRef} aria-hidden="true" />
+      </div>
     </section>
   )
 }

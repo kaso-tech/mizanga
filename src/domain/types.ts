@@ -2,8 +2,11 @@ export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about'
 
 export type ThemePreference = 'light' | 'dark'
 export type UserWritingMode = 'standard' | 'informal'
-/** Langue et registre d’écriture des réponses, réunis en un seul choix pour éviter les combinaisons contradictoires. */
-export type ResponseLanguage = 'moore-standard' | 'moore-informal' | 'french' | 'english'
+/**
+ * Langue et registre d’écriture des réponses, réunis en un seul choix pour éviter les combinaisons contradictoires.
+ * « auto » : répondre dans la langue du message de l’utilisateur.
+ */
+export type ResponseLanguage = 'auto' | 'moore-standard' | 'moore-informal' | 'french' | 'english'
 
 export interface LinguisticPreferences {
   interfaceLanguage: 'fr'
@@ -55,7 +58,7 @@ export interface LinguisticFeedback {
 
 export const defaultPreferences: LinguisticPreferences = {
   interfaceLanguage: 'fr',
-  responseLanguage: 'moore-standard',
+  responseLanguage: 'auto',
   userWritingMode: 'standard',
   theme: 'light',
 }
