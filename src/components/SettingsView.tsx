@@ -1,4 +1,5 @@
 import { Languages, Mic2, Moon, ShieldCheck, SunMedium, Volume2 } from 'lucide-react'
+import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
 import type { LinguisticPreferences } from '../domain/types'
 
 interface SettingsViewProps {
@@ -16,9 +17,8 @@ export function SettingsView({ preferences, onChange, onNewConversation, onNotif
       <div className="settings-section"><div className="section-heading"><span><Languages size={18} /></span><div><h2>Préférences linguistiques</h2><p>Préparez votre manière d’écrire et de recevoir le Mooré.</p></div></div>
         <div className="settings-card">
           <label><span>Langue de l’interface<small>Le français est actuellement la langue disponible.</small></span><select value="fr" disabled><option value="fr">Français</option></select></label>
-          <label><span>Langue souhaitée pour les réponses</span><select value={preferences.responseLanguage} onChange={(event) => onChange({ responseLanguage: event.target.value as LinguisticPreferences['responseLanguage'] })}><option value="moore-standard">Mooré standardisé</option><option value="moore-informal">Mooré adapté à l’écriture informelle</option><option value="french">Français</option><option value="english">Anglais</option></select></label>
-          <label><span>Votre mode d’écriture<small>Le texte original sera toujours conservé ; aucune substitution automatique n’est appliquée.</small></span><select value={preferences.userWritingMode} onChange={(event) => onChange({ userWritingMode: event.target.value as LinguisticPreferences['userWritingMode'] })}><option value="standard">Écriture standardisée du Mooré</option><option value="informal">Écriture informelle sur Internet</option><option value="automatic">Automatique — bientôt disponible</option></select></label>
-          <label><span>Écriture des réponses</span><select value={preferences.responseWritingMode} onChange={(event) => onChange({ responseWritingMode: event.target.value as LinguisticPreferences['responseWritingMode'] })}><option value="standard">Mooré standardisé</option><option value="informal">Mooré informel</option><option value="french">Français</option><option value="english">Anglais</option><option value="other">Autre langue — bientôt disponible</option></select></label>
+          <label><span>Votre mode d’écriture<small>Le texte original sera toujours conservé ; aucune substitution automatique n’est appliquée.</small></span><select value={preferences.userWritingMode} onChange={(event) => onChange({ userWritingMode: event.target.value as LinguisticPreferences['userWritingMode'] })}>{Object.entries(userWritingModeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option value="automatic" disabled>Automatique — bientôt disponible</option></select></label>
+          <label><span>Langue et écriture des réponses<small>Le même choix est accessible depuis l’en-tête.</small></span><select value={preferences.responseLanguage} onChange={(event) => onChange({ responseLanguage: event.target.value as LinguisticPreferences['responseLanguage'] })}>{Object.entries(responseLanguageLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option value="other" disabled>Autre langue — bientôt disponible</option></select></label>
         </div>
       </div>
 

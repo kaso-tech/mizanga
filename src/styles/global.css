@@ -143,6 +143,8 @@ kbd { padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; color
 .demo-chip { padding: 2px 6px; border-radius: 5px; color: var(--blue-secondary); background: var(--blue-secondary-pale); font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .message-bubble { padding: 13px 15px; border: 1px solid var(--line); border-radius: 4px 14px 14px 14px; color: var(--ink); background: var(--surface); font-size: 14px; line-height: 1.58; }
 .message-row.is-user .message-bubble { border-color: transparent; border-radius: 14px 4px 14px 14px; background: var(--blue); color: var(--on-blue); }
+.message-bubble.is-error { border-color: color-mix(in srgb, var(--ink-soft) 40%, var(--line)); color: var(--ink-soft); }
+.message-status { margin: 6px 4px 0; color: var(--ink-soft); font-size: 12px; font-style: italic; }
 .message-bubble p { margin: 0; white-space: pre-wrap; }
 .message-bubble p + p { margin-top: 10px; }
 .message-bubble h3 { margin: 0 0 8px; font-size: 15px; line-height: 1.35; }

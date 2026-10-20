@@ -1,4 +1,4 @@
-import type { AppView, LinguisticPreferences } from '../domain/types'
+import type { LinguisticErrorType, ResponseLanguage, UserWritingMode } from '../domain/types'
 
 export const welcomeText =
   'Bienvenue sur Mizanga. Posez vos questions, explorez les expressions du Mooré, traduisez vos textes ou découvrez de nouvelles connaissances dans votre langue.'
@@ -11,19 +11,26 @@ export const suggestions = [
   'Aide-moi à apprendre le Mooré.',
 ]
 
-export const navigationItems: Array<{ view: AppView; label: string }> = [
-  { view: 'chat', label: 'Nouvelle conversation' },
-  { view: 'history', label: 'Historique' },
-  { view: 'favorites', label: 'Favoris' },
-  { view: 'settings', label: 'Paramètres' },
-  { view: 'about', label: 'À propos du projet' },
-]
-
-export const responseLanguageLabels: Record<LinguisticPreferences['responseLanguage'], string> = {
+export const responseLanguageLabels: Record<ResponseLanguage, string> = {
   'moore-standard': 'Mooré standardisé',
   'moore-informal': 'Mooré informel',
   french: 'Français',
   english: 'Anglais',
+}
+
+export const userWritingModeLabels: Record<UserWritingMode, string> = {
+  standard: 'Écriture standardisée du Mooré',
+  informal: 'Écriture informelle sur Internet',
+}
+
+export const errorTypeLabels: Record<LinguisticErrorType, string> = {
+  orthographe: 'Orthographe',
+  grammaire: 'Grammaire',
+  vocabulaire: 'Vocabulaire',
+  traduction: 'Traduction',
+  expression: 'Expression idiomatique',
+  contexte: 'Contexte culturel',
+  autre: 'Autre',
 }
 
 export const demonstrationReply =

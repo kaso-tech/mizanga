@@ -8,8 +8,10 @@ import { FeedbackDialog } from '../components/FeedbackDialog'
 import { Header } from '../components/Header'
 import { SettingsView } from '../components/SettingsView'
 import { Sidebar } from '../components/Sidebar'
-import { demonstrationReply } from '../data/content'
+import type { AiService } from '../domain/services'
 import { defaultPreferences, type AppView, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences } from '../domain/types'
+import { demoAiService } from '../services/demoAiService'
+import { useConversation } from './useConversation'
 
 const routeByView: Record<AppView, string> = {
   chat: '/',
@@ -47,21 +49,20 @@ function syncViewFromLocation(): AppView {
 
 type ToastTone = 'success' | 'info'
 
-function createId(prefix: string) {
-  return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`
+interface AppProps {
+  /** Fournisseur d’IA injecté : remplacer l’adaptateur de démonstration ne touche pas l’interface. */
+  aiService?: AiService
 }
 
-export function App() {
+export function App({ aiService = demoAiService }: AppProps) {
   const [activeView, setActiveView] = useState<AppView>(syncViewFromLocation)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [preferences, setPreferences] = useState<LinguisticPreferences>(defaultPreferences)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const { messages, isGenerating, send, stop, reset } = useConversation(aiService, preferences)
   const [draft, setDraft] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
   const [toast, setToast] = useState<{ message: string; tone: ToastTone }>()
-  const generationTimer = useRef<number>()
   const toastTimer = useRef<number>()
   const copiedTimer = useRef<number>()
 
@@ -81,7 +82,6 @@ export function App() {
   }, [])
 
   useEffect(() => () => {
-    if (generationTimer.current) window.clearTimeout(generationTimer.current)
     if (toastTimer.current) window.clearTimeout(toastTimer.current)
     if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
   }, [])
@@ -104,44 +104,20 @@ export function App() {
   }
 
   const startNewConversation = () => {
-    if (generationTimer.current) window.clearTimeout(generationTimer.current)
-    setMessages([])
+    reset()
     setDraft('')
-    setIsGenerating(false)
     navigate('chat')
     notify('Nouvelle conversation locale prête. Rien n’a été enregistré.', 'success')
   }
 
   const sendMessage = (content: string) => {
-    const userMessage: ChatMessage = {
-      id: createId('user'),
-      role: 'user',
-      content,
-      createdAt: new Date(),
-    }
-    setMessages((current) => [...current, userMessage])
+    send(content)
     setDraft('')
-    setIsGenerating(true)
-    generationTimer.current = window.setTimeout(() => {
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId('demo'),
-          role: 'assistant',
-          content: demonstrationReply,
-          createdAt: new Date(),
-          language: 'fr',
-          isDemonstration: true,
-        },
-      ])
-      setIsGenerating(false)
-    }, 750)
   }
 
   const stopGeneration = () => {
-    if (generationTimer.current) window.clearTimeout(generationTimer.current)
-    setIsGenerating(false)
-    notify('La démonstration a été arrêtée. Aucun appel IA n’était en cours.')
+    stop()
+    notify(aiService.isDemonstration ? 'La démonstration a été arrêtée. Aucun appel IA n’était en cours.' : 'Génération arrêtée.')
   }
 
   const copyMessage = async (message: ChatMessage) => {
@@ -178,7 +154,7 @@ export function App() {
       case 'about':
         return <AboutView />
       default:
-        return <ChatView messages={messages} isGenerating={isGenerating} copiedMessageId={copiedMessageId} onSuggestion={(suggestion) => { setDraft(suggestion); notify('Suggestion ajoutée au champ de saisie.') }} onCopy={copyMessage} onFeedback={recordFeedback} onReport={setReportedMessage} />
+        return <ChatView messages={messages} isGenerating={isGenerating} isDemonstration={aiService.isDemonstration} copiedMessageId={copiedMessageId} onSuggestion={(suggestion) => { setDraft(suggestion); notify('Suggestion ajoutée au champ de saisie.') }} onCopy={copyMessage} onFeedback={recordFeedback} onReport={setReportedMessage} />
     }
   }
 
@@ -188,7 +164,7 @@ export function App() {
       <main className="main-area">
         <Header isDrawerOpen={drawerOpen} preferences={preferences} onMenuToggle={() => setDrawerOpen((open) => !open)} onPreferencesChange={updatePreferences} onOpenSettings={() => navigate('settings')} onNotify={notify} />
         <div className="content-scroll"><div className="content-frame">{renderView()}</div></div>
-        {activeView === 'chat' && <div className="composer-zone"><Composer value={draft} isSending={isGenerating} onValueChange={setDraft} onSend={sendMessage} onNotify={notify} />{isGenerating && <button className="stop-button" type="button" onClick={stopGeneration}>Arrêter la démonstration</button>}</div>}
+        {activeView === 'chat' && <div className="composer-zone"><Composer value={draft} isSending={isGenerating} onValueChange={setDraft} onSend={sendMessage} onNotify={notify} />{isGenerating && <button className="stop-button" type="button" onClick={stopGeneration}>{aiService.isDemonstration ? 'Arrêter la démonstration' : 'Arrêter la génération'}</button>}</div>}
       </main>
       <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
       {/* Zone live permanente : les lecteurs d’écran n’annoncent pas toujours une région créée avec son contenu. */}

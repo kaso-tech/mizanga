@@ -86,6 +86,8 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, copiedMessageId, onCopy, onFeedback, onReport }: ChatMessageProps) {
   const isUser = message.role === 'user'
+  const isStreaming = message.status === 'streaming'
+  const isError = message.status === 'error'
 
   return (
     <article className={`message-row ${isUser ? 'is-user' : 'is-assistant'}`}>
@@ -95,9 +97,10 @@ export function ChatMessage({ message, copiedMessageId, onCopy, onFeedback, onRe
           <strong>{isUser ? 'Vous' : 'Mizanga'}</strong>
           {!isUser && message.isDemonstration && <span className="demo-chip">Démonstration</span>}
         </div>
-        <div className="message-bubble" lang={message.language}><MessageContent content={message.content} /></div>
+        <div className={`message-bubble ${isError ? 'is-error' : ''}`} lang={message.language} aria-busy={isStreaming || undefined}><MessageContent content={message.content} /></div>
+        {message.status === 'stopped' && <p className="message-status">Réponse interrompue.</p>}
 
-        {!isUser && (
+        {!isUser && !isStreaming && !isError && (
           <>
             <section className="sources-empty" aria-label="Sources">
               <div><span className="sources-dot" aria-hidden="true" /><strong>Sources</strong></div>

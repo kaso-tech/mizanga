@@ -7,6 +7,7 @@ import { ChatMessage } from './ChatMessage'
 interface ChatViewProps {
   messages: ChatMessageType[]
   isGenerating: boolean
+  isDemonstration: boolean
   copiedMessageId?: string
   onSuggestion: (suggestion: string) => void
   onCopy: (message: ChatMessageType) => void
@@ -17,6 +18,7 @@ interface ChatViewProps {
 export function ChatView({
   messages,
   isGenerating,
+  isDemonstration,
   copiedMessageId,
   onSuggestion,
   onCopy,
@@ -24,13 +26,15 @@ export function ChatView({
   onReport,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
+  // L’indicateur d’attente disparaît dès que le premier fragment de réponse s’affiche.
+  const isStreaming = messages.at(-1)?.status === 'streaming'
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isEmpty) return
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'end' })
-  }, [messages.length, isGenerating, isEmpty])
+  }, [messages.length, isGenerating, isEmpty, messages.at(-1)?.content.length])
 
   return (
     <section className={`conversation-view ${isEmpty ? 'is-empty' : ''}`} aria-label="Conversation">
@@ -66,11 +70,11 @@ export function ChatView({
               onReport={onReport}
             />
           ))}
-          {isGenerating && (
+          {isGenerating && !isStreaming && (
             <div className="generation-indicator" aria-live="polite">
               <span className="assistant-avatar" aria-hidden="true">M</span>
               <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
-              <span>Préparation d’un état de démonstration…</span>
+              <span>{isDemonstration ? 'Préparation d’un état de démonstration…' : 'Génération de la réponse…'}</span>
             </div>
           )}
           <div ref={endRef} aria-hidden="true" />

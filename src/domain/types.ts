@@ -1,24 +1,29 @@
 export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about'
 
 export type ThemePreference = 'light' | 'dark'
-export type UserWritingMode = 'standard' | 'informal' | 'automatic'
-export type ResponseWritingMode = 'standard' | 'informal' | 'french' | 'english' | 'other'
+export type UserWritingMode = 'standard' | 'informal'
+/** Langue et registre d’écriture des réponses, réunis en un seul choix pour éviter les combinaisons contradictoires. */
+export type ResponseLanguage = 'moore-standard' | 'moore-informal' | 'french' | 'english'
 
 export interface LinguisticPreferences {
   interfaceLanguage: 'fr'
-  responseLanguage: 'moore-standard' | 'moore-informal' | 'french' | 'english'
+  responseLanguage: ResponseLanguage
   userWritingMode: UserWritingMode
-  responseWritingMode: ResponseWritingMode
   theme: ThemePreference
 }
+
+/** streaming : en cours de génération ; stopped : interrompue par l’utilisateur ; error : échec du service. */
+export type ChatMessageStatus = 'streaming' | 'complete' | 'stopped' | 'error'
 
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
-  createdAt: Date
+  /** Horodatage ISO 8601, directement sérialisable pour le futur stockage. */
+  createdAt: string
   /** Code de langue BCP 47 (ex. « fr », « mos » pour le Mooré) quand il est connu ; jamais deviné. */
   language?: string
+  status?: ChatMessageStatus
   isDemonstration?: boolean
 }
 
@@ -27,21 +32,23 @@ export interface Conversation {
   id: string
   title?: string
   messages: ChatMessage[]
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string
+  updatedAt: string
 }
+
+export type LinguisticErrorType =
+  | 'orthographe'
+  | 'grammaire'
+  | 'vocabulaire'
+  | 'traduction'
+  | 'expression'
+  | 'contexte'
+  | 'autre'
 
 export interface LinguisticFeedback {
   messageId: string
   selectedPassage?: string
-  errorType:
-    | 'orthographe'
-    | 'grammaire'
-    | 'vocabulaire'
-    | 'traduction'
-    | 'expression'
-    | 'contexte'
-    | 'autre'
+  errorType: LinguisticErrorType
   proposal: string
   explanation?: string
 }
@@ -50,6 +57,5 @@ export const defaultPreferences: LinguisticPreferences = {
   interfaceLanguage: 'fr',
   responseLanguage: 'moore-standard',
   userWritingMode: 'standard',
-  responseWritingMode: 'standard',
   theme: 'light',
 }

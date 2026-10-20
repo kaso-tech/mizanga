@@ -1,6 +1,7 @@
 import { AlertCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { ChatMessage, LinguisticFeedback } from '../domain/types'
+import { errorTypeLabels } from '../data/content'
+import type { ChatMessage, LinguisticErrorType, LinguisticFeedback } from '../domain/types'
 
 interface FeedbackDialogProps {
   message: ChatMessage | null
@@ -50,7 +51,7 @@ export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogPro
   }, [message])
 
   const [selectedPassage, setSelectedPassage] = useState('')
-  const [errorType, setErrorType] = useState<LinguisticFeedback['errorType']>('orthographe')
+  const [errorType, setErrorType] = useState<LinguisticErrorType>('orthographe')
   const [proposal, setProposal] = useState('')
   const [explanation, setExplanation] = useState('')
 
@@ -78,9 +79,8 @@ export function FeedbackDialog({ message, onClose, onSubmit }: FeedbackDialogPro
         <blockquote className="reported-message">{message.content}</blockquote>
         <form onSubmit={submit}>
           <label>Passage à corriger <span>facultatif</span><input ref={firstFieldRef} value={selectedPassage} onChange={(event) => setSelectedPassage(event.target.value)} placeholder="Copiez le passage concerné" /></label>
-          <label>Type d’erreur<select value={errorType} onChange={(event) => setErrorType(event.target.value as LinguisticFeedback['errorType'])}>
-            <option value="orthographe">Orthographe</option><option value="grammaire">Grammaire</option><option value="vocabulaire">Vocabulaire</option><option value="traduction">Traduction</option><option value="expression">Expression idiomatique</option><option value="contexte">Contexte culturel</option><option value="autre">Autre</option>
-          </select></label>
+          <label>Type d’erreur<select value={errorType} onChange={(event) => setErrorType(event.target.value as LinguisticErrorType)}>
+            {Object.entries(errorTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Proposition de correction<input required lang="mos" value={proposal} onChange={(event) => setProposal(event.target.value)} placeholder="Votre correction proposée" /></label>
           <label>Explication <span>facultatif</span><textarea value={explanation} onChange={(event) => setExplanation(event.target.value)} rows={2} placeholder="Ajoutez un contexte si utile" /></label>
           <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Annuler</button><button type="submit" className="primary-button">Préparer le signalement</button></div>
