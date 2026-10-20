@@ -73,7 +73,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
   }
 
   /** `previousVersions` : versions précédentes de la réponse, quand elle est régénérée. */
-  const run = async (conversationId: string, history: ChatMessage[], previousVersions: ReplyVersion[] = []) => {
+  const run = async (conversationId: string, history: ChatMessage[], previousVersions: ReplyVersion[] = [], overrides: Partial<LinguisticPreferences> = {}) => {
     controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
@@ -88,7 +88,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     let completed = false
     try {
       const webSearch = history.findLast((message) => message.role === 'user')?.webSearch === true
-      for await (const chunk of aiService.generate({ messages: history, preferences: preferencesRef.current, webSearch }, { signal: controller.signal })) {
+      for await (const chunk of aiService.generate({ messages: history, preferences: { ...preferencesRef.current, ...overrides }, webSearch }, { signal: controller.signal })) {
         if (controller.signal.aborted) break
         if (chunk.sources || chunk.searchSuggestionsHtml) {
           updateMessage(conversationId, replyId, (message) => ({ ...message, sources: chunk.sources, searchSuggestionsHtml: chunk.searchSuggestionsHtml }))
@@ -113,9 +113,10 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
       completed = hasReply && !controller.signal.aborted
     } catch (error) {
       const errorMessage = error instanceof AiServiceError ? error.userMessage : undefined
+      const errorCode = error instanceof AiServiceError ? error.code : undefined
       if (hasReply) {
         updateMessage(conversationId, replyId, (message) => (
-          isAbortError(error) ? { ...message, status: 'stopped' } : { ...message, status: 'error', errorMessage }
+          isAbortError(error) ? { ...message, status: 'stopped' } : { ...message, status: 'error', errorMessage, ...(errorCode ? { errorCode } : {}) }
         ))
       } else if (!isAbortError(error)) {
         updateMessages(conversationId, (messages) => [...messages, withVersions({
@@ -125,6 +126,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
           createdAt: new Date().toISOString(),
           status: 'error',
           errorMessage,
+          ...(errorCode ? { errorCode } : {}),
           isDemonstration: aiService.isDemonstration,
         })])
       }
@@ -176,15 +178,18 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     void run(activeConversation.id, history)
   }
 
-  /** Relance la dernière demande ; la réponse précédente reste consultable comme version antérieure. */
-  const regenerate = () => {
+  /**
+   * Relance la dernière demande ; la réponse précédente reste consultable comme version antérieure.
+   * `overrides` : préférences à appliquer tout de suite (ex. modèle économe), avant leur prochain rendu.
+   */
+  const regenerate = (overrides?: Partial<LinguisticPreferences>) => {
     if (!activeConversation) return
     const lastUserIndex = activeConversation.messages.findLastIndex((message) => message.role === 'user')
     if (lastUserIndex < 0) return
     const history = activeConversation.messages.slice(0, lastUserIndex + 1)
     const previousVersions = versionsBeforeRegeneration(activeConversation.messages[lastUserIndex + 1])
     updateMessages(activeConversation.id, () => history)
-    void run(activeConversation.id, history, previousVersions)
+    void run(activeConversation.id, history, previousVersions, overrides)
   }
 
   const selectVersion = (messageId: string, index: number) => {

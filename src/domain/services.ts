@@ -33,6 +33,8 @@ export interface AiService {
   readonly isDemonstration: boolean
   /** Nom du moteur montré à l’utilisateur (transparence). */
   readonly label: string
+  /** Modèles proposés au choix (paramètres), quand le moteur en offre plusieurs. */
+  readonly models?: { standard: string; lite?: string }
   generate(request: AiGenerationRequest, options: { signal: AbortSignal }): AsyncIterable<AiChunk>
   /** Facultatif : propose un titre court pour une conversation à partir de son premier message. */
   suggestTitle?(firstMessage: string): Promise<string | null>
@@ -41,7 +43,8 @@ export interface AiService {
 /** Erreur d’un service d’IA dont le message peut être montré tel quel à l’utilisateur. */
 export class AiServiceError extends Error {
   /** `retryAt` : moment où la limite d’utilisation sera réinitialisée, quand le moteur l’indique. */
-  constructor(readonly userMessage: string, readonly retryAt?: Date) {
+  /** `code` « quota » : quota du moteur épuisé (un autre modèle peut avoir le sien). */
+  constructor(readonly userMessage: string, readonly retryAt?: Date, readonly code?: 'quota') {
     super(userMessage)
     this.name = 'AiServiceError'
   }

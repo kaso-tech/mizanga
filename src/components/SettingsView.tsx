@@ -6,7 +6,7 @@ import { isSpeechSupported, listVoices, speak, speechRates, subscribeVoices } fr
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS } from '../services/remoteAiService'
 import { isVoiceRecordingSupported } from '../app/voiceRecording'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
-import type { LinguisticPreferences, ResponseLanguage, TextSize, ThemePreference, UserWritingMode } from '../domain/types'
+import type { LinguisticPreferences, ModelTier, ResponseLanguage, TextSize, ThemePreference, UserWritingMode } from '../domain/types'
 
 type SectionId = 'general' | 'personnalisation' | 'langue' | 'donnees' | 'voix' | 'compte'
 
@@ -244,7 +244,7 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
 
 interface SettingsViewProps {
   preferences: LinguisticPreferences
-  engine: { label: string; isDemonstration: boolean }
+  engine: { label: string; isDemonstration: boolean; models?: { standard: string; lite?: string } }
   conversationCount: number
   onChange: (changes: Partial<LinguisticPreferences>) => void
   onResetPreferences: () => void
@@ -346,9 +346,27 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 />
               </SettingRow>
               <InstallRow />
-              <SettingRow label="Moteur de réponses" description={engine.isDemonstration ? 'Aucun moteur d’IA n’est connecté : les réponses sont des messages de démonstration.' : 'Le modèle qui rédige les réponses de Mizanga.'}>
-                <span className="value-pill">{engine.label}</span>
-              </SettingRow>
+              {engine.models?.lite ? (
+                <SettingRow
+                  label="Modèle de réponses"
+                  htmlFor="setting-model-tier"
+                  description="Le modèle standard rédige des réponses plus approfondies. Le modèle économe est plus rapide et dispose d’un quota gratuit distinct et plus large : utile pour les demandes simples ou quand la limite du modèle standard est atteinte."
+                >
+                  <SelectControl<ModelTier>
+                    id="setting-model-tier"
+                    value={preferences.modelTier}
+                    options={[
+                      { value: 'standard', label: `Standard — ${engine.models.standard}` },
+                      { value: 'lite', label: `Économe — ${engine.models.lite}` },
+                    ]}
+                    onChange={(modelTier) => onChange({ modelTier })}
+                  />
+                </SettingRow>
+              ) : (
+                <SettingRow label="Moteur de réponses" description={engine.isDemonstration ? 'Aucun moteur d’IA n’est connecté : les réponses sont des messages de démonstration.' : 'Le modèle qui rédige les réponses de Mizanga.'}>
+                  <span className="value-pill">{engine.label}</span>
+                </SettingRow>
+              )}
               <SettingRow label="Langue de l’interface" htmlFor="setting-interface-language" description="Le mooré sera proposé comme langue d’interface dans une prochaine version.">
                 <SelectControl
                   id="setting-interface-language"

@@ -13,7 +13,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Fichiers joints : photos (réduites avant l’envoi pour économiser les données), PDF et fichiers texte, par bouton, glisser-déposer ou collage ; 4 fichiers et 8 Mo au plus par message. Leur contenu n’est pas conservé dans l’historique.
 - Recherche web à la demande : la réponse cite ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
 - Messages vocaux (2 minutes au plus, convertis en WAV 16 kHz) et fichiers audio ; la compréhension du mooré parlé n’est pas encore garantie.
-- Conversations renommables, exportables en Markdown et réponses partageables (WhatsApp, SMS…) via le partage du téléphone.
+- Conversations renommables, exportables en Markdown, imprimables ou enregistrables en PDF (mise en page dédiée), et réponses partageables (WhatsApp, SMS…) via le partage du téléphone.
 - **Instructions personnelles** (Paramètres › Personnalisation) : métier, région, ton ou longueur de réponse préférés, pris en compte dans toutes les conversations (1 500 caractères au plus, placés après les règles de Mizanga).
 - **Consignes enregistrées** : les demandes fréquentes, enregistrées depuis un message ou dans Paramètres › Personnalisation, proposées sur l’accueil et en tapant « / » au début d’un message.
 - **Lecture à voix haute** des réponses avec la synthèse vocale de l’appareil (vitesse et voix réglables, sans envoi de données) ; aucune voix mooré n’existe encore, l’interface le signale.
@@ -24,7 +24,8 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Avis sur les réponses et signalement d’erreurs en mooré (préparés localement, pas encore envoyés).
 - Paramètres : général (thème, taille du texte, installation), personnalisation, langue et écriture, données, voix, et compte (à venir).
 - Accessible au clavier et aux lecteurs d’écran, utilisable sur téléphone, tablette et ordinateur.
-- Installable comme une application (PWA) sur Android, iPhone et ordinateur ; l’interface et l’historique s’ouvrent hors connexion (les réponses du moteur demandent le réseau).
+- Installable comme une application (PWA) sur Android, iPhone et ordinateur ; l’interface et l’historique s’ouvrent hors connexion (les réponses du moteur demandent le réseau). Hors connexion, un message peut être mis en attente : il part automatiquement au retour du réseau.
+- Deux modèles au choix : standard ou économe (plus rapide, quota gratuit distinct et plus large). Quand le quota du modèle standard est épuisé, un bouton propose de réessayer avec le modèle économe. Les titres de conversation passent par le modèle économe pour préserver le quota principal.
 
 ## Démarrer
 
@@ -84,7 +85,8 @@ Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemi
 | Variable | Rôle |
 | --- | --- |
 | `GEMINI_API_KEY` | Clé de l’API Gemini. Absente : mode démonstration. |
-| `GEMINI_MODEL` | Modèle utilisé (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
+| `GEMINI_MODEL` | Modèle standard (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
+| `GEMINI_LITE_MODEL` | Modèle économe, proposé au choix et utilisé pour les titres (défaut : `gemini-flash-lite-latest`). |
 | `PORT` | Port du serveur de production (défaut : 3000). |
 
 **Confidentialité :** avec l’offre gratuite de Gemini, Google peut utiliser les échanges pour améliorer ses services ; l’application le signale dans les paramètres. Passez à une offre payante avant d’accueillir des données sensibles.

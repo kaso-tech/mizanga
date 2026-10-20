@@ -17,13 +17,16 @@ export function formatResetTime(retryAt: Date, now = new Date()) {
 }
 
 /** Message d’erreur du serveur, complété par l’heure de réinitialisation quand une limite est atteinte. */
-function errorFrom(body: { error?: string; retryAt?: string } | null, status?: number) {
+type ErrorBody = { error?: string; retryAt?: string; code?: string }
+
+function errorFrom(body: ErrorBody | null, status?: number) {
   const retryAt = body?.retryAt ? new Date(body.retryAt) : undefined
   const message = body?.error ?? 'Le serveur de Mizanga est injoignable. Vérifiez votre connexion et réessayez.'
+  const code = body?.code === 'quota' ? 'quota' : undefined
   if (retryAt && !Number.isNaN(retryAt.getTime())) {
-    return new AiServiceError(`${message} Elle sera réinitialisée ${formatResetTime(retryAt)}.`, retryAt)
+    return new AiServiceError(`${message} Elle sera réinitialisée ${formatResetTime(retryAt)}.`, retryAt, code)
   }
-  return new AiServiceError(status === 429 ? `${message} Réessayez dans quelques minutes.` : message)
+  return new AiServiceError(status === 429 ? `${message} Réessayez dans quelques minutes.` : message, undefined, code)
 }
 
 /** Plafonds alignés sur le serveur (server/chat-handler.mjs). */
@@ -74,10 +77,11 @@ export function selectHistory(messages: ChatMessage[]) {
  * (Gemini). La clé d’API reste sur le serveur ; le navigateur ne reçoit que le texte.
  * Réponse attendue : NDJSON, une ligne `{"text": …}` par fragment ou `{"error": …}`.
  */
-export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label: string; endpoint?: string }): AiService {
+export function createRemoteAiService({ label, models, endpoint = '/api/chat' }: { label: string; models?: AiService['models']; endpoint?: string }): AiService {
   return {
     isDemonstration: false,
     label,
+    models,
     async suggestTitle(firstMessage) {
       const response = await fetch('/api/title', {
         method: 'POST',
@@ -97,6 +101,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
           body: JSON.stringify({
             messages: selectHistory(messages),
             webSearch,
+            modelTier: models?.lite ? preferences.modelTier : 'standard',
             preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode, customInstructions: preferences.customInstructions },
           }),
           signal,
@@ -107,7 +112,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
         throw new AiServiceError(navigator.onLine ? 'Le serveur de Mizanga est injoignable. Réessayez dans un instant.' : 'Vous êtes hors connexion. Vérifiez votre réseau puis réessayez.')
       }
       if (!response.ok || !response.body) {
-        throw errorFrom((await response.json().catch(() => null)) as { error?: string; retryAt?: string } | null, response.status)
+        throw errorFrom((await response.json().catch(() => null)) as ErrorBody | null, response.status)
       }
 
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -120,7 +125,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (!line.trim()) continue
-          const event = JSON.parse(line) as { text?: string; error?: string; retryAt?: string; sources?: SourceReference[]; searchSuggestionsHtml?: string }
+          const event = JSON.parse(line) as ErrorBody & { text?: string; sources?: SourceReference[]; searchSuggestionsHtml?: string }
           if (event.error) throw errorFrom(event)
           // La langue réelle de la réponse n’est pas connue : elle n’est pas indiquée plutôt que devinée.
           if (event.text) yield { text: event.text }
@@ -137,10 +142,15 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
  */
 const engineStorageKey = 'mizanga.engine.v1'
 
-type Health = { engine?: string; model?: string | null }
+type Health = { engine?: string; model?: string | null; liteModel?: string | null }
 
 const serviceFor = (health: Health) => (
-  health.engine === 'gemini' ? createRemoteAiService({ label: health.model ? `Gemini (${health.model})` : 'Gemini' }) : demoAiService
+  health.engine === 'gemini'
+    ? createRemoteAiService({
+      label: health.model ? `Gemini (${health.model})` : 'Gemini',
+      models: health.model ? { standard: health.model, ...(health.liteModel ? { lite: health.liteModel } : {}) } : undefined,
+    })
+    : demoAiService
 )
 
 export async function detectAiService({ timeoutMs = 2500 } = {}): Promise<AiService> {
@@ -149,7 +159,7 @@ export async function detectAiService({ timeoutMs = 2500 } = {}): Promise<AiServ
     const health = (await response.json()) as Health
     if (!response.ok) return demoAiService
     try {
-      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, model: health.model ?? null }))
+      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, model: health.model ?? null, liteModel: health.liteModel ?? null }))
     } catch {
       // Stockage indisponible : la détection se refera au prochain lancement.
     }

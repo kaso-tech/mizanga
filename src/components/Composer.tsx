@@ -1,4 +1,4 @@
-import { ArrowUp, Bookmark, Check, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Bookmark, Check, Clock, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { acceptAttribute, formatSize, isAudio, isImage } from '../app/attachments'
 import { filterSavedPrompts, type SavedPrompt } from '../app/savedPrompts'
@@ -11,6 +11,9 @@ interface ComposerProps {
   isGenerating: boolean
   isDemonstration: boolean
   isOffline?: boolean
+  /** Hors connexion : le message partira automatiquement au retour du réseau. */
+  isQueued?: boolean
+  onQueueChange?: (queued: boolean) => void
   stopLabel: string
   /** Change de valeur pour redonner le focus au champ (ex. après le choix d’une suggestion). */
   focusToken: number
@@ -33,6 +36,8 @@ export function Composer({
   isGenerating,
   isDemonstration,
   isOffline = false,
+  isQueued = false,
+  onQueueChange,
   stopLabel,
   focusToken,
   attachments,
@@ -90,7 +95,11 @@ export function Composer({
   }, [focusToken])
 
   const submit = () => {
-    if (!hasContent || isGenerating || isOffline || isPreparingFiles || isRecording) return
+    if (!hasContent || isGenerating || isPreparingFiles || isRecording) return
+    if (isOffline) {
+      onQueueChange?.(true)
+      return
+    }
     onSend(value)
   }
 
@@ -109,10 +118,17 @@ export function Composer({
   return (
     <div className="composer-wrap">
       {isOffline && (
-        <p className="offline-banner" role="status">
+        <div className="offline-banner" role="status">
           <WifiOff size={16} aria-hidden="true" />
-          Vous êtes hors connexion. Votre message est conservé : vous pourrez l’envoyer dès le retour du réseau.
-        </p>
+          {isQueued ? (
+            <>
+              <span>Hors connexion. Votre message partira automatiquement dès le retour du réseau.</span>
+              <button type="button" className="text-button" onClick={() => onQueueChange?.(false)}>Annuler l’envoi automatique</button>
+            </>
+          ) : (
+            <span>Vous êtes hors connexion. Votre message est conservé{onQueueChange ? ' : appuyez sur Envoyer pour qu’il parte automatiquement dès le retour du réseau.' : '.'}</span>
+          )}
+        </div>
       )}
       {isPromptMenuOpen && (
         <ul className="prompt-menu" role="listbox" id="prompt-menu" aria-label="Consignes enregistrées">
@@ -295,8 +311,15 @@ export function Composer({
               <Square size={16} fill="currentColor" />
             </button>
           ) : (
-            <button type="button" className="send-button" aria-label="Envoyer" disabled={!hasContent || isOffline || isPreparingFiles || isRecording} onClick={submit}>
-              <ArrowUp size={20} />
+            <button
+              type="button"
+              className={`send-button ${isQueued ? 'is-queued' : ''}`}
+              aria-label={isOffline ? (isQueued ? 'Envoi automatique prévu' : 'Envoyer au retour du réseau') : 'Envoyer'}
+              title={isOffline ? 'Envoyer automatiquement au retour du réseau' : undefined}
+              disabled={!hasContent || isQueued || (isOffline && !onQueueChange) || isPreparingFiles || isRecording}
+              onClick={submit}
+            >
+              {isQueued ? <Clock size={18} /> : <ArrowUp size={20} />}
             </button>
           )}
         </div>

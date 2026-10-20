@@ -1,4 +1,4 @@
-import { BookmarkPlus, Check, CheckCheck, ChevronLeft, ChevronRight, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
+import { BookmarkPlus, Check, Zap, CheckCheck, ChevronLeft, ChevronRight, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { formatSize, isAudio, isImage } from '../app/attachments'
 import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
@@ -169,9 +169,10 @@ interface ChatMessageProps {
   /** Changer de version ; seulement pour la dernière réponse, que la suite de la conversation ne contredit pas. */
   onSelectVersion?: (message: ChatMessageType, index: number) => void
   onSavePrompt?: (prompt: string) => void
+  onUseLiteModel?: () => void
 }
 
-export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt }: ChatMessageProps) {
+export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt, onUseLiteModel }: ChatMessageProps) {
   // Le passage sélectionné dans la réponse pré-remplit le formulaire de signalement.
   const [selectedPassage, setSelectedPassage] = useState('')
 
@@ -202,6 +203,9 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
           <div className="message-actions">
             {onSelectVersion && <VersionNav message={message} onSelect={(index) => onSelectVersion(message, index)} />}
             <button type="button" className="has-label" onClick={onRegenerate}><RefreshCw size={16} aria-hidden="true" /> Réessayer</button>
+            {message.errorCode === 'quota' && onUseLiteModel && (
+              <button type="button" className="has-label is-highlighted" onClick={onUseLiteModel}><Zap size={16} aria-hidden="true" /> Réessayer avec le modèle économe</button>
+            )}
           </div>
         )}
         {isDone && message.content && (

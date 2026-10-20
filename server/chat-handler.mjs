@@ -62,6 +62,7 @@ export function validateChatRequest(body) {
   const preferences = body.preferences ?? {}
   return {
     webSearch: body.webSearch === true,
+    modelTier: body.modelTier === 'lite' ? /** @type {const} */ ('lite') : /** @type {const} */ ('standard'),
     messages: messages.map(({ role, content, attachments }) => ({
       role,
       content,
@@ -97,23 +98,32 @@ function createRateLimiter({ windowMs, maxRequests } = RATE_LIMIT, now = () => D
 }
 
 /** Corps d’erreur JSON, avec l’heure de réinitialisation quand elle est connue. */
-const errorBody = (/** @type {string} */ message, /** @type {Date | undefined} */ retryAt) => (retryAt ? { error: message, retryAt: retryAt.toISOString() } : { error: message })
+/**
+ * Corps d’erreur JSON ; `code: 'quota'` signale le quota du moteur épuisé, que le modèle économe
+ * (quota distinct) peut contourner.
+ * @param {string} message @param {Date | undefined} [retryAt] @param {'quota'} [code]
+ */
+const errorBody = (message, retryAt, code) => ({ error: message, ...(retryAt ? { retryAt: retryAt.toISOString() } : {}), ...(code ? { code } : {}) })
+
+/** @param {unknown} error */
+const quotaCode = (error) => (error instanceof UpstreamError && error.status === 429 ? /** @type {const} */ ('quota') : undefined)
 
 /**
  * Gestionnaire Node pour `/api/health` et `/api/chat`, partagé par le serveur de développement Vite
  * et le serveur de production. Réponse de `/api/chat` : NDJSON, une ligne `{"text": …}` par fragment,
  * ou `{"error": …}` si le moteur échoue en cours de route.
- * @param {{ apiKey?: string, model?: string, apiBase?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
+ * `liteModel` : modèle économe (plus rapide, quota gratuit plus large), proposé au choix et utilisé pour les titres.
+ * @param {{ apiKey?: string, model?: string, liteModel?: string, apiBase?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBase, rateLimit } = {}) {
+export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteModel = 'gemini-flash-lite-latest', apiBase, rateLimit } = {}) {
   const limit = createRateLimiter(rateLimit)
 
   return async (req, res, next) => {
     const path = (req.url ?? '').split('?')[0]
 
     if (path === '/api/health' && req.method === 'GET') {
-      return sendJson(res, 200, { engine: apiKey ? 'gemini' : 'demo', model: apiKey ? model : null })
+      return sendJson(res, 200, { engine: apiKey ? 'gemini' : 'demo', model: apiKey ? model : null, liteModel: apiKey ? liteModel : null })
     }
     if (path !== '/api/chat' && path !== '/api/title') {
       if (next) return next()
@@ -130,7 +140,8 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
       try {
         const body = await readJson(req)
         if (typeof body?.text !== 'string' || !body.text.trim() || body.text.length > MAX_MESSAGE_CHARS) return sendJson(res, 400, { error: 'Requête invalide.' })
-        const title = await generateGeminiTitle({ apiKey, model, apiBase, text: body.text })
+        // Les titres passent par le modèle économe pour préserver le quota du modèle principal.
+        const title = await generateGeminiTitle({ apiKey, model: liteModel, apiBase, text: body.text })
         return sendJson(res, 200, { title })
       } catch (error) {
         const { status = 502, message = 'Titre indisponible.', retryAt } = /** @type {{ status?: number, message?: string, retryAt?: Date }} */ (error)
@@ -153,7 +164,8 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
 
     let started = false
     try {
-      for await (const event of streamGeminiReply({ apiKey, model, apiBase, ...request, signal: controller.signal })) {
+      const { modelTier, ...reply } = request
+      for await (const event of streamGeminiReply({ apiKey, model: modelTier === 'lite' ? liteModel : model, apiBase, ...reply, signal: controller.signal })) {
         if (!started) {
           res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
           started = true
@@ -168,9 +180,9 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
       if (!(error instanceof UpstreamError)) console.error('[mizanga] Erreur du moteur :', error)
       const retryAt = error instanceof UpstreamError ? error.retryAt : undefined
       if (started) {
-        res.end(`${JSON.stringify(errorBody(message, retryAt))}\n`)
+        res.end(`${JSON.stringify(errorBody(message, retryAt, quotaCode(error)))}\n`)
       } else {
-        sendJson(res, error instanceof UpstreamError ? error.status : 502, errorBody(message, retryAt))
+        sendJson(res, error instanceof UpstreamError ? error.status : 502, errorBody(message, retryAt, quotaCode(error)))
       }
     }
   }

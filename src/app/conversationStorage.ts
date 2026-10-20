@@ -23,6 +23,7 @@ function readReplyFields(message: Partial<ChatMessage>) {
     ...(isString(message.searchSuggestionsHtml) ? { searchSuggestionsHtml: message.searchSuggestionsHtml } : {}),
     ...(status === 'complete' || status === 'stopped' || status === 'error' ? { status } : {}),
     ...(isString(message.errorMessage) ? { errorMessage: message.errorMessage } : {}),
+    ...(message.errorCode === 'quota' ? { errorCode: 'quota' as const } : {}),
     ...(message.isDemonstration ? { isDemonstration: true } : {}),
     ...(message.rating === 'positive' || message.rating === 'negative' || message.rating === 'correct' ? { rating: message.rating } : {}),
   }

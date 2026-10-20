@@ -9,7 +9,7 @@ import { createApiHandler } from './server/chat-handler.mjs'
 function mizangaApi(): Plugin {
   const handlerFor = (mode: string, root: string) => {
     const env = { ...loadEnv(mode, root, ''), ...process.env }
-    return createApiHandler({ apiKey: env.GEMINI_API_KEY || undefined, model: env.GEMINI_MODEL || undefined, apiBase: env.GEMINI_API_BASE || undefined })
+    return createApiHandler({ apiKey: env.GEMINI_API_KEY || undefined, model: env.GEMINI_MODEL || undefined, liteModel: env.GEMINI_LITE_MODEL || undefined, apiBase: env.GEMINI_API_BASE || undefined })
   }
   return {
     name: 'mizanga-api',

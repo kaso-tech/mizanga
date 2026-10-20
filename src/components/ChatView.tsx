@@ -27,6 +27,8 @@ interface ChatViewProps {
   onNewConversation: () => void
   onCopy: (message: ChatMessageType) => void
   onRegenerate: () => void
+  /** Proposé quand le quota du modèle principal est épuisé et qu’un modèle économe existe. */
+  onUseLiteModel?: () => void
   onEditLastMessage: (content: string) => void
   onRate: (message: ChatMessageType, rating: MessageRating) => void
   onReport: (message: ChatMessageType, selectedPassage: string) => void
@@ -36,6 +38,8 @@ interface ChatViewProps {
   onSelectVersion: (message: ChatMessageType, index: number) => void
   savedPrompts: SavedPrompt[]
   onSavePrompt: (prompt: string) => void
+  /** Titre de la conversation, repris en tête de la version imprimée. */
+  title?: string
 }
 
 export function ChatView({
@@ -49,6 +53,7 @@ export function ChatView({
   onNewConversation,
   onCopy,
   onRegenerate,
+  onUseLiteModel,
   onEditLastMessage,
   onRate,
   onReport,
@@ -57,6 +62,7 @@ export function ChatView({
   onSelectVersion,
   savedPrompts,
   onSavePrompt,
+  title,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
   const lastMessage = messages.at(-1)
@@ -140,6 +146,10 @@ export function ChatView({
 
   return (
     <section className="conversation-view" aria-label="Conversation">
+      <header className="print-header">
+        <p>Mizanga — conversation imprimée le {new Date().toLocaleDateString('fr', { dateStyle: 'long' })}</p>
+        <h1>{title || 'Conversation'}</h1>
+      </header>
       <div className="messages-list">
         {messages.map((message) => (
           <ChatMessage
@@ -157,6 +167,7 @@ export function ChatView({
             isSpeaking={speakingMessageId === message.id}
             onSelectVersion={message === lastMessage && !isGenerating ? onSelectVersion : undefined}
             onSavePrompt={onSavePrompt}
+            onUseLiteModel={message === lastMessage && !isGenerating ? onUseLiteModel : undefined}
           />
         ))}
         {isGenerating && !isStreaming && (

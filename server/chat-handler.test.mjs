@@ -68,9 +68,9 @@ afterAll(() => {
 describe('API Mizanga', () => {
   it('annonce le moteur disponible', async () => {
     const demo = await startApi({})
-    expect(await (await fetch(`${demo}/api/health`)).json()).toEqual({ engine: 'demo', model: null })
+    expect(await (await fetch(`${demo}/api/health`)).json()).toEqual({ engine: 'demo', model: null, liteModel: null })
     const gemini = await startApi({ apiKey: 'cle', model: 'gemini-test' })
-    expect(await (await fetch(`${gemini}/api/health`)).json()).toEqual({ engine: 'gemini', model: 'gemini-test' })
+    expect(await (await fetch(`${gemini}/api/health`)).json()).toEqual({ engine: 'gemini', model: 'gemini-test', liteModel: 'gemini-flash-lite-latest' })
   })
 
   it('refuse /api/chat sans clé configurée', async () => {
@@ -115,8 +115,9 @@ describe('API Mizanga', () => {
     const before = Date.now()
     const response = await post(base, validBody)
     expect(response.status).toBe(429)
-    const body = /** @type {{ error: string, retryAt: string }} */ (await response.json())
+    const body = /** @type {{ error: string, retryAt: string, code: string }} */ (await response.json())
     expect(body.error).toContain('limite d’utilisation gratuite')
+    expect(body.code).toBe('quota')
     const delay = new Date(body.retryAt).getTime() - before
     expect(delay).toBeGreaterThanOrEqual(36_000)
     expect(delay).toBeLessThanOrEqual(40_000)
@@ -142,11 +143,11 @@ describe('API Mizanga', () => {
     expect(new Date(retryAt).getTime()).toBeGreaterThan(Date.now() + 50_000)
   })
 
-  it('propose un titre court et nettoyé', async () => {
-    const base = await startApi({ apiKey: 'cle', model: 'gemini-test', apiBase: geminiBase })
+  it('propose un titre court et nettoyé, avec le modèle économe', async () => {
+    const base = await startApi({ apiKey: 'cle', model: 'gemini-test', liteModel: 'gemini-lite-test', apiBase: geminiBase })
     const response = await fetch(`${base}/api/title`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Explique la photosynthèse' }) })
     expect(await response.json()).toEqual({ title: 'Photosynthèse expliquée' })
-    expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-test:generateContent')
+    expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-lite-test:generateContent')
   })
 
   it('transmet les fichiers joints à Gemini et refuse les formats non autorisés', async () => {
@@ -207,5 +208,14 @@ describe('API Mizanga', () => {
     expect(instruction.indexOf('ne prétends jamais maîtriser')).toBeLessThan(instruction.indexOf('Je suis enseignant'))
     expect(instruction.length).toBeLessThan(buildSystemInstruction(validBody.preferences).length + 1700)
     expect(buildSystemInstruction({ customInstructions: '   ' })).not.toContain('Instructions personnelles')
+  })
+
+  it('utilise le modèle économe quand la demande le choisit', async () => {
+    upstreamReply = { status: 200, events: [textEvent('ok')] }
+    const base = await startApi({ apiKey: 'cle', model: 'gemini-test', liteModel: 'gemini-lite-test', apiBase: geminiBase })
+    await (await post(base, { ...validBody, modelTier: 'lite' })).text()
+    expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-lite-test:streamGenerateContent?alt=sse')
+    await (await post(base, { ...validBody, modelTier: 'inconnu' })).text()
+    expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-test:streamGenerateContent?alt=sse')
   })
 })

@@ -3,6 +3,8 @@ export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about' | 
 /** « system » suit le réglage clair/sombre de l’appareil. */
 export type ThemePreference = 'light' | 'dark' | 'system'
 export type TextSize = 'small' | 'normal' | 'large' | 'xlarge'
+/** « lite » : modèle économe, plus rapide et au quota gratuit plus large, pour les demandes simples. */
+export type ModelTier = 'standard' | 'lite'
 export type UserWritingMode = 'standard' | 'informal'
 /**
  * Langue et registre d’écriture des réponses, réunis en un seul choix pour éviter les combinaisons contradictoires.
@@ -17,6 +19,7 @@ export interface LinguisticPreferences {
   responseLanguage: ResponseLanguage
   userWritingMode: UserWritingMode
   theme: ThemePreference
+  modelTier: ModelTier
   /** Taille du texte des conversations. */
   textSize: TextSize
   /** Ce que Mizanga doit savoir sur l’utilisateur et sa façon de répondre ; transmis au moteur avec chaque demande. */
@@ -54,6 +57,8 @@ export interface ChatMessage {
   status?: ChatMessageStatus
   /** Explication montrée quand `status` vaut « error ». */
   errorMessage?: string
+  /** « quota » : quota du moteur épuisé ; le modèle économe peut prendre le relais. */
+  errorCode?: 'quota'
   isDemonstration?: boolean
   attachments?: Attachment[]
   /** Message de l’utilisateur envoyé avec la recherche web activée. */
@@ -71,7 +76,7 @@ export interface ChatMessage {
   versionIndex?: number
 }
 
-export type ReplyVersion = Pick<ChatMessage, 'content' | 'createdAt' | 'language' | 'status' | 'errorMessage' | 'isDemonstration' | 'sources' | 'searchSuggestionsHtml' | 'rating'>
+export type ReplyVersion = Pick<ChatMessage, 'content' | 'createdAt' | 'language' | 'status' | 'errorMessage' | 'errorCode' | 'isDemonstration' | 'sources' | 'searchSuggestionsHtml' | 'rating'>
 
 export type MessageRating = 'positive' | 'negative' | 'correct'
 
@@ -109,6 +114,7 @@ export const defaultPreferences: LinguisticPreferences = {
   userWritingMode: 'standard',
   theme: 'light',
   textSize: 'normal',
+  modelTier: 'standard',
   customInstructions: '',
   readAloud: true,
   speechRate: 1,

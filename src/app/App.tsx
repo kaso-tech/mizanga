@@ -98,6 +98,7 @@ function loadPreferences(): LinguisticPreferences {
       ...(stored.responseLanguage && Object.hasOwn(responseLanguageLabels, stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
       ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
       ...(stored.theme === 'light' || stored.theme === 'dark' || stored.theme === 'system' ? { theme: stored.theme } : {}),
+      ...(stored.modelTier === 'standard' || stored.modelTier === 'lite' ? { modelTier: stored.modelTier } : {}),
       ...(stored.textSize && ['small', 'normal', 'large', 'xlarge'].includes(stored.textSize) ? { textSize: stored.textSize } : {}),
       ...(typeof stored.saveConversations === 'boolean' ? { saveConversations: stored.saveConversations } : {}),
       ...(typeof stored.customInstructions === 'string' ? { customInstructions: stored.customInstructions.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS) } : {}),
@@ -153,6 +154,7 @@ export function App({ aiService = demoAiService }: AppProps) {
   // La démonstration fonctionne sans réseau ; un vrai moteur, non.
   const isOffline = !useIsOnline() && !aiService.isDemonstration
   const [toast, setToast] = useState<{ message: string; tone: ToastTone }>()
+  const [sendWhenOnline, setSendWhenOnline] = useState(false)
   const toastTimer = useRef<number>()
   const copiedTimer = useRef<number>()
 
@@ -256,6 +258,13 @@ export function App({ aiService = demoAiService }: AppProps) {
     return true
   }
 
+  /** Quota du modèle principal épuisé : bascule sur le modèle économe (quota distinct) et relance. */
+  const switchToLiteModel = () => {
+    updatePreferences({ modelTier: 'lite' })
+    conversation.regenerate({ modelTier: 'lite' })
+    notify('Modèle économe activé. Vous pourrez revenir au modèle standard dans Paramètres › Général.', 'success')
+  }
+
   const exportConversations = () => {
     downloadFile(`mizanga-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`, createBackup(conversation.conversations), 'application/json')
     notify('Sauvegarde téléchargée. Le contenu des fichiers joints n’y figure pas.', 'success')
@@ -280,6 +289,25 @@ export function App({ aiService = demoAiService }: AppProps) {
     setDraftAttachments([])
     navigate('chat')
     setFocusToken((token) => token + 1)
+  }
+
+  // Impression (ou PDF) : la conversation est ouverte, puis imprimée une fois ses réponses mises en forme.
+  const [printToken, setPrintToken] = useState(0)
+  useEffect(() => {
+    if (printToken === 0) return
+    let attempts = 0
+    const timer = window.setInterval(() => {
+      attempts++
+      if (document.querySelector('.markdown-fallback, .page-loading') && attempts < 20) return
+      window.clearInterval(timer)
+      window.print()
+    }, 100)
+    return () => window.clearInterval(timer)
+  }, [printToken])
+
+  const printConversation = (conversationId: string) => {
+    selectConversation(conversationId)
+    setPrintToken((token) => token + 1)
   }
 
   const selectConversation = (conversationId: string) => {
@@ -310,6 +338,21 @@ export function App({ aiService = demoAiService }: AppProps) {
       setIsPreparingFiles(false)
     }
   }
+
+  // Message mis en attente hors connexion : il part dès le retour du réseau (sauf s’il a été vidé entre-temps).
+  const hasDraft = draft.trim().length > 0 || draftAttachments.length > 0
+  useEffect(() => {
+    if (!sendWhenOnline) return
+    if (!hasDraft) {
+      setSendWhenOnline(false)
+      return
+    }
+    if (isOffline || conversation.isGenerating) return
+    setSendWhenOnline(false)
+    sendMessage(draft)
+    notify('Connexion rétablie : votre message a été envoyé.', 'success')
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- seul le retour du réseau (ou un brouillon vidé) doit déclencher l’envoi
+  }, [isOffline, sendWhenOnline, hasDraft])
 
   const stopLabel = aiService.isDemonstration ? 'Arrêter la démonstration' : 'Arrêter la génération'
   const stopGeneration = () => {
@@ -376,6 +419,8 @@ export function App({ aiService = demoAiService }: AppProps) {
       isGenerating={conversation.isGenerating}
       isDemonstration={aiService.isDemonstration}
       isOffline={isOffline}
+      isQueued={sendWhenOnline}
+      onQueueChange={setSendWhenOnline}
       stopLabel={stopLabel}
       focusToken={focusToken}
       attachments={draftAttachments}
@@ -402,7 +447,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         return (
           <SettingsView
             preferences={preferences}
-            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration }}
+            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration, models: aiService.models }}
             conversationCount={conversation.conversations.length}
             onChange={updatePreferences}
             onResetPreferences={() => {
@@ -439,7 +484,8 @@ export function App({ aiService = demoAiService }: AppProps) {
             onSuggestion={(prompt) => { setDraft(prompt); setFocusToken((token) => token + 1) }}
             onNewConversation={startNewConversation}
             onCopy={copyMessage}
-            onRegenerate={conversation.regenerate}
+            onRegenerate={() => conversation.regenerate()}
+            onUseLiteModel={aiService.models?.lite && preferences.modelTier !== 'lite' ? switchToLiteModel : undefined}
             onEditLastMessage={conversation.editLastUserMessage}
             onRate={rateMessage}
             onReport={openReport}
@@ -448,6 +494,7 @@ export function App({ aiService = demoAiService }: AppProps) {
             savedPrompts={savedPrompts}
             onSavePrompt={(prompt) => void savePrompt(prompt)}
             onSpeak={preferences.readAloud && isSpeechSupported() ? toggleSpeech : undefined}
+            title={conversation.activeConversation?.title}
           />
         )
     }
@@ -468,6 +515,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         onRemoveConversation={conversation.remove}
         onRenameConversation={conversation.rename}
         onToggleFavorite={conversation.toggleFavorite}
+        onPrintConversation={printConversation}
       />
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header

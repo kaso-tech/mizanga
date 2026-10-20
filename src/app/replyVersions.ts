@@ -9,6 +9,7 @@ export const snapshotReply = (message: ChatMessage): ReplyVersion => ({
   language: message.language,
   status: message.status,
   errorMessage: message.errorMessage,
+  errorCode: message.errorCode,
   isDemonstration: message.isDemonstration,
   sources: message.sources,
   searchSuggestionsHtml: message.searchSuggestionsHtml,

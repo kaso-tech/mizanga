@@ -375,6 +375,7 @@ button.close-drawer { display: none; }
 .send-button:hover { opacity: .9; }
 .send-button:disabled { color: var(--muted-foreground); background: var(--muted); opacity: 1; }
 .send-button.is-stop { color: var(--background); background: var(--foreground); }
+.send-button.is-queued:disabled { color: var(--primary); background: var(--ochre-soft); }
 .disclaimer { margin: 8px 0 0; color: var(--muted-foreground); font-size: 11px; text-align: center; }
 
 /* ---------- Messages ---------- */
@@ -444,6 +445,8 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 .message-actions button:hover { color: var(--foreground); background: var(--accent); }
 .message-actions button.is-positive { color: var(--primary); }
 .message-actions button.is-active { color: var(--primary); background: var(--accent); }
+.message-actions button.is-highlighted { color: var(--primary-foreground); background: var(--primary); }
+.message-actions button.is-highlighted:hover { color: var(--primary-foreground); background: color-mix(in oklab, var(--primary) 88%, black); }
 .version-nav { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
 .version-nav > span { min-width: 34px; text-align: center; }
 .message-actions .version-nav button { min-width: 28px; padding: 0 4px; }
@@ -479,6 +482,9 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 
 .offline-banner { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 10px 14px; border-radius: 14px; color: var(--foreground); background: var(--ochre-soft); font-size: 13px; }
 .offline-banner > svg { flex: 0 0 auto; color: var(--primary); }
+.offline-banner { flex-wrap: wrap; }
+.offline-banner > span { flex: 1 1 200px; }
+.offline-banner .text-button { font-size: 13px; }
 
 /* Fichiers joints : dans la zone de saisie et dans les messages. */
 .composer.is-dragging { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent); }
@@ -908,4 +914,22 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* Impression et export PDF : la conversation seule, en clair, sans les commandes de l’interface. */
+.print-header { display: none; }
+@media print {
+  @page { margin: 16mm 14mm; }
+  html, body { height: auto; background: #fff !important; color: #1d1712 !important; }
+  .app-shell, .main-area, .content-scroll, .content-frame { display: block; height: auto; overflow: visible; }
+  .sidebar, .drawer-backdrop, .topbar, .composer-zone, .toast-region, .scroll-bottom-button, .restart-row, .message-actions, .user-actions, .weave-band, .message-row.is-assistant > .brand-mark, .search-suggestions { display: none !important; }
+  .messages-list { zoom: 1 !important; }
+  .print-header { display: block; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid #d9cfc4; }
+  .print-header p { margin: 0 0 4px; color: #6b5d50; font-size: 11px; }
+  .print-header h1 { margin: 0; font-family: var(--font-display); font-size: 20px; }
+  .message-row { break-inside: avoid-page; }
+  .user-bubble { border: 1px solid #d9cfc4; color: #1d1712 !important; background: #f6f1ea !important; }
+  .assistant-content pre, .table-scroll { overflow: visible; white-space: pre-wrap; }
+  .fade-up { animation: none !important; }
+  a { color: inherit; }
 }

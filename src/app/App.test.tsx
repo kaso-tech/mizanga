@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { AiService } from '../domain/services'
+import { act } from 'react'
+import { AiServiceError, type AiService } from '../domain/services'
 import { App } from './App'
 import { createBackup } from './conversationStorage'
 
@@ -205,5 +206,61 @@ describe('App', () => {
     renderApp('/parametres')
     await userEvent.selectOptions(await screen.findByLabelText('Taille du texte'), 'large')
     expect(document.documentElement.dataset.textSize).toBe('large')
+  })
+
+  it('met un message en attente hors connexion et l’envoie au retour du réseau', async () => {
+    const sent: string[] = []
+    const remote: AiService = { isDemonstration: false, label: 'Gemini', async *generate({ messages }) { sent.push(messages.at(-1)!.content); yield { text: 'Réponse en ligne' } } }
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    try {
+      window.history.replaceState({}, '', '/')
+      render(<App aiService={remote} />)
+      await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Question hors ligne')
+      await userEvent.click(screen.getByRole('button', { name: 'Envoyer au retour du réseau' }))
+      expect(screen.getByText(/partira automatiquement/)).toBeInTheDocument()
+      expect(sent).toEqual([])
+
+      onLine.mockReturnValue(true)
+      act(() => { window.dispatchEvent(new Event('online')) })
+      expect(await screen.findByText('Réponse en ligne')).toBeInTheDocument()
+      expect(sent).toEqual(['Question hors ligne'])
+    } finally {
+      onLine.mockRestore()
+    }
+  })
+
+  it('propose le modèle économe quand le quota est épuisé', async () => {
+    const tiers: string[] = []
+    const remote: AiService = {
+      isDemonstration: false,
+      label: 'Gemini',
+      models: { standard: 'flash', lite: 'flash-lite' },
+      async *generate({ preferences }) {
+        tiers.push(preferences.modelTier)
+        if (preferences.modelTier === 'standard') throw new AiServiceError('La limite d’utilisation gratuite du moteur est atteinte.', undefined, 'quota')
+        yield { text: 'Réponse économe' }
+      },
+    }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={remote} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
+    await userEvent.click(await screen.findByRole('button', { name: /Réessayer avec le modèle économe/ }))
+    expect(await screen.findByText('Réponse économe')).toBeInTheDocument()
+    expect(tiers).toEqual(['standard', 'lite'])
+    expect(JSON.parse(localStorage.getItem('mizanga.preferences.v1') ?? '{}').modelTier).toBe('lite')
+  })
+
+  it('imprime une conversation depuis son menu', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined)
+    try {
+      renderApp()
+      await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
+      await screen.findByText('Réponse de test')
+      await userEvent.click(screen.getByRole('button', { name: /Options pour/ }))
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Imprimer ou PDF' }))
+      await waitFor(() => expect(print).toHaveBeenCalledTimes(1))
+    } finally {
+      print.mockRestore()
+    }
   })
 })

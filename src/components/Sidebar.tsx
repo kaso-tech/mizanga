@@ -1,4 +1,4 @@
-import { Download, Info, LogIn, MessageSquarePlus, MoreHorizontal, Pencil, Search, Settings, Star, Trash2, X } from 'lucide-react'
+import { Download, Info, LogIn, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Brand } from './Brand'
 import { downloadConversation } from '../app/exportConversation'
@@ -18,6 +18,7 @@ interface SidebarProps {
   onRemoveConversation: (conversationId: string) => void
   onRenameConversation: (conversationId: string, title: string) => void
   onToggleFavorite: (conversationId: string) => void
+  onPrintConversation: (conversationId: string) => void
 }
 
 export function Sidebar({
@@ -33,6 +34,7 @@ export function Sidebar({
   onRemoveConversation,
   onRenameConversation,
   onToggleFavorite,
+  onPrintConversation,
 }: SidebarProps) {
   const [query, setQuery] = useState('')
   const [onlyFavorites, setOnlyFavorites] = useState(false)
@@ -104,6 +106,7 @@ export function Sidebar({
                     onToggleFavorite={() => onToggleFavorite(conversation.id)}
                     onRename={(title) => onRenameConversation(conversation.id, title)}
                     onRemove={() => onRemoveConversation(conversation.id)}
+                    onPrint={() => onPrintConversation(conversation.id)}
                   />
                 )
               })}
@@ -135,10 +138,11 @@ interface ConversationRowProps {
   onToggleFavorite: () => void
   onRename: (title: string) => void
   onRemove: () => void
+  onPrint: () => void
 }
 
 /** Ligne de l’historique : ouverture, favori, et menu « … » (renommer, exporter, supprimer). */
-function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, onRename, onRemove }: ConversationRowProps) {
+function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, onRename, onRemove, onPrint }: ConversationRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
   const rowRef = useRef<HTMLLIElement>(null)
@@ -225,6 +229,9 @@ function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, o
           </button>
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); downloadConversation(conversation) }}>
             <Download size={15} aria-hidden="true" /> Exporter (.md)
+          </button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPrint() }}>
+            <Printer size={15} aria-hidden="true" /> Imprimer ou PDF
           </button>
           <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); onRemove() }}>
             <Trash2 size={15} aria-hidden="true" /> Supprimer

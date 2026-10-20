@@ -40,6 +40,7 @@ describe('remoteAiService', () => {
     expect(JSON.parse(init.body)).toEqual({
       messages: [{ role: 'user', content: 'Bonjour' }],
       webSearch: false,
+      modelTier: 'standard',
       preferences: { responseLanguage: 'auto', userWritingMode: 'standard', customInstructions: '' },
     })
   })
@@ -119,5 +120,22 @@ describe('remoteAiService', () => {
     expect(formatResetTime(new Date(2026, 9, 20, 14, 31, 10), now)).toBe('à 14 h 32')
     expect(formatResetTime(new Date(2026, 9, 21, 9, 0), now)).toBe('demain à 9 h 00')
     expect(formatResetTime(new Date(2026, 9, 23, 8, 0), now)).toBe('le 23 octobre à 8 h 00')
+  })
+
+  it('annonce le modèle économe et l’utilise quand il est choisi', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })))
+    const live = await detectAiService()
+    expect(live.models).toEqual({ standard: 'gemini-flash-latest', lite: 'gemini-flash-lite-latest' })
+
+    const fetchMock = vi.fn().mockResolvedValue(streamedResponse(['{"text":"ok"}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    for await (const _chunk of live.generate({ ...request, preferences: { ...defaultPreferences, modelTier: 'lite' } }, { signal: new AbortController().signal })) { /* lecture complète */ }
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).modelTier).toBe('lite')
+  })
+
+  it('signale un quota épuisé avec un code', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'La limite d’utilisation gratuite du moteur est atteinte.', code: 'quota' }, { status: 429 })))
+    const error = await collect().catch((caught: unknown) => caught)
+    expect((error as AiServiceError).code).toBe('quota')
   })
 })

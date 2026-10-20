@@ -1,5 +1,5 @@
 // Serveur de production : sert le site compilé (dist/) et l’API /api/*.
-// Usage : `pnpm build && pnpm start` (variables : PORT, GEMINI_API_KEY, GEMINI_MODEL).
+// Usage : `pnpm build && pnpm start` (variables : PORT, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL).
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -93,6 +93,7 @@ async function serveStatic(req, res) {
 const api = createApiHandler({
   apiKey: process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL || undefined,
+  liteModel: process.env.GEMINI_LITE_MODEL || undefined,
   apiBase: process.env.GEMINI_API_BASE || undefined,
 })
 
