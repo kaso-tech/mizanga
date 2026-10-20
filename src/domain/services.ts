@@ -6,9 +6,26 @@ export interface SourceReference {
   url: string
 }
 
+export interface AiGenerationRequest {
+  /** Historique complet de la conversation, dernier message utilisateur inclus. Le texte n’est jamais normalisé. */
+  messages: ChatMessage[]
+  preferences: LinguisticPreferences
+}
+
+/** Fragment de réponse. `language` (BCP 47) n’est fourni que si le service le connaît réellement. */
+export interface AiChunk {
+  text: string
+  language?: string
+}
+
+/**
+ * Fournisseur d’IA remplaçable. Une implémentation produit la réponse par fragments et doit
+ * s’arrêter en levant une `AbortError` dès que `signal` est annulé.
+ */
 export interface AiService {
-  generate(input: string, preferences: LinguisticPreferences): Promise<ChatMessage>
-  stop(): void
+  /** Vrai tant qu’aucun moteur linguistique réel n’est branché : l’interface doit l’afficher. */
+  readonly isDemonstration: boolean
+  generate(request: AiGenerationRequest, options: { signal: AbortSignal }): AsyncIterable<AiChunk>
 }
 
 export interface ResearchService {
@@ -40,18 +57,9 @@ export interface LinguisticAdministrationService {
 }
 
 /**
- * Adaptateurs temporaires : aucun appel IA, recherche, stockage ou traitement vocal
- * n’est effectué pendant la phase 1. Des implémentations réelles remplaceront ces objets.
+ * Adaptateur temporaire : aucune recherche n’est effectuée pendant la phase 1.
+ * L’adaptateur IA de démonstration se trouve dans `src/services/demoAiService.ts`.
  */
-export const unavailableAiService: AiService = {
-  async generate() {
-    throw new Error('Le moteur IA n’est pas encore connecté.')
-  },
-  stop() {
-    // Aucun flux à interrompre tant que le moteur n’est pas intégré.
-  },
-}
-
 export const unavailableResearchService: ResearchService = {
   async search() {
     return []
