@@ -12,6 +12,7 @@ import { MAX_CUSTOM_INSTRUCTIONS_CHARS, MAX_MESSAGE_CHARS } from '../services/re
 import { prepareAttachments } from './attachments'
 import { createBackup, readBackup } from './conversationStorage'
 import { downloadFile } from './exportConversation'
+import { addSavedPrompt, loadSavedPrompts, storeSavedPrompts, type SavedPrompt } from './savedPrompts'
 import { isSpeechSupported, speak, speechRates, stopSpeaking } from './speech'
 import { useConversation } from './useConversation'
 
@@ -97,6 +98,7 @@ function loadPreferences(): LinguisticPreferences {
       ...(stored.responseLanguage && Object.hasOwn(responseLanguageLabels, stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
       ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
       ...(stored.theme === 'light' || stored.theme === 'dark' || stored.theme === 'system' ? { theme: stored.theme } : {}),
+      ...(stored.textSize && ['small', 'normal', 'large', 'xlarge'].includes(stored.textSize) ? { textSize: stored.textSize } : {}),
       ...(typeof stored.saveConversations === 'boolean' ? { saveConversations: stored.saveConversations } : {}),
       ...(typeof stored.customInstructions === 'string' ? { customInstructions: stored.customInstructions.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS) } : {}),
       ...(typeof stored.readAloud === 'boolean' ? { readAloud: stored.readAloud } : {}),
@@ -146,6 +148,7 @@ export function App({ aiService = demoAiService }: AppProps) {
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
   const [reportedPassage, setReportedPassage] = useState('')
   const [speakingMessageId, setSpeakingMessageId] = useState<string>()
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>(loadSavedPrompts)
   const isMobile = useIsMobileLayout()
   // La démonstration fonctionne sans réseau ; un vrai moteur, non.
   const isOffline = !useIsOnline() && !aiService.isDemonstration
@@ -173,6 +176,10 @@ export function App({ aiService = demoAiService }: AppProps) {
       // Stockage indisponible (navigation privée) : les préférences restent valables pour la session.
     }
   }, [preferences])
+
+  useEffect(() => {
+    document.documentElement.dataset.textSize = preferences.textSize
+  }, [preferences.textSize])
 
   const conversationTitle = conversation.activeConversation?.title
   useEffect(() => {
@@ -227,6 +234,26 @@ export function App({ aiService = demoAiService }: AppProps) {
       voiceName: preferences.voiceName,
       onEnd: () => setSpeakingMessageId((current) => (current === message.id ? undefined : current)),
     })
+  }
+
+  const savedPromptsLoaded = useRef(false)
+  useEffect(() => {
+    if (!savedPromptsLoaded.current) {
+      savedPromptsLoaded.current = true
+      return
+    }
+    storeSavedPrompts(savedPrompts)
+  }, [savedPrompts])
+
+  /** Renvoie vrai si la consigne a été enregistrée. */
+  const savePrompt = (prompt: string, title?: string) => {
+    const result = addSavedPrompt(savedPrompts, prompt, title)
+    if (result.problem === 'duplicate') notify('Cette consigne est déjà enregistrée.')
+    else if (result.problem === 'full') notify('Vous avez atteint la limite de consignes enregistrées. Supprimez-en une dans Paramètres › Personnalisation.')
+    if (result.problem) return false
+    setSavedPrompts(result.prompts)
+    notify('Consigne enregistrée. Retrouvez-la sur l’accueil ou en tapant « / » dans la zone de saisie.', 'success')
+    return true
   }
 
   const exportConversations = () => {
@@ -361,6 +388,7 @@ export function App({ aiService = demoAiService }: AppProps) {
       onSend={sendMessage}
       onStop={stopGeneration}
       onNotify={notify}
+      savedPrompts={savedPrompts}
     />
   )
 
@@ -389,6 +417,9 @@ export function App({ aiService = demoAiService }: AppProps) {
               notify('Toutes les conversations de cette session ont été supprimées.', 'success')
             }}
             onExportConversations={exportConversations}
+            savedPrompts={savedPrompts}
+            onAddPrompt={savePrompt}
+            onDeletePrompt={(id) => setSavedPrompts((current) => current.filter((item) => item.id !== id))}
             onImportConversations={(file) => void importConversations(file)}
           />
         )
@@ -413,6 +444,9 @@ export function App({ aiService = demoAiService }: AppProps) {
             onRate={rateMessage}
             onReport={openReport}
             speakingMessageId={speakingMessageId}
+            onSelectVersion={(message, index) => conversation.selectVersion(message.id, index)}
+            savedPrompts={savedPrompts}
+            onSavePrompt={(prompt) => void savePrompt(prompt)}
             onSpeak={preferences.readAloud && isSpeechSupported() ? toggleSpeech : undefined}
           />
         )

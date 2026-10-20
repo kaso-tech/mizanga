@@ -70,4 +70,14 @@ describe('conversationStorage', () => {
     expect(merged).toMatchObject({ added: 0, updated: 1 })
     expect(merged.conversations[0].title).toBe('Récent')
   })
+
+  it('relit les versions d’une réponse et ignore des versions incohérentes', () => {
+    const reply = { id: 'a1', role: 'assistant' as const, content: 'B', createdAt: '2026-10-20T10:00:02.000Z', status: 'complete' as const }
+    const versions = [{ content: 'A', createdAt: '2026-10-20T10:00:01.000Z', status: 'complete' as const, rating: 'positive' as const }, { content: 'B', createdAt: '2026-10-20T10:00:02.000Z' }]
+    saveConversations([{ ...conversation, messages: [conversation.messages[0], { ...reply, versions, versionIndex: 1 }] }])
+    expect(loadConversations()[0].messages[1]).toMatchObject({ versionIndex: 1, versions: [{ content: 'A', rating: 'positive' }, { content: 'B' }] })
+
+    saveConversations([{ ...conversation, messages: [conversation.messages[0], { ...reply, versions, versionIndex: 5 }] }])
+    expect(loadConversations()[0].messages[1].versions).toBeUndefined()
+  })
 })

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { AiServiceError, type AiService } from '../domain/services'
 import { clearStoredConversations, loadConversations, mergeConversations, saveConversations } from './conversationStorage'
-import type { Attachment, ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
+import type { Attachment, ChatMessage, Conversation, LinguisticPreferences, MessageRating, ReplyVersion } from '../domain/types'
+import { showReplyVersion, snapshotReply, versionsBeforeRegeneration } from './replyVersions'
 
 function createId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`
@@ -71,13 +72,18 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     updateMessages(conversationId, (messages) => messages.map((message) => (message.id === messageId ? update(message) : message)))
   }
 
-  const run = async (conversationId: string, history: ChatMessage[]) => {
+  /** `previousVersions` : versions précédentes de la réponse, quand elle est régénérée. */
+  const run = async (conversationId: string, history: ChatMessage[], previousVersions: ReplyVersion[] = []) => {
     controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
     setIsGenerating(true)
 
     const replyId = createId('assistant')
+    // La nouvelle réponse devient la dernière version ; sa copie dans `versions` est rafraîchie au changement de version.
+    const withVersions = (reply: ChatMessage): ChatMessage => (
+      previousVersions.length > 0 ? { ...reply, versions: [...previousVersions, snapshotReply(reply)], versionIndex: previousVersions.length } : reply
+    )
     let hasReply = false
     let completed = false
     try {
@@ -90,7 +96,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
         }
         if (!hasReply) {
           hasReply = true
-          updateMessages(conversationId, (messages) => [...messages, {
+          updateMessages(conversationId, (messages) => [...messages, withVersions({
             id: replyId,
             role: 'assistant',
             content: chunk.text,
@@ -98,7 +104,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
             language: chunk.language,
             status: 'streaming',
             isDemonstration: aiService.isDemonstration,
-          }])
+          })])
         } else {
           updateMessage(conversationId, replyId, (message) => ({ ...message, content: message.content + chunk.text }))
         }
@@ -112,7 +118,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
           isAbortError(error) ? { ...message, status: 'stopped' } : { ...message, status: 'error', errorMessage }
         ))
       } else if (!isAbortError(error)) {
-        updateMessages(conversationId, (messages) => [...messages, {
+        updateMessages(conversationId, (messages) => [...messages, withVersions({
           id: replyId,
           role: 'assistant',
           content: '',
@@ -120,7 +126,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
           status: 'error',
           errorMessage,
           isDemonstration: aiService.isDemonstration,
-        }])
+        })])
       }
     } finally {
       if (controllerRef.current === controller) {
@@ -170,14 +176,20 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     void run(activeConversation.id, history)
   }
 
-  /** Relance la dernière demande en remplaçant la réponse qui la suit. */
+  /** Relance la dernière demande ; la réponse précédente reste consultable comme version antérieure. */
   const regenerate = () => {
     if (!activeConversation) return
     const lastUserIndex = activeConversation.messages.findLastIndex((message) => message.role === 'user')
     if (lastUserIndex < 0) return
     const history = activeConversation.messages.slice(0, lastUserIndex + 1)
+    const previousVersions = versionsBeforeRegeneration(activeConversation.messages[lastUserIndex + 1])
     updateMessages(activeConversation.id, () => history)
-    void run(activeConversation.id, history)
+    void run(activeConversation.id, history, previousVersions)
+  }
+
+  const selectVersion = (messageId: string, index: number) => {
+    if (!activeConversation || isGenerating) return
+    updateMessage(activeConversation.id, messageId, (message) => showReplyVersion(message, index))
   }
 
   const stop = () => {
@@ -243,6 +255,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     send,
     editLastUserMessage,
     regenerate,
+    selectVersion,
     stop,
     select,
     startNew,

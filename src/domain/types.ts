@@ -2,6 +2,7 @@ export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about' | 
 
 /** « system » suit le réglage clair/sombre de l’appareil. */
 export type ThemePreference = 'light' | 'dark' | 'system'
+export type TextSize = 'small' | 'normal' | 'large' | 'xlarge'
 export type UserWritingMode = 'standard' | 'informal'
 /**
  * Langue et registre d’écriture des réponses, réunis en un seul choix pour éviter les combinaisons contradictoires.
@@ -16,6 +17,8 @@ export interface LinguisticPreferences {
   responseLanguage: ResponseLanguage
   userWritingMode: UserWritingMode
   theme: ThemePreference
+  /** Taille du texte des conversations. */
+  textSize: TextSize
   /** Ce que Mizanga doit savoir sur l’utilisateur et sa façon de répondre ; transmis au moteur avec chaque demande. */
   customInstructions: string
   /** Affiche le bouton « Écouter » sous les réponses (synthèse vocale du navigateur). */
@@ -60,7 +63,15 @@ export interface ChatMessage {
   searchSuggestionsHtml?: string
   /** Avis local de l’utilisateur ; il n’est envoyé nulle part dans cette version. */
   rating?: MessageRating
+  /**
+   * Réponse régénérée : toutes ses versions, dans l’ordre. Les champs du message reflètent la version
+   * affichée (`versionIndex`), seule transmise au moteur ; l’entrée correspondante peut être en retard.
+   */
+  versions?: ReplyVersion[]
+  versionIndex?: number
 }
+
+export type ReplyVersion = Pick<ChatMessage, 'content' | 'createdAt' | 'language' | 'status' | 'errorMessage' | 'isDemonstration' | 'sources' | 'searchSuggestionsHtml' | 'rating'>
 
 export type MessageRating = 'positive' | 'negative' | 'correct'
 
@@ -97,6 +108,7 @@ export const defaultPreferences: LinguisticPreferences = {
   responseLanguage: 'auto',
   userWritingMode: 'standard',
   theme: 'light',
+  textSize: 'normal',
   customInstructions: '',
   readAloud: true,
   speechRate: 1,

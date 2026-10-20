@@ -398,6 +398,10 @@ button.close-drawer { display: none; }
 .assistant-body { flex: 1; min-width: 0; }
 .demo-badge { display: inline-block; margin-bottom: 8px; padding: 2px 10px; border-radius: 999px; background: var(--ochre-soft); font-size: 11px; font-weight: 500; }
 .assistant-content { font-size: 16px; line-height: 1.625; overflow-wrap: anywhere; }
+/* Taille du texte choisie dans les paramètres : toute la conversation est mise à l’échelle, icônes comprises. */
+html[data-text-size="small"] .messages-list { zoom: .9; }
+html[data-text-size="large"] .messages-list { zoom: 1.15; }
+html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 .assistant-content > * + * { margin-top: 12px; }
 .assistant-content > :first-child { margin-top: 0; }
 .assistant-content p, .assistant-content ul, .assistant-content ol, .assistant-content pre, .assistant-content blockquote, .assistant-content .table-scroll { margin-bottom: 0; }
@@ -440,6 +444,10 @@ button.close-drawer { display: none; }
 .message-actions button:hover { color: var(--foreground); background: var(--accent); }
 .message-actions button.is-positive { color: var(--primary); }
 .message-actions button.is-active { color: var(--primary); background: var(--accent); }
+.version-nav { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
+.version-nav > span { min-width: 34px; text-align: center; }
+.message-actions .version-nav button { min-width: 28px; padding: 0 4px; }
+.message-actions .version-nav button:disabled { opacity: .35; cursor: default; background: transparent; }
 .message-actions button.is-negative { color: var(--destructive); }
 .label-short { display: none; }
 
@@ -664,6 +672,27 @@ button.close-drawer { display: none; }
 .instructions-input::placeholder { color: var(--muted-foreground); }
 .instructions-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .char-count { color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
+.instructions-group + .instructions-group { border-top: 1px solid var(--border); }
+.prompt-form { display: grid; gap: 8px; }
+.prompt-form .instructions-input { margin-top: 0; }
+.saved-prompt-list { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
+.saved-prompt-list li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.saved-prompt-preview { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: pre-line; }
+
+.saved-prompt-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; max-width: 720px; margin: 4px auto 0; }
+.saved-prompt-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 34px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--foreground); background: var(--accent); font-size: 13px; }
+.saved-prompt-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-prompt-chip:hover { border-color: var(--ring); }
+
+.prompt-menu { display: grid; gap: 2px; max-height: 280px; margin: 0 0 8px; padding: 6px; overflow-y: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--card); box-shadow: var(--shadow-composer); list-style: none; animation: fade-up .2s ease-out both; }
+.prompt-menu li[role="option"] { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+.prompt-menu li[role="option"] > svg { flex: 0 0 auto; margin-top: 3px; color: var(--primary); }
+.prompt-menu li.is-active { background: var(--accent); }
+.prompt-menu-text { display: grid; min-width: 0; font-size: 14px; }
+.prompt-menu-text > span { overflow: hidden; color: var(--muted-foreground); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-menu-help { padding: 4px 10px 2px; color: var(--muted-foreground); font-size: 11px; }
+.prompt-menu-empty { padding: 10px 14px; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
+.prompt-menu-empty svg { vertical-align: -2px; }
 
 .select-control { position: relative; display: inline-flex; }
 .select-control::after {

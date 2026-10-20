@@ -1,4 +1,4 @@
-import type { Attachment, ChatMessage, Conversation } from '../domain/types'
+import type { Attachment, ChatMessage, Conversation, ReplyVersion } from '../domain/types'
 
 const storageKey = 'mizanga.conversations.v1'
 
@@ -14,26 +14,46 @@ function readAttachments(value: unknown): Attachment[] {
   })
 }
 
-/** Relit un message enregistré ; une réponse interrompue par le rechargement est marquée « arrêtée ». */
-function readMessage(value: unknown): ChatMessage | null {
-  const message = value as Partial<ChatMessage> | null
-  if (!message || !isString(message.id) || (message.role !== 'user' && message.role !== 'assistant') || !isString(message.content) || !isString(message.createdAt)) return null
+/** Champs d’une réponse relus depuis le stockage ; une réponse interrompue par le rechargement est marquée « arrêtée ». */
+function readReplyFields(message: Partial<ChatMessage>) {
   const status = message.status === 'streaming' ? 'stopped' : message.status
-  const attachments = readAttachments(message.attachments)
   return {
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    createdAt: message.createdAt,
     ...(isString(message.language) ? { language: message.language } : {}),
-    ...(attachments.length > 0 ? { attachments } : {}),
-    ...(message.webSearch === true ? { webSearch: true } : {}),
     ...(Array.isArray(message.sources) ? { sources: message.sources.filter((source) => isString(source?.title) && isString(source?.url) && /^https?:\/\//.test(source.url)).map(({ title, url }) => ({ title, url })) } : {}),
     ...(isString(message.searchSuggestionsHtml) ? { searchSuggestionsHtml: message.searchSuggestionsHtml } : {}),
     ...(status === 'complete' || status === 'stopped' || status === 'error' ? { status } : {}),
     ...(isString(message.errorMessage) ? { errorMessage: message.errorMessage } : {}),
     ...(message.isDemonstration ? { isDemonstration: true } : {}),
     ...(message.rating === 'positive' || message.rating === 'negative' || message.rating === 'correct' ? { rating: message.rating } : {}),
+  }
+}
+
+function readVersions(message: Partial<ChatMessage>): Pick<ChatMessage, 'versions' | 'versionIndex'> {
+  if (!Array.isArray(message.versions)) return {}
+  const versions = message.versions.flatMap((value): ReplyVersion[] => {
+    const version = value as Partial<ReplyVersion> | null
+    if (!version || !isString(version.content) || !isString(version.createdAt)) return []
+    return [{ content: version.content, createdAt: version.createdAt, ...readReplyFields(version) }]
+  })
+  const index = message.versionIndex
+  if (versions.length !== message.versions.length || versions.length < 2 || !Number.isInteger(index) || index! < 0 || index! >= versions.length) return {}
+  return { versions, versionIndex: index }
+}
+
+/** Relit un message enregistré ; toute donnée inattendue est ignorée. */
+function readMessage(value: unknown): ChatMessage | null {
+  const message = value as Partial<ChatMessage> | null
+  if (!message || !isString(message.id) || (message.role !== 'user' && message.role !== 'assistant') || !isString(message.content) || !isString(message.createdAt)) return null
+  const attachments = readAttachments(message.attachments)
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+    ...(attachments.length > 0 ? { attachments } : {}),
+    ...(message.webSearch === true ? { webSearch: true } : {}),
+    ...readReplyFields(message),
+    ...(message.role === 'assistant' ? readVersions(message) : {}),
   }
 }
 

@@ -154,4 +154,56 @@ describe('App', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it('enregistre un message comme consigne et la propose sur l’accueil et avec « / »', async () => {
+    renderApp()
+    const input = screen.getByRole('textbox', { name: 'Votre message' })
+    await userEvent.type(input, 'Résume ce texte en 5 points{Enter}')
+    await userEvent.click(await screen.findByRole('button', { name: 'Enregistrer comme consigne' }))
+    expect(await screen.findByText(/Consigne enregistrée/)).toBeInTheDocument()
+
+    await userEvent.keyboard('{Control>}{Shift>}o{/Shift}{/Control}')
+    const chips = await screen.findByLabelText('Vos consignes')
+    expect(within(chips).getByRole('button', { name: /Résume ce texte en 5 points/ })).toBeInTheDocument()
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), '/resum')
+    const menu = screen.getByRole('listbox', { name: 'Consignes enregistrées' })
+    expect(within(menu).getByRole('option', { selected: true })).toHaveTextContent('Résume ce texte en 5 points')
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByRole('textbox', { name: 'Votre message' })).toHaveValue('Résume ce texte en 5 points')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Comment puis-je vous aider/ })).toBeInTheDocument()
+  })
+
+  it('ferme le menu des consignes avec Échap et garde le texte', async () => {
+    localStorage.setItem('mizanga.prompts.v1', JSON.stringify([{ id: 'p1', title: 'Courrier', prompt: 'Rédige un courrier' }]))
+    renderApp()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), '/')
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Votre message' })).toHaveValue('/')
+  })
+
+  it('navigue entre les versions d’une réponse régénérée', async () => {
+    let call = 0
+    const counting: AiService = { ...instantService, async *generate() { call++; yield { text: `Réponse numéro ${call}` } } }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={counting} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
+    await screen.findByText('Réponse numéro 1')
+    await userEvent.click(screen.getByRole('button', { name: 'Régénérer' }))
+    await screen.findByText('Réponse numéro 2')
+    const versions = screen.getByRole('group', { name: 'Versions de la réponse' })
+    expect(versions).toHaveTextContent('2 / 2')
+    await userEvent.click(within(versions).getByRole('button', { name: 'Version précédente' }))
+    expect(await screen.findByText('Réponse numéro 1')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Versions de la réponse' })).toHaveTextContent('1 / 2')
+  })
+
+  it('applique la taille du texte choisie', async () => {
+    renderApp('/parametres')
+    await userEvent.selectOptions(await screen.findByLabelText('Taille du texte'), 'large')
+    expect(document.documentElement.dataset.textSize).toBe('large')
+  })
 })

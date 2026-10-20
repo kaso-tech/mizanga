@@ -1,6 +1,7 @@
-import { ArrowUp, Check, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Bookmark, Check, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { acceptAttribute, formatSize, isAudio, isImage } from '../app/attachments'
+import { filterSavedPrompts, type SavedPrompt } from '../app/savedPrompts'
 import { MAX_RECORDING_SECONDS, formatDuration, isVoiceRecordingSupported, useVoiceRecording } from '../app/voiceRecording'
 import { mooreCharacters } from '../data/content'
 import type { Attachment } from '../domain/types'
@@ -23,6 +24,8 @@ interface ComposerProps {
   onSend: (content: string) => void
   onStop: () => void
   onNotify: (message: string) => void
+  /** Consignes proposées quand le message commence par « / ». */
+  savedPrompts?: SavedPrompt[]
 }
 
 export function Composer({
@@ -42,6 +45,7 @@ export function Composer({
   onSend,
   onStop,
   onNotify,
+  savedPrompts = [],
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -51,6 +55,25 @@ export function Composer({
   const recording = useVoiceRecording({ onRecorded: (file) => onAddFiles([file]), onError: onNotify })
   const isRecording = recording.state === 'recording'
   const hasContent = value.trim().length > 0 || attachments.length > 0
+
+  // « / » en début de message ouvre la liste des consignes enregistrées, filtrée par la suite du texte.
+  const slashQuery = /^\/[^\n]*$/.test(value) ? value.slice(1) : null
+  const [menuDismissedFor, setMenuDismissedFor] = useState<string | null>(null)
+  const [activePrompt, setActivePrompt] = useState(0)
+  const promptMatches = slashQuery !== null && menuDismissedFor !== value ? filterSavedPrompts(savedPrompts, slashQuery).slice(0, 8) : []
+  const showPromptHint = value === '/' && savedPrompts.length === 0 && menuDismissedFor !== value
+  const isPromptMenuOpen = promptMatches.length > 0
+  const selectedPrompt = Math.min(activePrompt, Math.max(promptMatches.length - 1, 0))
+
+  const choosePrompt = (prompt: SavedPrompt) => {
+    onValueChange(prompt.prompt)
+    setActivePrompt(0)
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      textarea?.focus()
+      textarea?.setSelectionRange(prompt.prompt.length, prompt.prompt.length)
+    })
+  }
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -89,6 +112,31 @@ export function Composer({
         <p className="offline-banner" role="status">
           <WifiOff size={16} aria-hidden="true" />
           Vous êtes hors connexion. Votre message est conservé : vous pourrez l’envoyer dès le retour du réseau.
+        </p>
+      )}
+      {isPromptMenuOpen && (
+        <ul className="prompt-menu" role="listbox" id="prompt-menu" aria-label="Consignes enregistrées">
+          {promptMatches.map((prompt, index) => (
+            <li
+              key={prompt.id}
+              id={`prompt-option-${prompt.id}`}
+              role="option"
+              aria-selected={index === selectedPrompt}
+              className={index === selectedPrompt ? 'is-active' : ''}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setActivePrompt(index)}
+              onClick={() => choosePrompt(prompt)}
+            >
+              <Bookmark size={14} aria-hidden="true" />
+              <span className="prompt-menu-text"><strong>{prompt.title}</strong><span>{prompt.prompt}</span></span>
+            </li>
+          ))}
+          <li className="prompt-menu-help" aria-hidden="true">↑ ↓ pour choisir · Entrée pour insérer · Échap pour fermer</li>
+        </ul>
+      )}
+      {showPromptHint && (
+        <p className="prompt-menu prompt-menu-empty" role="status">
+          Aucune consigne enregistrée. Enregistrez un de vos messages avec son bouton <Bookmark size={13} aria-label="signet" />, ou ajoutez-en dans Paramètres › Personnalisation.
         </p>
       )}
       {showCharacters && (
@@ -149,6 +197,7 @@ export function Composer({
           spellCheck={false}
           enterKeyHint="enter"
           aria-label="Votre message"
+          aria-controls={isPromptMenuOpen ? 'prompt-menu' : undefined}
           placeholder="Demandez n’importe quoi, en français ou en mooré…"
           onChange={(event) => onValueChange(event.target.value)}
           onPaste={(event) => {
@@ -159,6 +208,24 @@ export function Composer({
             onAddFiles(files)
           }}
           onKeyDown={(event) => {
+            if (isPromptMenuOpen) {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault()
+                const step = event.key === 'ArrowDown' ? 1 : -1
+                setActivePrompt((selectedPrompt + step + promptMatches.length) % promptMatches.length)
+                return
+              }
+              if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+                event.preventDefault()
+                choosePrompt(promptMatches[selectedPrompt])
+                return
+              }
+            }
+            if ((isPromptMenuOpen || showPromptHint) && event.key === 'Escape') {
+              event.preventDefault()
+              setMenuDismissedFor(value)
+              return
+            }
             const isTouch = window.matchMedia('(pointer: coarse)').matches
             // Pendant une composition (touches mortes, IME), Entrée valide le caractère et ne doit pas envoyer.
             const isComposing = event.nativeEvent.isComposing || event.keyCode === 229

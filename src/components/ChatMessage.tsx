@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
+import { BookmarkPlus, Check, CheckCheck, ChevronLeft, ChevronRight, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { formatSize, isAudio, isImage } from '../app/attachments'
 import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
@@ -83,8 +83,22 @@ function WebSources({ sources = [], searchSuggestionsHtml }: { sources?: Array<{
   )
 }
 
+/** Choix entre les versions d’une réponse régénérée. */
+function VersionNav({ message, onSelect }: { message: ChatMessageType; onSelect: (index: number) => void }) {
+  const count = message.versions?.length ?? 0
+  const index = message.versionIndex ?? count - 1
+  if (count < 2) return null
+  return (
+    <span className="version-nav" role="group" aria-label="Versions de la réponse">
+      <button type="button" disabled={index === 0} onClick={() => onSelect(index - 1)} aria-label="Version précédente" title="Version précédente"><ChevronLeft size={16} /></button>
+      <span aria-live="polite">{index + 1} / {count}</span>
+      <button type="button" disabled={index === count - 1} onClick={() => onSelect(index + 1)} aria-label="Version suivante" title="Version suivante"><ChevronRight size={16} /></button>
+    </span>
+  )
+}
+
 /** Message de l’utilisateur, avec copie et — pour le dernier — modification puis relance. */
-function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessageType; canEdit: boolean; onCopy: (message: ChatMessageType) => void; onEdit: (content: string) => void }) {
+function UserMessage({ message, canEdit, onCopy, onEdit, onSavePrompt }: { message: ChatMessageType; canEdit: boolean; onCopy: (message: ChatMessageType) => void; onEdit: (content: string) => void; onSavePrompt?: (prompt: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null)
 
   if (draft !== null) {
@@ -131,6 +145,9 @@ function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessag
           {canEdit && (
             <button type="button" onClick={() => setDraft(message.content)} aria-label="Modifier le message" title="Modifier le message"><Pencil size={15} /></button>
           )}
+          {onSavePrompt && message.content.trim() && (
+            <button type="button" onClick={() => onSavePrompt(message.content)} aria-label="Enregistrer comme consigne" title="Enregistrer comme consigne réutilisable"><BookmarkPlus size={15} /></button>
+          )}
         </div>
       </div>
     </article>
@@ -149,14 +166,17 @@ interface ChatMessageProps {
   onReport: (message: ChatMessageType, selectedPassage: string) => void
   onSpeak?: (message: ChatMessageType) => void
   isSpeaking?: boolean
+  /** Changer de version ; seulement pour la dernière réponse, que la suite de la conversation ne contredit pas. */
+  onSelectVersion?: (message: ChatMessageType, index: number) => void
+  onSavePrompt?: (prompt: string) => void
 }
 
-export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false }: ChatMessageProps) {
+export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt }: ChatMessageProps) {
   // Le passage sélectionné dans la réponse pré-remplit le formulaire de signalement.
   const [selectedPassage, setSelectedPassage] = useState('')
 
   if (message.role === 'user') {
-    return <UserMessage message={message} canEdit={canEdit} onCopy={onCopy} onEdit={onEdit} />
+    return <UserMessage message={message} canEdit={canEdit} onCopy={onCopy} onEdit={onEdit} onSavePrompt={onSavePrompt} />
   }
 
   const isDone = message.status !== 'streaming'
@@ -180,11 +200,13 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
 
         {isDone && !message.content && canRegenerate && (
           <div className="message-actions">
+            {onSelectVersion && <VersionNav message={message} onSelect={(index) => onSelectVersion(message, index)} />}
             <button type="button" className="has-label" onClick={onRegenerate}><RefreshCw size={16} aria-hidden="true" /> Réessayer</button>
           </div>
         )}
         {isDone && message.content && (
           <div className="message-actions" aria-label="Actions pour cette réponse">
+            {onSelectVersion && <VersionNav message={message} onSelect={(index) => onSelectVersion(message, index)} />}
             <button type="button" onClick={() => onCopy(message)} aria-label={isCopied ? 'Copié' : 'Copier'} title={isCopied ? 'Copié' : 'Copier'}>
               {isCopied ? <Check size={16} /> : <Copy size={16} />}
             </button>

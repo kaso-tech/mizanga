@@ -1,5 +1,6 @@
-import { ArrowDown, Code2, FileText, Lightbulb, Mail, RotateCcw, Search, Sprout } from 'lucide-react'
+import { ArrowDown, Bookmark, Code2, FileText, Lightbulb, Mail, RotateCcw, Search, Sprout } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { SavedPrompt } from '../app/savedPrompts'
 import { suggestions, type SuggestionIcon } from '../data/content'
 import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
@@ -32,6 +33,9 @@ interface ChatViewProps {
   /** Lecture à voix haute ; absent quand elle est désactivée ou non prise en charge. */
   onSpeak?: (message: ChatMessageType) => void
   speakingMessageId?: string
+  onSelectVersion: (message: ChatMessageType, index: number) => void
+  savedPrompts: SavedPrompt[]
+  onSavePrompt: (prompt: string) => void
 }
 
 export function ChatView({
@@ -50,6 +54,9 @@ export function ChatView({
   onReport,
   onSpeak,
   speakingMessageId,
+  onSelectVersion,
+  savedPrompts,
+  onSavePrompt,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
   const lastMessage = messages.at(-1)
@@ -106,6 +113,16 @@ export function ChatView({
         </div>
         <div className="welcome-composer">{composer}</div>
         <p className="response-language-note">Réponses en : <strong>{responseLanguageLabel}</strong></p>
+        {savedPrompts.length > 0 && (
+          <div className="saved-prompt-row" aria-label="Vos consignes">
+            {savedPrompts.slice(0, 6).map((item) => (
+              <button type="button" key={item.id} className="saved-prompt-chip" title={item.prompt} onClick={() => onSuggestion(item.prompt)}>
+                <Bookmark size={14} aria-hidden="true" />
+                <span>{item.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="suggestion-grid" aria-label="Suggestions">
           {suggestions.map(({ label, prompt, icon }) => {
             const Icon = suggestionIcons[icon]
@@ -138,6 +155,8 @@ export function ChatView({
             onReport={onReport}
             onSpeak={onSpeak}
             isSpeaking={speakingMessageId === message.id}
+            onSelectVersion={message === lastMessage && !isGenerating ? onSelectVersion : undefined}
+            onSavePrompt={onSavePrompt}
           />
         ))}
         {isGenerating && !isStreaming && (

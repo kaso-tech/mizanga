@@ -64,6 +64,40 @@ describe('useConversation', () => {
     expect(result.current.messages[1].id).not.toBe(firstReplyId)
   })
 
+  it('garde les versions précédentes d’une réponse régénérée et permet d’y revenir', async () => {
+    let call = 0
+    const service: AiService = {
+      isDemonstration: false,
+      label: 'Test',
+      async *generate() {
+        call++
+        if (call === 3) throw new Error('panne')
+        yield { text: `Version ${call}` }
+      },
+    }
+    const { result } = setup(service)
+    act(() => result.current.send('Question'))
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    act(() => result.current.rate(result.current.messages[1].id, 'positive'))
+
+    act(() => result.current.regenerate())
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    expect(result.current.messages[1]).toMatchObject({ content: 'Version 2', versionIndex: 1 })
+    expect(result.current.messages[1].versions).toHaveLength(2)
+
+    // Retour à la première version : son avis est conservé.
+    act(() => result.current.selectVersion(result.current.messages[1].id, 0))
+    expect(result.current.messages[1]).toMatchObject({ content: 'Version 1', rating: 'positive', versionIndex: 0 })
+
+    // Un échec de régénération reste une version consultable, sans effacer les précédentes.
+    act(() => result.current.regenerate())
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    expect(result.current.messages[1]).toMatchObject({ content: '', status: 'error', versionIndex: 2 })
+    act(() => result.current.selectVersion(result.current.messages[1].id, 1))
+    expect(result.current.messages[1]).toMatchObject({ content: 'Version 2', status: 'complete' })
+    expect(result.current.messages[1].versions?.map((version) => version.content)).toEqual(['Version 1', 'Version 2', ''])
+  })
+
   it('gère avis, favoris, suppression et effacement complet', async () => {
     const { result } = setup(fakeService())
     act(() => result.current.send('Première'))

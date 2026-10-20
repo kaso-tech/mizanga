@@ -1,17 +1,18 @@
-import { AudioLines, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Upload, UserRound, type LucideIcon } from 'lucide-react'
+import { AudioLines, Bookmark, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, UserRound, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
+import { MAX_PROMPT_TITLE_CHARS, MAX_SAVED_PROMPTS, type SavedPrompt } from '../app/savedPrompts'
 import { isSpeechSupported, listVoices, speak, speechRates, subscribeVoices } from '../app/speech'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS } from '../services/remoteAiService'
 import { isVoiceRecordingSupported } from '../app/voiceRecording'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
-import type { LinguisticPreferences, ResponseLanguage, ThemePreference, UserWritingMode } from '../domain/types'
+import type { LinguisticPreferences, ResponseLanguage, TextSize, ThemePreference, UserWritingMode } from '../domain/types'
 
 type SectionId = 'general' | 'personnalisation' | 'langue' | 'donnees' | 'voix' | 'compte'
 
 const sections: Array<{ id: SectionId; label: string; description: string; icon: LucideIcon }> = [
   { id: 'general', label: 'Général', description: 'Apparence et langue de l’interface.', icon: SlidersHorizontal },
-  { id: 'personnalisation', label: 'Personnalisation', description: 'Ce que Mizanga doit savoir sur vous et la façon dont vous préférez qu’elle réponde.', icon: Sparkles },
+  { id: 'personnalisation', label: 'Personnalisation', description: 'Ce que Mizanga doit savoir sur vous, votre façon de répondre préférée et vos consignes réutilisables.', icon: Sparkles },
   { id: 'langue', label: 'Langue et écriture', description: 'La langue de vos échanges avec Mizanga et votre façon d’écrire le mooré.', icon: Languages },
   { id: 'donnees', label: 'Conversations et données', description: 'Ce qui est conservé, où, et comment l’effacer.', icon: Database },
   { id: 'voix', label: 'Voix', description: 'Messages vocaux et lecture audio des réponses.', icon: AudioLines },
@@ -138,6 +139,49 @@ function CustomInstructions({ value, isDemonstration, onSave }: { value: string;
   )
 }
 
+/** Consignes réutilisables : ajout, liste et suppression. */
+function SavedPromptsSettings({ prompts, onAdd, onDelete }: { prompts: SavedPrompt[]; onAdd: (prompt: string, title: string) => boolean; onDelete: (id: string) => void }) {
+  const [title, setTitle] = useState('')
+  const [prompt, setPrompt] = useState('')
+  const add = () => {
+    if (onAdd(prompt, title)) {
+      setTitle('')
+      setPrompt('')
+    }
+  }
+  return (
+    <div className="setting-group instructions-group">
+      <p className="setting-label">Consignes enregistrées</p>
+      <p className="setting-description">
+        Les demandes que vous faites souvent, prêtes à l’emploi : elles apparaissent sur l’accueil et en tapant « / » au début d’un message. Vous pouvez aussi enregistrer un de vos messages avec son bouton <Bookmark size={12} aria-label="signet" />.
+      </p>
+      <div className="prompt-form">
+        <label className="visually-hidden" htmlFor="new-prompt-title">Titre de la consigne</label>
+        <input id="new-prompt-title" className="instructions-input" value={title} maxLength={MAX_PROMPT_TITLE_CHARS} placeholder="Titre (facultatif), par ex. « Résumé en 5 points »" onChange={(event) => setTitle(event.target.value)} />
+        <label className="visually-hidden" htmlFor="new-prompt-text">Texte de la consigne</label>
+        <textarea id="new-prompt-text" className="instructions-input" rows={3} maxLength={4000} value={prompt} placeholder="Par ex. : Résume le texte suivant en 5 points clairs, puis propose un titre." onChange={(event) => setPrompt(event.target.value)} />
+        <div className="instructions-footer">
+          <span className="char-count">{prompts.length} / {MAX_SAVED_PROMPTS} consignes</span>
+          <button type="button" className="primary-button" disabled={!prompt.trim()} onClick={add}>Ajouter la consigne</button>
+        </div>
+      </div>
+      {prompts.length > 0 && (
+        <ul className="saved-prompt-list" aria-label="Vos consignes">
+          {prompts.map((item) => (
+            <li key={item.id}>
+              <span className="setting-text">
+                <span className="setting-label">{item.title}</span>
+                <span className="setting-description saved-prompt-preview">{item.prompt}</span>
+              </span>
+              <button type="button" className="icon-button" onClick={() => onDelete(item.id)} aria-label={`Supprimer la consigne « ${item.title} »`} title="Supprimer"><Trash2 size={16} /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 /** Voix de l’appareil, mises à jour quand le navigateur finit de les charger. */
 function useVoices() {
   const [voices, setVoices] = useState(listVoices)
@@ -209,9 +253,12 @@ interface SettingsViewProps {
   onClearConversations: () => void
   onExportConversations: () => void
   onImportConversations: (file: File) => void
+  savedPrompts: SavedPrompt[]
+  onAddPrompt: (prompt: string, title: string) => boolean
+  onDeletePrompt: (id: string) => void
 }
 
-export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onOpenEvaluation, onClearConversations, onExportConversations, onImportConversations }: SettingsViewProps) {
+export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onOpenEvaluation, onClearConversations, onExportConversations, onImportConversations, savedPrompts, onAddPrompt, onDeletePrompt }: SettingsViewProps) {
   const importInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection)
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -285,6 +332,19 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   onChange={(theme) => onChange({ theme })}
                 />
               </SettingRow>
+              <SettingRow label="Taille du texte" htmlFor="setting-text-size" description="Agrandit ou réduit les messages des conversations.">
+                <SelectControl<TextSize>
+                  id="setting-text-size"
+                  value={preferences.textSize}
+                  options={[
+                    { value: 'small', label: 'Petite' },
+                    { value: 'normal', label: 'Normale' },
+                    { value: 'large', label: 'Grande' },
+                    { value: 'xlarge', label: 'Très grande' },
+                  ]}
+                  onChange={(textSize) => onChange({ textSize })}
+                />
+              </SettingRow>
               <InstallRow />
               <SettingRow label="Moteur de réponses" description={engine.isDemonstration ? 'Aucun moteur d’IA n’est connecté : les réponses sont des messages de démonstration.' : 'Le modèle qui rédige les réponses de Mizanga.'}>
                 <span className="value-pill">{engine.label}</span>
@@ -301,7 +361,10 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
           )}
 
           {activeSection === 'personnalisation' && (
-            <CustomInstructions value={preferences.customInstructions} isDemonstration={engine.isDemonstration} onSave={(customInstructions) => onChange({ customInstructions })} />
+            <>
+              <CustomInstructions value={preferences.customInstructions} isDemonstration={engine.isDemonstration} onSave={(customInstructions) => onChange({ customInstructions })} />
+              <SavedPromptsSettings prompts={savedPrompts} onAdd={onAddPrompt} onDelete={onDeletePrompt} />
+            </>
           )}
 
           {activeSection === 'langue' && (
