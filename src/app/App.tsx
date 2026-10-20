@@ -63,6 +63,20 @@ function useIsMobileLayout() {
   return isMobile
 }
 
+function useIsOnline() {
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+  useEffect(() => {
+    const update = () => setIsOnline(navigator.onLine)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+  return isOnline
+}
+
 const preferencesStorageKey = 'mizanga.preferences.v1'
 
 /** Préférences conservées sur cet appareil uniquement ; une valeur illisible ou inconnue est ignorée. */
@@ -108,6 +122,8 @@ export function App({ aiService = demoAiService }: AppProps) {
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
   const [reportedPassage, setReportedPassage] = useState('')
   const isMobile = useIsMobileLayout()
+  // La démonstration fonctionne sans réseau ; un vrai moteur, non.
+  const isOffline = !useIsOnline() && !aiService.isDemonstration
   const [toast, setToast] = useState<{ message: string; tone: ToastTone }>()
   const toastTimer = useRef<number>()
   const copiedTimer = useRef<number>()
@@ -203,7 +219,7 @@ export function App({ aiService = demoAiService }: AppProps) {
       return
     }
     setCopiedMessageId(message.id)
-    notify('Réponse copiée dans le presse-papiers.', 'success')
+    notify(message.role === 'user' ? 'Message copié dans le presse-papiers.' : 'Réponse copiée dans le presse-papiers.', 'success')
     if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
     copiedTimer.current = window.setTimeout(() => setCopiedMessageId(undefined), 1800)
   }
@@ -234,6 +250,7 @@ export function App({ aiService = demoAiService }: AppProps) {
       value={draft}
       isGenerating={conversation.isGenerating}
       isDemonstration={aiService.isDemonstration}
+      isOffline={isOffline}
       stopLabel={stopLabel}
       focusToken={focusToken}
       onValueChange={setDraft}
@@ -283,6 +300,7 @@ export function App({ aiService = demoAiService }: AppProps) {
             onNewConversation={startNewConversation}
             onCopy={copyMessage}
             onRegenerate={conversation.regenerate}
+            onEditLastMessage={conversation.editLastUserMessage}
             onRate={rateMessage}
             onReport={openReport}
           />

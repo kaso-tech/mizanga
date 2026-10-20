@@ -13,6 +13,11 @@ const fakeGemini = createServer(async (req, res) => {
   let raw = ''
   for await (const chunk of req) raw += chunk
   lastUpstreamRequest = { url: req.url, headers: req.headers, body: JSON.parse(raw) }
+  if (req.url?.endsWith(':generateContent')) {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'réflexion', thought: true }, { text: '« Photosynthèse expliquée. »\nligne en trop' }] } }] }))
+    return
+  }
   if (upstreamReply.status !== 200) {
     res.writeHead(upstreamReply.status, { 'Content-Type': 'application/json' }).end('{}')
     return
@@ -116,5 +121,12 @@ describe('API Mizanga', () => {
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, rateLimit: { windowMs: 60_000, maxRequests: 1 } })
     expect((await post(base, validBody)).status).toBe(200)
     expect((await post(base, validBody)).status).toBe(429)
+  })
+
+  it('propose un titre court et nettoyé', async () => {
+    const base = await startApi({ apiKey: 'cle', model: 'gemini-test', apiBase: geminiBase })
+    const response = await fetch(`${base}/api/title`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Explique la photosynthèse' }) })
+    expect(await response.json()).toEqual({ title: 'Photosynthèse expliquée' })
+    expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-test:generateContent')
   })
 })

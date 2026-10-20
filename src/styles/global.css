@@ -451,6 +451,26 @@ button.close-drawer { display: none; }
 .restart-button { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; color: var(--muted-foreground); background: transparent; font-size: 12px; transition: background .15s ease, color .15s ease; }
 .restart-button:hover { color: var(--foreground); background: var(--accent); }
 
+/* Messages de l’utilisateur : actions au survol, modification en place. */
+.user-message { display: flex; flex-direction: column; align-items: flex-end; max-width: 85%; }
+.user-message .user-bubble { max-width: 100%; }
+.user-actions { margin-top: 2px; opacity: 0; transition: opacity .15s ease; }
+.message-row.is-user:hover .user-actions, .user-actions:focus-within { opacity: 1; }
+.edit-box { width: min(100%, 640px); padding: 10px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: var(--shadow-composer); }
+.edit-box textarea { display: block; width: 100%; padding: 6px 8px; border: 0; outline: 0; resize: vertical; background: transparent; font-size: 16px; line-height: 1.6; }
+.edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.edit-actions .primary-button { min-height: 36px; }
+
+/* Blocs de code : langage et bouton de copie. */
+.code-block { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--muted); }
+.code-block-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); font-size: 12px; }
+.code-block-bar button { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 8px; border: 0; border-radius: 8px; color: var(--muted-foreground); background: transparent; font-size: 12px; }
+.code-block-bar button:hover { color: var(--foreground); background: var(--accent); }
+.assistant-content .code-block pre { margin: 0; border: 0; border-radius: 0; }
+
+.offline-banner { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 10px 14px; border-radius: 14px; color: var(--foreground); background: var(--ochre-soft); font-size: 13px; }
+.offline-banner > svg { flex: 0 0 auto; color: var(--primary); }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }
@@ -735,6 +755,7 @@ button.close-drawer { display: none; }
 
 /* Écrans tactiles : zones d’au moins 44 px. */
 @media (pointer: coarse) {
+  .user-actions { opacity: 1; }
   .icon-button, .composer-tool, .send-button, .row-action, .toast button { min-width: 44px; min-height: 44px; }
   .message-actions button, .restart-button, .choice, .conversation-item, .filter-tabs button { min-height: 44px; }
   .message-actions button { min-width: 44px; }

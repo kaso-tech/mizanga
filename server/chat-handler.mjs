@@ -1,4 +1,4 @@
-import { streamGeminiReply, UpstreamError } from './gemini.mjs'
+import { generateGeminiTitle, streamGeminiReply, UpstreamError } from './gemini.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
 const MAX_BODY_BYTES = 512 * 1024
@@ -84,7 +84,7 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
     if (path === '/api/health' && req.method === 'GET') {
       return sendJson(res, 200, { engine: apiKey ? 'gemini' : 'demo', model: apiKey ? model : null })
     }
-    if (path !== '/api/chat') {
+    if (path !== '/api/chat' && path !== '/api/title') {
       if (next) return next()
       return sendJson(res, 404, { error: 'Introuvable.' })
     }
@@ -93,6 +93,18 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
 
     const client = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnu'
     if (!allow(client)) return sendJson(res, 429, { error: 'Trop de demandes en peu de temps. Patientez une minute.' })
+
+    if (path === '/api/title') {
+      try {
+        const body = await readJson(req)
+        if (typeof body?.text !== 'string' || !body.text.trim() || body.text.length > MAX_MESSAGE_CHARS) return sendJson(res, 400, { error: 'Requête invalide.' })
+        const title = await generateGeminiTitle({ apiKey, model, apiBase, text: body.text })
+        return sendJson(res, 200, { title })
+      } catch (error) {
+        const { status = 502, message = 'Titre indisponible.' } = /** @type {{ status?: number, message?: string }} */ (error)
+        return sendJson(res, status, { error: message })
+      }
+    }
 
     let request
     try {

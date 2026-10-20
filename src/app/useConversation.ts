@@ -79,6 +79,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
 
     const replyId = createId('assistant')
     let hasReply = false
+    let completed = false
     try {
       for await (const chunk of aiService.generate({ messages: history, preferences: preferencesRef.current }, { signal: controller.signal })) {
         if (controller.signal.aborted) break
@@ -98,6 +99,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
         }
       }
       if (hasReply) updateMessage(conversationId, replyId, (message) => ({ ...message, status: controller.signal.aborted ? 'stopped' : 'complete' }))
+      completed = hasReply && !controller.signal.aborted
     } catch (error) {
       const errorMessage = error instanceof AiServiceError ? error.userMessage : undefined
       if (hasReply) {
@@ -121,6 +123,12 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
         setIsGenerating(false)
       }
     }
+
+    // Premier échange réussi : le moteur peut proposer un titre plus parlant que la première ligne.
+    if (completed && history.length === 1 && aiService.suggestTitle) {
+      const title = await aiService.suggestTitle(history[0].content).catch(() => null)
+      if (title) setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? { ...conversation, title } : conversation)))
+    }
   }
 
   const send = (content: string) => {
@@ -137,6 +145,17 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
       setActiveId(conversationId)
     }
     void run(conversationId, history)
+  }
+
+  /** Remplace le dernier message de l’utilisateur et relance la réponse à partir de lui. */
+  const editLastUserMessage = (content: string) => {
+    if (!activeConversation) return
+    const lastUserIndex = activeConversation.messages.findLastIndex((message) => message.role === 'user')
+    if (lastUserIndex < 0) return
+    const edited = { ...activeConversation.messages[lastUserIndex], content }
+    const history = [...activeConversation.messages.slice(0, lastUserIndex), edited]
+    updateMessages(activeConversation.id, () => history)
+    void run(activeConversation.id, history)
   }
 
   /** Relance la dernière demande en remplaçant la réponse qui la suit. */
@@ -197,6 +216,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     messages: activeConversation?.messages ?? [],
     isGenerating,
     send,
+    editLastUserMessage,
     regenerate,
     stop,
     select,

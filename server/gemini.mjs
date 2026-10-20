@@ -114,3 +114,32 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
     }
   }
 }
+
+/**
+ * Propose un titre court (6 mots au plus) pour une conversation, dans la langue du message.
+ * @param {{ apiKey: string, model: string, apiBase?: string, text: string, signal?: AbortSignal }} options
+ * @returns {Promise<string | null>}
+ */
+export async function generateGeminiTitle({ apiKey, model, apiBase = DEFAULT_API_BASE, text, signal }) {
+  const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: 'Tu donnes un titre très court (6 mots au plus) à une conversation, dans la langue de son premier message. Réponds uniquement par le titre, sans guillemets, sans ponctuation finale, sans Markdown.' }] },
+      contents: [{ role: 'user', parts: [{ text: text.slice(0, 2000) }] }],
+    }),
+    signal,
+  })
+  if (!response.ok) throw errorForStatus(response.status)
+  const payload = /** @type {{ candidates?: Array<{ content?: { parts?: Array<{ text?: string, thought?: boolean }> } }> }} */ (await response.json())
+  const parts = payload.candidates?.[0]?.content?.parts ?? []
+  const raw = parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('')
+  return sanitizeTitle(raw)
+}
+
+/** @param {string} raw */
+export function sanitizeTitle(raw) {
+  const title = raw.trim().split(/\r?\n/)[0].replace(/^[#*\s"'«»“”]+|[\s"'«»“”.!?:;…*]+$/g, '').trim()
+  if (!title) return null
+  return title.length > 60 ? `${title.slice(0, 59).trimEnd()}…` : title
+}

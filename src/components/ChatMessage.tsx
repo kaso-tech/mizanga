@@ -1,36 +1,125 @@
-import { Check, CheckCheck, Copy, Flag, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { useState } from 'react'
+import { Check, CheckCheck, Copy, Flag, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
 
+/** Bloc de code avec son langage et un bouton de copie. */
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const preRef = useRef<HTMLPreElement | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [language, setLanguage] = useState('')
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(preRef.current?.innerText ?? '')
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <div className="code-block">
+      <div className="code-block-bar">
+        <span>{language}</span>
+        <button type="button" onClick={copy} aria-label={copied ? 'Code copié' : 'Copier le code'}>
+          {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+          {copied ? 'Copié' : 'Copier'}
+        </button>
+      </div>
+      <pre
+        ref={(element) => {
+          preRef.current = element
+          const match = element?.querySelector('code')?.className.match(/language-([\w+#-]+)/)
+          if (match && match[1] !== language) setLanguage(match[1])
+        }}
+      >
+        {children}
+      </pre>
+    </div>
+  )
+}
+
 // Le HTML brut reste désactivé (comportement par défaut de react-markdown) : seul le Markdown est interprété.
 const markdownComponents: Components = {
   a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
   table: ({ node: _node, ...props }) => <div className="table-scroll"><table {...props} /></div>,
+  pre: ({ node: _node, children }) => <CodeBlock>{children}</CodeBlock>,
+}
+
+/** Message de l’utilisateur, avec copie et — pour le dernier — modification puis relance. */
+function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessageType; canEdit: boolean; onCopy: (message: ChatMessageType) => void; onEdit: (content: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  if (draft !== null) {
+    const submit = () => {
+      if (!draft.trim()) return
+      onEdit(draft)
+      setDraft(null)
+    }
+    return (
+      <article className="message-row is-user" aria-label="Modifier votre message">
+        <div className="edit-box">
+          <label className="visually-hidden" htmlFor={`edit-${message.id}`}>Modifier votre message</label>
+          <textarea
+            id={`edit-${message.id}`}
+            autoFocus
+            value={draft}
+            rows={Math.min(8, Math.max(2, draft.split('\n').length))}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setDraft(null)
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                submit()
+              }
+            }}
+          />
+          <div className="edit-actions">
+            <button type="button" className="secondary-button" onClick={() => setDraft(null)}>Annuler</button>
+            <button type="button" className="primary-button" disabled={!draft.trim()} onClick={submit}>Envoyer</button>
+          </div>
+        </div>
+      </article>
+    )
+  }
+
+  return (
+    <article className="message-row is-user fade-up" aria-label="Votre message">
+      <div className="user-message">
+        <div className="user-bubble">{message.content}</div>
+        <div className="message-actions user-actions">
+          <button type="button" onClick={() => onCopy(message)} aria-label="Copier le message" title="Copier le message"><Copy size={15} /></button>
+          {canEdit && (
+            <button type="button" onClick={() => setDraft(message.content)} aria-label="Modifier le message" title="Modifier le message"><Pencil size={15} /></button>
+          )}
+        </div>
+      </div>
+    </article>
+  )
 }
 
 interface ChatMessageProps {
   message: ChatMessageType
   copiedMessageId?: string
   canRegenerate: boolean
+  canEdit: boolean
+  onEdit: (content: string) => void
   onCopy: (message: ChatMessageType) => void
   onRegenerate: () => void
   onRate: (message: ChatMessageType, rating: MessageRating) => void
   onReport: (message: ChatMessageType, selectedPassage: string) => void
 }
 
-export function ChatMessage({ message, copiedMessageId, canRegenerate, onCopy, onRegenerate, onRate, onReport }: ChatMessageProps) {
+export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport }: ChatMessageProps) {
   // Le passage sélectionné dans la réponse pré-remplit le formulaire de signalement.
   const [selectedPassage, setSelectedPassage] = useState('')
 
   if (message.role === 'user') {
-    return (
-      <article className="message-row is-user fade-up" aria-label="Votre message">
-        <div className="user-bubble">{message.content}</div>
-      </article>
-    )
+    return <UserMessage message={message} canEdit={canEdit} onCopy={onCopy} onEdit={onEdit} />
   }
 
   const isDone = message.status !== 'streaming'

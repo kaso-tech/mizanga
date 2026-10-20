@@ -34,16 +34,33 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
   return {
     isDemonstration: false,
     label,
-    async *generate({ messages, preferences }, { signal }): AsyncGenerator<AiChunk> {
-      const response = await fetch(endpoint, {
+    async suggestTitle(firstMessage) {
+      const response = await fetch('/api/title', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: selectHistory(messages),
-          preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode },
-        }),
-        signal,
+        body: JSON.stringify({ text: firstMessage }),
       })
+      if (!response.ok) return null
+      const { title } = (await response.json()) as { title?: string | null }
+      return typeof title === 'string' && title.trim() ? title.trim().slice(0, 60) : null
+    },
+    async *generate({ messages, preferences }, { signal }): AsyncGenerator<AiChunk> {
+      let response: Response
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: selectHistory(messages),
+            preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode },
+          }),
+          signal,
+        })
+      } catch (error) {
+        if (signal.aborted) throw error
+        // Réseau coupé ou serveur injoignable.
+        throw new AiServiceError(navigator.onLine ? 'Le serveur de Mizanga est injoignable. Réessayez dans un instant.' : 'Vous êtes hors connexion. Vérifiez votre réseau puis réessayez.')
+      }
       if (!response.ok || !response.body) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null
         throw new AiServiceError(body?.error ?? 'Le serveur de Mizanga est injoignable. Vérifiez votre connexion et réessayez.')

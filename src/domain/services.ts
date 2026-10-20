@@ -28,6 +28,8 @@ export interface AiService {
   /** Nom du moteur montré à l’utilisateur (transparence). */
   readonly label: string
   generate(request: AiGenerationRequest, options: { signal: AbortSignal }): AsyncIterable<AiChunk>
+  /** Facultatif : propose un titre court pour une conversation à partir de son premier message. */
+  suggestTitle?(firstMessage: string): Promise<string | null>
 }
 
 /** Erreur d’un service d’IA dont le message peut être montré tel quel à l’utilisateur. */

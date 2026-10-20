@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AiChunk, AiService } from '../domain/services'
 import { defaultPreferences } from '../domain/types'
 import { useConversation } from './useConversation'
@@ -90,5 +90,27 @@ describe('useConversation', () => {
     act(() => result.current.clearAll())
     expect(result.current.conversations).toEqual([])
     expect(result.current.activeConversation).toBeUndefined()
+  })
+
+  it('modifie le dernier message et relance la réponse', async () => {
+    const { result } = setup(fakeService())
+    act(() => result.current.send('Premièr messag'))
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+
+    act(() => result.current.editLastUserMessage('Premier message'))
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    expect(result.current.messages.map((message) => message.content)).toEqual(['Premier message', 'Bonjour à vous'])
+  })
+
+  it('demande un titre au moteur après le premier échange réussi', async () => {
+    const service = { ...fakeService(), suggestTitle: vi.fn().mockResolvedValue('Titre proposé') }
+    const { result } = setup(service)
+    act(() => result.current.send('Une longue question sur la photosynthèse'))
+    await waitFor(() => expect(result.current.activeConversation?.title).toBe('Titre proposé'))
+    expect(service.suggestTitle).toHaveBeenCalledWith('Une longue question sur la photosynthèse')
+
+    act(() => result.current.send('Suite'))
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    expect(service.suggestTitle).toHaveBeenCalledTimes(1)
   })
 })

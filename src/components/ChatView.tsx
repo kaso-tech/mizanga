@@ -26,6 +26,7 @@ interface ChatViewProps {
   onNewConversation: () => void
   onCopy: (message: ChatMessageType) => void
   onRegenerate: () => void
+  onEditLastMessage: (content: string) => void
   onRate: (message: ChatMessageType, rating: MessageRating) => void
   onReport: (message: ChatMessageType, selectedPassage: string) => void
 }
@@ -41,11 +42,13 @@ export function ChatView({
   onNewConversation,
   onCopy,
   onRegenerate,
+  onEditLastMessage,
   onRate,
   onReport,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
   const lastMessage = messages.at(-1)
+  const lastUserMessage = messages.findLast((message) => message.role === 'user')
   // L’indicateur d’attente disparaît dès que le premier fragment de réponse s’affiche.
   const isStreaming = lastMessage?.status === 'streaming'
   const endRef = useRef<HTMLDivElement>(null)
@@ -90,6 +93,8 @@ export function ChatView({
             message={message}
             copiedMessageId={copiedMessageId}
             canRegenerate={message === lastMessage && !isGenerating}
+            canEdit={message === lastUserMessage && !isGenerating}
+            onEdit={onEditLastMessage}
             onCopy={onCopy}
             onRegenerate={onRegenerate}
             onRate={onRate}

@@ -77,4 +77,16 @@ describe('remoteAiService', () => {
     ])
     expect(history.map((message) => message.content.slice(0, 8))).toEqual(['Question', 'xxxxxxxx', 'Dernière'])
   })
+
+  it('transforme une coupure réseau en message clair', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await expect(collect()).rejects.toBeInstanceOf(AiServiceError)
+  })
+
+  it('récupère un titre proposé par le serveur', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ title: 'Photosynthèse expliquée' }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await createRemoteAiService({ label: 'Gemini' }).suggestTitle?.('Explique la photosynthèse')).toBe('Photosynthèse expliquée')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/title')
+  })
 })

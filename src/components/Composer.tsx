@@ -1,4 +1,4 @@
-import { ArrowUp, ClipboardPaste, Keyboard, Mic, Square } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, Keyboard, Mic, Square, WifiOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { mooreCharacters } from '../data/content'
 
@@ -6,6 +6,7 @@ interface ComposerProps {
   value: string
   isGenerating: boolean
   isDemonstration: boolean
+  isOffline?: boolean
   stopLabel: string
   /** Change de valeur pour redonner le focus au champ (ex. après le choix d’une suggestion). */
   focusToken: number
@@ -15,7 +16,7 @@ interface ComposerProps {
   onNotify: (message: string) => void
 }
 
-export function Composer({ value, isGenerating, isDemonstration, stopLabel, focusToken, onValueChange, onSend, onStop, onNotify }: ComposerProps) {
+export function Composer({ value, isGenerating, isDemonstration, isOffline = false, stopLabel, focusToken, onValueChange, onSend, onStop, onNotify }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [showCharacters, setShowCharacters] = useState(false)
 
@@ -34,7 +35,7 @@ export function Composer({ value, isGenerating, isDemonstration, stopLabel, focu
   }, [focusToken])
 
   const submit = () => {
-    if (!value.trim() || isGenerating) return
+    if (!value.trim() || isGenerating || isOffline) return
     onSend(value)
   }
 
@@ -62,6 +63,12 @@ export function Composer({ value, isGenerating, isDemonstration, stopLabel, focu
 
   return (
     <div className="composer-wrap">
+      {isOffline && (
+        <p className="offline-banner" role="status">
+          <WifiOff size={16} aria-hidden="true" />
+          Vous êtes hors connexion. Votre message est conservé : vous pourrez l’envoyer dès le retour du réseau.
+        </p>
+      )}
       {showCharacters && (
         <div className="character-palette" role="group" aria-label="Caractères du mooré">
           {mooreCharacters.map((character) => (
@@ -114,7 +121,7 @@ export function Composer({ value, isGenerating, isDemonstration, stopLabel, focu
               <Square size={16} fill="currentColor" />
             </button>
           ) : (
-            <button type="button" className="send-button" aria-label="Envoyer" disabled={!value.trim()} onClick={submit}>
+            <button type="button" className="send-button" aria-label="Envoyer" disabled={!value.trim() || isOffline} onClick={submit}>
               <ArrowUp size={20} />
             </button>
           )}
