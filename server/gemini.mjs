@@ -87,7 +87,7 @@ export function buildSystemInstruction(preferences) {
     responseLanguageInstructions[preferences.responseLanguage ?? 'auto'] ?? responseLanguageInstructions.auto,
     writingModeInstructions[preferences.userWritingMode ?? 'standard'] ?? writingModeInstructions.standard,
     'Honnêteté : ne prétends jamais maîtriser un mot, une expression ou une tournure en mooré dont tu n’es pas sûr. Signale-le brièvement et propose une formulation simple ou l’équivalent en français. N’invente ni sources, ni citations, ni proverbes.',
-    'Mise en forme : Markdown sobre (titres courts, listes, tableaux et blocs de code quand c’est utile).',
+    'Mise en forme : Markdown sobre (titres courts, listes, tableaux et blocs de code quand c’est utile). Écris les formules mathématiques en LaTeX entre $$ et $$, y compris au milieu d’une phrase ; n’utilise jamais un seul $ pour une formule.',
   ].join('\n')
 }
 

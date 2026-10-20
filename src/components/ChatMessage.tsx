@@ -1,55 +1,11 @@
 import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
-import ReactMarkdown, { type Components } from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { lazy, Suspense, useState } from 'react'
 import { formatSize, isAudio, isImage } from '../app/attachments'
 import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
 
-/** Bloc de code avec son langage et un bouton de copie. */
-function CodeBlock({ children }: { children?: ReactNode }) {
-  const preRef = useRef<HTMLPreElement | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [language, setLanguage] = useState('')
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(preRef.current?.innerText ?? '')
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <div className="code-block">
-      <div className="code-block-bar">
-        <span>{language}</span>
-        <button type="button" onClick={copy} aria-label={copied ? 'Code copié' : 'Copier le code'}>
-          {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-          {copied ? 'Copié' : 'Copier'}
-        </button>
-      </div>
-      <pre
-        ref={(element) => {
-          preRef.current = element
-          const match = element?.querySelector('code')?.className.match(/language-([\w+#-]+)/)
-          if (match && match[1] !== language) setLanguage(match[1])
-        }}
-      >
-        {children}
-      </pre>
-    </div>
-  )
-}
-
-// Le HTML brut reste désactivé (comportement par défaut de react-markdown) : seul le Markdown est interprété.
-const markdownComponents: Components = {
-  a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
-  table: ({ node: _node, ...props }) => <div className="table-scroll"><table {...props} /></div>,
-  pre: ({ node: _node, children }) => <CodeBlock>{children}</CodeBlock>,
-}
+// Le moteur Markdown n’est chargé qu’à l’affichage de la première réponse.
+const MarkdownContent = lazy(() => import('./MarkdownContent').then((module) => ({ default: module.MarkdownContent })))
 
 /** Fichiers joints à un message : aperçu des photos, sinon nom et taille. */
 function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
@@ -211,7 +167,9 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
         {message.isDemonstration && <span className="demo-badge">Démonstration — aucune IA réelle</span>}
         {message.content && (
           <div className="assistant-content" lang={message.language} aria-busy={!isDone || undefined} onMouseUp={() => setSelectedPassage(window.getSelection()?.toString() ?? '')}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</ReactMarkdown>
+            <Suspense fallback={<p className="markdown-fallback">{message.content}</p>}>
+              <MarkdownContent content={message.content} />
+            </Suspense>
           </div>
         )}
         {isDone && (message.sources || message.searchSuggestionsHtml) && <WebSources sources={message.sources} searchSuggestionsHtml={message.searchSuggestionsHtml} />}
