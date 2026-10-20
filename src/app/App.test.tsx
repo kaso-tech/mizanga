@@ -24,9 +24,9 @@ describe('App', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('ouvre les paramètres depuis une adresse non canonique', () => {
+  it('ouvre les paramètres depuis une adresse non canonique', async () => {
     renderApp('/parametres/')
-    expect(screen.getByRole('heading', { level: 1, name: 'Paramètres' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Paramètres' })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/parametres')
   })
 
@@ -50,7 +50,7 @@ describe('App', () => {
     renderApp()
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
     await userEvent.click(await screen.findByRole('button', { name: /Signaler une erreur en mooré/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Signaler une erreur en mooré' })
+    const dialog = await screen.findByRole('dialog', { name: 'Signaler une erreur en mooré' })
     const submit = within(dialog).getByRole('button', { name: 'Préparer le signalement' })
     expect(submit).toBeDisabled()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Grammaire' }))

@@ -6,7 +6,9 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 
 ## Fonctionnalités
 
-- Conversation avec réponse progressive, arrêt et régénération ; réponses en Markdown (tableaux, code, liens).
+- Conversation avec réponse progressive, arrêt et régénération ; réponses en Markdown (tableaux, code, liens) et formules mathématiques (KaTeX, chargé seulement quand une réponse en contient).
+- Défilement intelligent : la page suit la réponse sauf si vous remontez lire ; un bouton permet de reprendre le fil.
+- Raccourcis : Échap arrête la génération, Ctrl/Cmd + Maj + O ouvre une nouvelle conversation.
 - Langue des réponses : automatique (même langue que l’utilisateur), mooré standardisé ou informel, français, anglais.
 - Fichiers joints : photos (réduites avant l’envoi pour économiser les données), PDF et fichiers texte, par bouton, glisser-déposer ou collage ; 4 fichiers et 8 Mo au plus par message. Leur contenu n’est pas conservé dans l’historique.
 - Recherche web à la demande : la réponse cite ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
@@ -95,7 +97,7 @@ Pour changer de fournisseur, il suffit d’un autre `AiService` (contrat dans `s
 - **Production Manus :** un conteneur Node, et non un site statique, car l’API doit rester côté serveur. Le `Dockerfile` active pnpm, installe le verrouillé, construit `dist/`, puis lance `server/index.mjs` avec `pnpm start`. La sonde `/api/health` est publique et ne révèle pas la clé.
 - **Variables :** `GEMINI_API_KEY` (et éventuellement `GEMINI_MODEL`) sont des secrets injectés à l’exécution ; `PORT` est fourni par l’hébergement. La clé ne doit jamais être placée dans un fichier versionné ou dans une variable `VITE_*`.
 
-Le serveur sert aussi les routes de l’application (`/parametres`…) et met en cache les fichiers de `dist/assets`.
+Le serveur sert aussi les routes de l’application (`/parametres`…), compresse les fichiers texte (brotli ou gzip) et met en cache les fichiers de `dist/assets`. Les vues secondaires (paramètres, évaluation, à propos…) et le rendu Markdown sont chargés à la demande : score Lighthouse mobile de 99 en performance.
 
 ## Principes du projet
 

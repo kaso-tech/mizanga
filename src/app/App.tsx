@@ -1,13 +1,8 @@
 import { CheckCircle2, Info, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { AboutView } from '../components/AboutView'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ChatView } from '../components/ChatView'
-import { CollectionView } from '../components/CollectionView'
-import { EvaluationView } from '../components/EvaluationView'
 import { Composer } from '../components/Composer'
-import { FeedbackDialog } from '../components/FeedbackDialog'
 import { Header } from '../components/Header'
-import { SettingsView } from '../components/SettingsView'
 import { Sidebar } from '../components/Sidebar'
 import type { AiService } from '../domain/services'
 import { responseLanguageLabels } from '../data/content'
@@ -16,6 +11,13 @@ import { demoAiService } from '../services/demoAiService'
 import { MAX_MESSAGE_CHARS } from '../services/remoteAiService'
 import { prepareAttachments } from './attachments'
 import { useConversation } from './useConversation'
+
+// Pages secondaires chargées à la demande : l’accueil s’affiche plus vite sur réseau mobile.
+const SettingsView = lazy(() => import('../components/SettingsView').then((module) => ({ default: module.SettingsView })))
+const EvaluationView = lazy(() => import('../components/EvaluationView').then((module) => ({ default: module.EvaluationView })))
+const AboutView = lazy(() => import('../components/AboutView').then((module) => ({ default: module.AboutView })))
+const CollectionView = lazy(() => import('../components/CollectionView').then((module) => ({ default: module.CollectionView })))
+const FeedbackDialog = lazy(() => import('../components/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })))
 
 const routeByView: Record<AppView, string> = {
   chat: '/',
@@ -384,12 +386,16 @@ export function App({ aiService = demoAiService }: AppProps) {
           onOpenSettings={() => navigate('settings')}
           onGoHome={() => navigate('chat')}
         />
-        <div className="content-scroll"><div className="content-frame">{renderView()}</div></div>
+        <div className="content-scroll"><div className="content-frame"><Suspense fallback={<div className="page-loading" aria-busy="true" />}>{renderView()}</Suspense></div></div>
         {activeView === 'chat' && !isEmptyChat && (
           <div className="composer-zone">{composer}</div>
         )}
       </main>
-      <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} initialPassage={reportedPassage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
+      {reportedMessage && (
+        <Suspense fallback={null}>
+        <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} initialPassage={reportedPassage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
+        </Suspense>
+      )}
       {/* Zone live permanente : les lecteurs d’écran n’annoncent pas toujours une région créée avec son contenu. */}
       <div className="toast-region" role="status" aria-live="polite">
         {toast && <div className="toast">{toast.tone === 'success' ? <CheckCircle2 size={18} aria-hidden="true" /> : <Info size={18} aria-hidden="true" />}<p>{toast.message}</p><button type="button" aria-label="Fermer la notification" onClick={() => setToast(undefined)}><X size={16} /></button></div>}

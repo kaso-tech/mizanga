@@ -560,6 +560,9 @@ button.close-drawer { display: none; }
 .crash-screen details { margin-top: 12px; color: var(--muted-foreground); font-size: 13px; }
 .crash-screen pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; text-align: left; }
 
+.markdown-fallback { margin: 0; white-space: pre-wrap; }
+.page-loading { min-height: 40vh; }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }

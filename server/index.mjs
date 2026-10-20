@@ -1,10 +1,12 @@
 // Serveur de production : sert le site compilé (dist/) et l’API /api/*.
 // Usage : `pnpm build && pnpm start` (variables : PORT, GEMINI_API_KEY, GEMINI_MODEL).
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { brotliCompress, constants as zlibConstants, gzip } from 'node:zlib'
 import { createApiHandler } from './chat-handler.mjs'
 
 const distDir = resolve(fileURLToPath(new URL('../dist', import.meta.url)))
@@ -30,6 +32,27 @@ const securityHeaders = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
 }
 
+const compressBrotli = promisify(brotliCompress)
+const compressGzip = promisify(gzip)
+const compressibleTypes = /^(text\/|application\/(json|manifest\+json)|image\/svg\+xml)/
+
+/** Versions compressées des fichiers du site, calculées une fois (ils ne changent pas pendant l’exécution). */
+/** @type {Map<string, Promise<Buffer>>} */
+const compressedCache = new Map()
+
+/** @param {string} filePath @param {'br' | 'gzip'} encoding */
+function compressedFile(filePath, encoding) {
+  const key = `${encoding}:${filePath}`
+  let cached = compressedCache.get(key)
+  if (!cached) {
+    cached = readFile(filePath).then((content) => (encoding === 'br'
+      ? compressBrotli(content, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 } })
+      : compressGzip(content, { level: 9 })))
+    compressedCache.set(key, cached)
+  }
+  return cached
+}
+
 /**
  * Renvoie le fichier demandé dans dist/, ou index.html pour les routes de l’application (SPA).
  * @param {import('node:http').IncomingMessage} req
@@ -45,12 +68,24 @@ async function serveStatic(req, res) {
     if (info?.isFile()) filePath = candidate
   }
   const isHashedAsset = filePath.startsWith(join(distDir, 'assets') + sep)
-  res.writeHead(200, {
+  const contentType = contentTypes[extname(filePath)] ?? 'application/octet-stream'
+  // Texte compressé (Brotli, sinon gzip) : environ 4 fois moins de données sur réseau mobile.
+  const accepted = String(req.headers['accept-encoding'] ?? '')
+  const encoding = !compressibleTypes.test(contentType) ? null : /\bbr\b/.test(accepted) ? 'br' : /\bgzip\b/.test(accepted) ? 'gzip' : null
+  const headers = {
     ...securityHeaders,
-    'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
+    'Content-Type': contentType,
     // Les fichiers de dist/assets portent une empreinte dans leur nom : ils peuvent être gardés en cache.
     'Cache-Control': isHashedAsset ? 'public, max-age=31536000, immutable' : 'no-cache',
-  })
+    Vary: 'Accept-Encoding',
+  }
+  if (encoding) {
+    const body = await compressedFile(filePath, encoding)
+    res.writeHead(200, { ...headers, 'Content-Encoding': encoding, 'Content-Length': body.length })
+    res.end(req.method === 'HEAD' ? undefined : body)
+    return
+  }
+  res.writeHead(200, headers)
   if (req.method === 'HEAD') return res.end()
   createReadStream(filePath).pipe(res)
 }
