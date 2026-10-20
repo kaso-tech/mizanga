@@ -488,6 +488,19 @@ button.close-drawer { display: none; }
 .message-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin: 0 0 6px; padding: 0; list-style: none; }
 .message-attachments img { display: block; max-width: min(260px, 70vw); max-height: 260px; border: 1px solid var(--border); border-radius: 14px; object-fit: cover; }
 
+/* Recherche web : interrupteur, étiquette et sources. */
+.composer-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); background: transparent; font-size: 13px; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.composer-pill:hover { color: var(--foreground); background: var(--accent); }
+.composer-pill.is-active { border-color: color-mix(in oklab, var(--primary) 45%, transparent); color: var(--primary); background: color-mix(in oklab, var(--primary) 10%, transparent); font-weight: 500; }
+.web-search-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--muted-foreground); font-size: 11px; }
+.web-sources { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
+.web-sources-title { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--muted-foreground); font-weight: 500; }
+.web-sources ol { display: grid; gap: 4px; margin: 0; padding-left: 20px; }
+.web-sources li span { margin-left: 6px; color: var(--muted-foreground); font-size: 12px; }
+.web-sources a { color: var(--primary); text-underline-offset: 2px; }
+.web-sources-empty { margin: 0; color: var(--muted-foreground); }
+.search-suggestions { display: block; width: 100%; height: 64px; margin-top: 8px; border: 0; color-scheme: normal; }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }
@@ -760,6 +773,8 @@ button.close-drawer { display: none; }
   .message-row.is-assistant > .brand-mark { display: none; }
   .user-bubble, .assistant-content { font-size: 15px; }
   .label-long { display: none; }
+  .composer-pill-label { display: none; }
+  .composer-pill { min-width: 40px; justify-content: center; padding: 0 10px; }
   .label-short { display: inline; }
   .settings-section { padding: 16px; }
   .page-view h1 { font-size: 24px; }

@@ -45,6 +45,11 @@ export interface ChatMessage {
   errorMessage?: string
   isDemonstration?: boolean
   attachments?: Attachment[]
+  /** Message de l’utilisateur envoyé avec la recherche web activée. */
+  webSearch?: boolean
+  /** Réponse : sources web consultées et suggestions de recherche Google associées. */
+  sources?: Array<{ title: string; url: string }>
+  searchSuggestionsHtml?: string
   /** Avis local de l’utilisateur ; il n’est envoyé nulle part dans cette version. */
   rating?: MessageRating
 }

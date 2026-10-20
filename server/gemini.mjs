@@ -131,28 +131,57 @@ function errorForStatus(status) {
 }
 
 /**
- * Diffuse la réponse de Gemini fragment par fragment.
+ * @typedef {{ title: string, url: string }} WebSource
+ * @typedef {{ text: string } | { sources: WebSource[], searchSuggestionsHtml?: string }} ReplyEvent
+ */
+
+/**
+ * Sources web d’une réponse ancrée dans la recherche Google (titres et liens), sans doublons.
+ * @param {any} metadata
+ * @returns {WebSource[]}
+ */
+export function readGroundingSources(metadata) {
+  /** @type {WebSource[]} */
+  const sources = []
+  for (const chunk of metadata?.groundingChunks ?? []) {
+    const url = chunk?.web?.uri
+    if (typeof url !== 'string' || !/^https?:\/\//.test(url) || sources.some((source) => source.url === url)) continue
+    sources.push({ title: typeof chunk.web.title === 'string' && chunk.web.title ? chunk.web.title : new URL(url).hostname, url })
+  }
+  return sources
+}
+
+/**
+ * Diffuse la réponse de Gemini fragment par fragment, puis, si la recherche web a servi,
+ * ses sources et les suggestions de recherche Google (à afficher telles quelles, conditions de Google).
  * @param {{
  *   apiKey: string,
  *   model: string,
  *   apiBase?: string,
  *   messages: RelayMessage[],
  *   preferences: { responseLanguage?: string, userWritingMode?: string },
+ *   webSearch?: boolean,
  *   signal?: AbortSignal,
  * }} options
- * @returns {AsyncGenerator<string>}
+ * @returns {AsyncGenerator<ReplyEvent>}
  */
-export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, signal }) {
+export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, webSearch = false, signal }) {
   const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: buildSystemInstruction(preferences) }] },
       contents: toGeminiContents(messages),
+      ...(webSearch ? { tools: [{ google_search: {} }] } : {}),
     }),
     signal,
   })
   if (!response.ok || !response.body) throw await errorForResponse(response)
+
+  /** @type {WebSource[]} */
+  let sources = []
+  /** @type {string | undefined} */
+  let searchSuggestionsHtml
 
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
@@ -174,11 +203,18 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
       for (const candidate of payload.candidates ?? []) {
         for (const part of candidate.content?.parts ?? []) {
           // Les « pensées » internes du modèle ne sont jamais montrées.
-          if (typeof part.text === 'string' && part.text && !part.thought) yield part.text
+          if (typeof part.text === 'string' && part.text && !part.thought) yield { text: part.text }
+        }
+        if (candidate.groundingMetadata) {
+          const found = readGroundingSources(candidate.groundingMetadata)
+          if (found.length > 0) sources = found
+          const html = candidate.groundingMetadata.searchEntryPoint?.renderedContent
+          if (typeof html === 'string' && html) searchSuggestionsHtml = html
         }
       }
     }
   }
+  if (sources.length > 0 || searchSuggestionsHtml) yield { sources, ...(searchSuggestionsHtml ? { searchSuggestionsHtml } : {}) }
 }
 
 /**

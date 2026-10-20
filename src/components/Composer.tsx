@@ -1,4 +1,4 @@
-import { ArrowUp, ClipboardPaste, FileText, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { acceptAttribute, formatSize, isImage } from '../app/attachments'
 import { mooreCharacters } from '../data/content'
@@ -14,6 +14,8 @@ interface ComposerProps {
   focusToken: number
   attachments: Attachment[]
   isPreparingFiles: boolean
+  webSearch: boolean
+  onToggleWebSearch: () => void
   onAddFiles: (files: File[]) => void
   onRemoveAttachment: (id: string) => void
   onValueChange: (value: string) => void
@@ -31,6 +33,8 @@ export function Composer({
   focusToken,
   attachments,
   isPreparingFiles,
+  webSearch,
+  onToggleWebSearch,
   onAddFiles,
   onRemoveAttachment,
   onValueChange,
@@ -196,6 +200,16 @@ export function Composer({
           </button>
           <button type="button" className="composer-tool" aria-label="Coller du texte" title="Coller du texte" onClick={paste}>
             <ClipboardPaste size={20} />
+          </button>
+          <button
+            type="button"
+            className={`composer-pill ${webSearch ? 'is-active' : ''}`}
+            aria-pressed={webSearch}
+            title={webSearch ? 'Recherche web activée : la réponse citera ses sources' : 'Activer la recherche web'}
+            onClick={onToggleWebSearch}
+          >
+            <Globe size={16} aria-hidden="true" />
+            <span className="composer-pill-label">Recherche web</span>
           </button>
           <button type="button" className="composer-tool" disabled aria-label="Dictée vocale (bientôt disponible)" title="Dictée vocale — bientôt disponible">
             <Mic size={20} />

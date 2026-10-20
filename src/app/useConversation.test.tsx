@@ -113,4 +113,21 @@ describe('useConversation', () => {
     await waitFor(() => expect(result.current.isGenerating).toBe(false))
     expect(service.suggestTitle).toHaveBeenCalledTimes(1)
   })
+
+  it('demande la recherche web pour le message concerné et enregistre les sources', async () => {
+    const generate = vi.fn(async function* (request: { webSearch?: boolean }) {
+      yield { text: 'Réponse' }
+      if (request.webSearch) yield { text: '', sources: [{ title: 'Source', url: 'https://exemple.bf' }], searchSuggestionsHtml: '<b>chips</b>' }
+    })
+    const { result } = setup({ isDemonstration: false, label: 'Test', generate })
+    act(() => result.current.send('Actualités', [], { webSearch: true }))
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    expect(generate.mock.calls[0][0]).toMatchObject({ webSearch: true })
+    expect(result.current.messages[0].webSearch).toBe(true)
+    expect(result.current.messages[1]).toMatchObject({ content: 'Réponse', sources: [{ title: 'Source', url: 'https://exemple.bf' }], searchSuggestionsHtml: '<b>chips</b>' })
+
+    act(() => result.current.regenerate())
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    expect(generate.mock.calls[1][0]).toMatchObject({ webSearch: true })
+  })
 })

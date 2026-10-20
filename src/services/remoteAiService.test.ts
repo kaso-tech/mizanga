@@ -39,6 +39,7 @@ describe('remoteAiService', () => {
     expect(url).toBe('/api/chat')
     expect(JSON.parse(init.body)).toEqual({
       messages: [{ role: 'user', content: 'Bonjour' }],
+      webSearch: false,
       preferences: { responseLanguage: 'auto', userWritingMode: 'standard' },
     })
   })

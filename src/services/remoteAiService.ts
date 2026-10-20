@@ -1,4 +1,4 @@
-import { AiServiceError, type AiChunk, type AiService } from '../domain/services'
+import { AiServiceError, type AiChunk, type AiService, type SourceReference } from '../domain/services'
 import type { ChatMessage } from '../domain/types'
 import { demoAiService } from './demoAiService'
 
@@ -86,7 +86,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
       const { title } = (await response.json()) as { title?: string | null }
       return typeof title === 'string' && title.trim() ? title.trim().slice(0, 60) : null
     },
-    async *generate({ messages, preferences }, { signal }): AsyncGenerator<AiChunk> {
+    async *generate({ messages, preferences, webSearch = false }, { signal }): AsyncGenerator<AiChunk> {
       let response: Response
       try {
         response = await fetch(endpoint, {
@@ -94,6 +94,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: selectHistory(messages),
+            webSearch,
             preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode },
           }),
           signal,
@@ -117,10 +118,11 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (!line.trim()) continue
-          const event = JSON.parse(line) as { text?: string; error?: string; retryAt?: string }
+          const event = JSON.parse(line) as { text?: string; error?: string; retryAt?: string; sources?: SourceReference[]; searchSuggestionsHtml?: string }
           if (event.error) throw errorFrom(event)
           // La langue réelle de la réponse n’est pas connue : elle n’est pas indiquée plutôt que devinée.
           if (event.text) yield { text: event.text }
+          if (event.sources || event.searchSuggestionsHtml) yield { text: '', sources: event.sources ?? [], searchSuggestionsHtml: event.searchSuggestionsHtml }
         }
       }
     },

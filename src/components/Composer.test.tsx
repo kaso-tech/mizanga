@@ -20,6 +20,8 @@ function renderComposer(initialValue = '', attachments: Attachment[] = []) {
         focusToken={0}
         attachments={attachments}
         isPreparingFiles={false}
+        webSearch={false}
+        onToggleWebSearch={vi.fn()}
         onAddFiles={onAddFiles}
         onRemoveAttachment={vi.fn()}
         onValueChange={setValue}

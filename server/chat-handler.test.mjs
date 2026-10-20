@@ -166,4 +166,34 @@ describe('API Mizanga', () => {
     const notBase64 = { messages: [{ role: 'user', content: 'x', attachments: [{ name: 'a.png', mimeType: 'image/png', data: '<script>' }] }] }
     expect((await post(base, notBase64)).status).toBe(400)
   })
+
+  it('active la recherche web à la demande et relaie les sources et suggestions Google', async () => {
+    upstreamReply = {
+      status: 200,
+      events: [
+        textEvent('Selon la météo, '),
+        { candidates: [{ content: { parts: [{ text: 'il fera chaud.' }] }, groundingMetadata: {
+          groundingChunks: [
+            { web: { uri: 'https://meteo.example.bf/ouaga', title: 'meteo.example.bf' } },
+            { web: { uri: 'https://meteo.example.bf/ouaga', title: 'doublon' } },
+            { web: { uri: 'javascript:alert(1)', title: 'piège' } },
+          ],
+          searchEntryPoint: { renderedContent: '<div class="chips">météo Ouagadougou</div>' },
+        } }] },
+      ],
+    }
+    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase })
+    const response = await post(base, { ...validBody, webSearch: true })
+    const lines = (await response.text()).trim().split('\n').map((line) => JSON.parse(line))
+    expect(lines).toEqual([
+      { text: 'Selon la météo, ' },
+      { text: 'il fera chaud.' },
+      { sources: [{ title: 'meteo.example.bf', url: 'https://meteo.example.bf/ouaga' }], searchSuggestionsHtml: '<div class="chips">météo Ouagadougou</div>' },
+    ])
+    expect(lastUpstreamRequest.body.tools).toEqual([{ google_search: {} }])
+
+    upstreamReply = { status: 200, events: [textEvent('ok')] }
+    await (await post(base, validBody)).text()
+    expect(lastUpstreamRequest.body.tools).toBeUndefined()
+  })
 })

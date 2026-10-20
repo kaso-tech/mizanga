@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Copy, FileText, Flag, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -71,6 +71,46 @@ function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
   )
 }
 
+const hostname = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+/**
+ * Sources web d’une réponse et suggestions de recherche Google. Les conditions de Google imposent
+ * d’afficher ces suggestions sans les modifier : elles sont isolées dans un cadre sans scripts.
+ */
+function WebSources({ sources = [], searchSuggestionsHtml }: { sources?: Array<{ title: string; url: string }>; searchSuggestionsHtml?: string }) {
+  return (
+    <section className="web-sources" aria-label="Sources web">
+      <p className="web-sources-title"><Library size={14} aria-hidden="true" /> Sources</p>
+      {sources.length > 0 ? (
+        <ol>
+          {sources.map((source) => (
+            <li key={source.url}>
+              <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a>
+              <span>{hostname(source.url)}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="web-sources-empty">Le moteur n’a cité aucune source pour cette réponse.</p>
+      )}
+      {searchSuggestionsHtml && (
+        <iframe
+          className="search-suggestions"
+          title="Suggestions de recherche Google"
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          srcDoc={`<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0}</style></head><body>${searchSuggestionsHtml}</body></html>`}
+        />
+      )}
+    </section>
+  )
+}
+
 /** Message de l’utilisateur, avec copie et — pour le dernier — modification puis relance. */
 function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessageType; canEdit: boolean; onCopy: (message: ChatMessageType) => void; onEdit: (content: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -113,6 +153,7 @@ function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessag
       <div className="user-message">
         {message.attachments && message.attachments.length > 0 && <MessageAttachments attachments={message.attachments} />}
         {message.content && <div className="user-bubble">{message.content}</div>}
+        {message.webSearch && <span className="web-search-tag"><Globe size={12} aria-hidden="true" /> Recherche web</span>}
         <div className="message-actions user-actions">
           <button type="button" onClick={() => onCopy(message)} aria-label="Copier le message" title="Copier le message"><Copy size={15} /></button>
           {canEdit && (
@@ -157,6 +198,7 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</ReactMarkdown>
           </div>
         )}
+        {isDone && (message.sources || message.searchSuggestionsHtml) && <WebSources sources={message.sources} searchSuggestionsHtml={message.searchSuggestionsHtml} />}
         {message.status === 'stopped' && <p className="message-status">Génération arrêtée.</p>}
         {message.status === 'error' && <p className="message-error" role="alert">{message.errorMessage ?? 'Une erreur est survenue lors de la génération. Réessayez.'}</p>}
 

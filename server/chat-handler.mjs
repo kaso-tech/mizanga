@@ -56,6 +56,7 @@ export function validateChatRequest(body) {
   if (last.role !== 'user' || (!last.content.trim() && !last.attachments?.length)) return null
   const preferences = body.preferences ?? {}
   return {
+    webSearch: body.webSearch === true,
     messages: messages.map(({ role, content, attachments }) => ({
       role,
       content,
@@ -146,12 +147,12 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
 
     let started = false
     try {
-      for await (const text of streamGeminiReply({ apiKey, model, apiBase, ...request, signal: controller.signal })) {
+      for await (const event of streamGeminiReply({ apiKey, model, apiBase, ...request, signal: controller.signal })) {
         if (!started) {
           res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
           started = true
         }
-        res.write(`${JSON.stringify({ text })}\n`)
+        res.write(`${JSON.stringify(event)}\n`)
       }
       if (!started) res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' })
       res.end()
