@@ -1,4 +1,4 @@
-import { ArrowUp, Check, ClipboardPaste, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Check, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { acceptAttribute, formatSize, isAudio, isImage } from '../app/attachments'
 import { MAX_RECORDING_SECONDS, formatDuration, isVoiceRecordingSupported, useVoiceRecording } from '../app/voiceRecording'
@@ -81,16 +81,6 @@ export function Composer({
       textarea?.focus()
       textarea?.setSelectionRange(start + text.length, start + text.length)
     })
-  }
-
-  const paste = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text) insert(text)
-      else onNotify('Le presse-papiers est vide.')
-    } catch {
-      onNotify('Accès au presse-papiers refusé. Collez avec un appui long ou Ctrl+V.')
-    }
   }
 
   return (
@@ -210,9 +200,6 @@ export function Composer({
             onClick={() => setShowCharacters((shown) => !shown)}
           >
             <Keyboard size={20} />
-          </button>
-          <button type="button" className="composer-tool" aria-label="Coller du texte" title="Coller du texte" onClick={paste}>
-            <ClipboardPaste size={20} />
           </button>
           <button
             type="button"
