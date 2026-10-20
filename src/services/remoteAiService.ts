@@ -90,15 +90,35 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
  * Choisit le moteur selon ce que le serveur annonce (/api/health). Sans serveur ou sans clé configurée
  * (site statique, test local), l’application reste en démonstration.
  */
+const engineStorageKey = 'mizanga.engine.v1'
+
+type Health = { engine?: string; model?: string | null }
+
+const serviceFor = (health: Health) => (
+  health.engine === 'gemini' ? createRemoteAiService({ label: health.model ? `Gemini (${health.model})` : 'Gemini' }) : demoAiService
+)
+
 export async function detectAiService({ timeoutMs = 2500 } = {}): Promise<AiService> {
   try {
     const response = await fetch('/api/health', { signal: AbortSignal.timeout(timeoutMs) })
-    const health = (await response.json()) as { engine?: string; model?: string | null }
-    if (response.ok && health.engine === 'gemini') {
-      return createRemoteAiService({ label: health.model ? `Gemini (${health.model})` : 'Gemini' })
+    const health = (await response.json()) as Health
+    if (!response.ok) return demoAiService
+    try {
+      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, model: health.model ?? null }))
+    } catch {
+      // Stockage indisponible : la détection se refera au prochain lancement.
     }
+    return serviceFor(health)
   } catch {
-    // Pas d’API disponible : démonstration.
+    // Application installée lancée hors connexion : on garde le dernier moteur connu, l’interface
+    // affichera « hors connexion » au lieu de basculer à tort en démonstration.
+    if (!navigator.onLine) {
+      try {
+        return serviceFor(JSON.parse(localStorage.getItem(engineStorageKey) ?? '{}') as Health)
+      } catch {
+        return demoAiService
+      }
+    }
+    return demoAiService
   }
-  return demoAiService
 }

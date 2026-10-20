@@ -13,6 +13,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Avis sur les réponses et signalement d’erreurs en mooré (préparés localement, pas encore envoyés).
 - Paramètres : thème clair, sombre ou système, langue et écriture, données, voix et compte (ces deux dernières sections arrivent bientôt).
 - Accessible au clavier et aux lecteurs d’écran, utilisable sur téléphone, tablette et ordinateur.
+- Installable comme une application (PWA) sur Android, iPhone et ordinateur ; l’interface et l’historique s’ouvrent hors connexion (les réponses du moteur demandent le réseau).
 
 ## Démarrer
 

@@ -1,5 +1,6 @@
 import { AudioLines, Database, Info, Languages, Monitor, Moon, SlidersHorizontal, Sun, UserRound, type LucideIcon } from 'lucide-react'
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
+import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
 import type { LinguisticPreferences, ResponseLanguage, ThemePreference, UserWritingMode } from '../domain/types'
 
@@ -73,6 +74,23 @@ function SegmentedControl<T extends string>({ name, label, value, options, onCha
 
 function Switch({ id, checked, onChange }: { id: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return <button type="button" id={id} role="switch" aria-checked={checked} className="switch" onClick={() => onChange(!checked)} />
+}
+
+/** Installation sur l’écran d’accueil, selon ce que permet le navigateur. */
+function InstallRow() {
+  const state = useSyncExternalStore(subscribeInstallState, getInstallState)
+  const descriptions = {
+    installed: 'Mizanga est installée sur cet appareil.',
+    available: 'Ajoutez Mizanga à l’écran d’accueil pour l’ouvrir comme une application, même avec une connexion fragile.',
+    ios: 'Sur iPhone ou iPad : touchez le bouton Partager de Safari, puis « Sur l’écran d’accueil ».',
+    unavailable: 'Depuis le menu de votre navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».',
+  }
+  return (
+    <SettingRow label="Installer l’application" description={descriptions[state]}>
+      {state === 'available' && <button type="button" className="primary-button" onClick={() => void promptInstall()}>Installer</button>}
+      {state === 'installed' && <span className="value-pill">Installée</span>}
+    </SettingRow>
+  )
 }
 
 function SoonSwitch({ label }: { label: string }) {
@@ -162,6 +180,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   onChange={(theme) => onChange({ theme })}
                 />
               </SettingRow>
+              <InstallRow />
               <SettingRow label="Moteur de réponses" description={engine.isDemonstration ? 'Aucun moteur d’IA n’est connecté : les réponses sont des messages de démonstration.' : 'Le modèle qui rédige les réponses de Mizanga.'}>
                 <span className="value-pill">{engine.label}</span>
               </SettingRow>
