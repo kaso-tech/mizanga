@@ -347,6 +347,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         onNewConversation={startNewConversation}
         onSelectConversation={selectConversation}
         onRemoveConversation={conversation.remove}
+        onRenameConversation={conversation.rename}
         onToggleFavorite={conversation.toggleFavorite}
       />
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>

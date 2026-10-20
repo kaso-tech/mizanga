@@ -208,6 +208,12 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     setConversations([])
   }
 
+  const rename = (conversationId: string, title: string) => {
+    const trimmed = title.trim().slice(0, 80)
+    if (!trimmed) return
+    setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? { ...conversation, title: trimmed } : conversation)))
+  }
+
   const toggleFavorite = (conversationId: string) => {
     setConversations((current) => current.map((conversation) => (
       conversation.id === conversationId ? { ...conversation, favorite: !conversation.favorite } : conversation
@@ -235,6 +241,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     startNew,
     remove,
     clearAll,
+    rename,
     toggleFavorite,
     rate,
   }

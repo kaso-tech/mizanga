@@ -510,6 +510,14 @@ button.close-drawer { display: none; }
 .composer-tool.is-recording { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 12%, transparent); }
 .audio-attachment audio { display: block; width: min(300px, 75vw); height: 40px; }
 
+/* Menu « … » d’une conversation et renommage. */
+.conversation-row { position: relative; }
+.row-menu { position: absolute; z-index: 20; top: calc(100% - 4px); right: 0; display: grid; min-width: 180px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-pop); animation: fade-up .15s ease-out both; }
+.row-menu button { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; text-align: left; }
+.row-menu button:hover, .row-menu button:focus-visible { background: var(--accent); }
+.row-menu button.is-danger { color: var(--destructive); }
+.rename-input { width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--ring); border-radius: 10px; outline: 0; background: var(--card); font-size: 14px; }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }

@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -73,6 +73,18 @@ function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
       ))}
     </ul>
   )
+}
+
+/** Partage natif (WhatsApp, SMS, e-mail…) quand le navigateur le propose, surtout sur mobile. */
+const canShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+async function shareReply(message: ChatMessageType) {
+  const sources = message.sources?.length ? `\n\nSources :\n${message.sources.map((source) => `- ${source.title} : ${source.url}`).join('\n')}` : ''
+  try {
+    await navigator.share({ title: 'Réponse de Mizanga', text: `${message.content}${sources}` })
+  } catch {
+    // Partage annulé par l’utilisateur : rien à signaler.
+  }
 }
 
 const hostname = (url: string) => {
@@ -216,6 +228,9 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
             <button type="button" onClick={() => onCopy(message)} aria-label={isCopied ? 'Copié' : 'Copier'} title={isCopied ? 'Copié' : 'Copier'}>
               {isCopied ? <Check size={16} /> : <Copy size={16} />}
             </button>
+            {canShare() && (
+              <button type="button" onClick={() => void shareReply(message)} aria-label="Partager la réponse" title="Partager (WhatsApp, SMS…)"><Share2 size={16} /></button>
+            )}
             {canRegenerate && (
               <button type="button" onClick={onRegenerate} aria-label="Régénérer" title="Régénérer"><RefreshCw size={16} /></button>
             )}

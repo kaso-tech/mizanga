@@ -130,4 +130,15 @@ describe('useConversation', () => {
     await waitFor(() => expect(result.current.isGenerating).toBe(false))
     expect(generate.mock.calls[1][0]).toMatchObject({ webSearch: true })
   })
+
+  it('renomme une conversation en ignorant les titres vides', async () => {
+    const { result } = setup(fakeService())
+    act(() => result.current.send('Question'))
+    await waitFor(() => expect(result.current.isGenerating).toBe(false))
+    const id = result.current.activeConversation!.id
+    act(() => result.current.rename(id, '  Mon titre  '))
+    expect(result.current.activeConversation?.title).toBe('Mon titre')
+    act(() => result.current.rename(id, '   '))
+    expect(result.current.activeConversation?.title).toBe('Mon titre')
+  })
 })
