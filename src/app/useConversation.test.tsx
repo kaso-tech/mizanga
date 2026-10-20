@@ -8,6 +8,7 @@ import { useConversation } from './useConversation'
 function fakeService({ chunks = ['Bonjour', ' à vous'], hang = false, fail = false } = {}): AiService {
   return {
     isDemonstration: false,
+    label: 'Test',
     async *generate(_request, { signal }): AsyncGenerator<AiChunk> {
       if (fail) throw new Error('panne')
       for (const text of chunks) yield { text, language: 'fr' }

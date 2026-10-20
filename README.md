@@ -2,7 +2,7 @@
 
 Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer, apprendre, s’organiser — dont la particularité est de **comprendre et de répondre en mooré**, une langue encore mal prise en charge par les autres assistants. D’autres langues du Burkina Faso (fulfulde, dioula/bambara) pourront suivre.
 
-> **État actuel : démonstration.** Aucun moteur d’IA n’est encore connecté. L’interface est complète et utilisable, mais chaque réponse est un message de démonstration qui l’indique explicitement. Aucune réponse, source ou phrase en mooré n’est inventée.
+> **Moteur : Gemini (Google), offre gratuite.** Quand une clé `GEMINI_API_KEY` est configurée sur le serveur, les réponses sont produites par Gemini. Sans clé, l’application reste en **mode démonstration** et le dit explicitement. La maîtrise du mooré par Gemini n’a pas encore été évaluée par des locuteurs.
 
 ## Fonctionnalités
 
@@ -20,8 +20,11 @@ Prérequis : Node.js 22 et pnpm (la version attendue est fixée dans `package.js
 
 ```bash
 pnpm install
-pnpm dev        # http://localhost:3000
+cp .env.example .env.local   # puis renseignez GEMINI_API_KEY (facultatif)
+pnpm dev                     # http://localhost:3000
 ```
+
+Sans clé, tout fonctionne en mode démonstration. Une clé gratuite se crée sur [Google AI Studio](https://aistudio.google.com/apikey). La clé peut aussi être fournie en variable d’environnement (secrets de l’environnement Manus, de Render…) ; elle n’est jamais envoyée au navigateur.
 
 | Commande | Rôle |
 | --- | --- |
@@ -30,7 +33,8 @@ pnpm dev        # http://localhost:3000
 | `pnpm typecheck` | Vérification TypeScript |
 | `pnpm test` | Tests Vitest (une fois) ; `pnpm test:watch` pour le mode continu |
 | `pnpm build` | Vérification des types puis build de production dans `dist/` |
-| `pnpm preview` | Sert le build de production localement |
+| `pnpm preview` | Sert le build de production localement (avec l’API) |
+| `pnpm start` | Serveur de production : site compilé + API (après `pnpm build`) |
 
 La CI GitHub Actions (`.github/workflows/ci.yml`) exécute lint, types, tests et build sur chaque pull request et sur `main`.
 
@@ -41,6 +45,7 @@ React 18, TypeScript, Vite ; CSS sans framework (jetons dans `src/styles/global.
 ## Structure
 
 ```text
+server/         Relais vers Gemini (/api/chat, /api/health) et serveur de production
 src/
   app/          App (routes, préférences, notifications) et hook useConversation
   components/   Barre latérale, en-tête, conversation, zone de saisie, paramètres…
@@ -53,22 +58,26 @@ public/         Favicon et manifeste des routes (manus-routes.json)
 plan.md         Décisions produit et design
 ```
 
-## Brancher un vrai moteur d’IA
+## Moteur d’IA
 
-Le moteur est injecté dans `App` et doit respecter le contrat `AiService` de `src/domain/services.ts` :
-
-```ts
-interface AiService {
-  readonly isDemonstration: boolean
-  generate(request: AiGenerationRequest, options: { signal: AbortSignal }): AsyncIterable<AiChunk>
-}
+```text
+Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemini
+            ◀─ NDJSON ──                            ◀─ SSE ──
 ```
 
-- `generate` reçoit tout l’historique (texte d’origine, jamais modifié) et les préférences, et renvoie la réponse par fragments ; il doit s’arrêter avec une `AbortError` quand `signal` est annulé (bouton « Arrêter »).
-- Chaque fragment peut préciser sa langue (`fr`, `mos`…) seulement si elle est réellement connue.
-- Les clés d’API ne doivent jamais se trouver dans le navigateur : un vrai service passera par un serveur.
+- **Côté serveur** (`server/chat-handler.mjs`, `server/gemini.mjs`) : le relais ajoute les consignes de Mizanga (assistant généraliste, langue de réponse choisie, honnêteté sur le mooré), transmet l’historique tel quel à Gemini et renvoie la réponse fragment par fragment. Le même code tourne dans `pnpm dev` (extension Vite), `pnpm preview` et `pnpm start`.
+- **Garde-fous** : taille des demandes limitée, 20 demandes par minute et par visiteur, annulation propagée quand l’utilisateur clique sur « Arrêter », erreurs traduites en messages clairs (quota gratuit atteint, clé refusée…).
+- **Côté navigateur** : au démarrage, l’application interroge `/api/health` et choisit le moteur Gemini (`src/services/remoteAiService.ts`) ou la démonstration (`src/services/demoAiService.ts`).
 
-`src/services/demoAiService.ts` sert d’exemple ; remplacez-le dans `src/main.tsx` (`<App aiService={monService} />`).
+| Variable | Rôle |
+| --- | --- |
+| `GEMINI_API_KEY` | Clé de l’API Gemini. Absente : mode démonstration. |
+| `GEMINI_MODEL` | Modèle utilisé (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
+| `PORT` | Port du serveur de production (défaut : 3000). |
+
+**Confidentialité :** avec l’offre gratuite de Gemini, Google peut utiliser les échanges pour améliorer ses services ; l’application le signale dans les paramètres. Passez à une offre payante avant d’accueillir des données sensibles.
+
+Pour changer de fournisseur, il suffit d’un autre `AiService` (contrat dans `src/domain/services.ts`) ou d’un autre relais côté serveur.
 
 ## Routes
 
@@ -76,12 +85,17 @@ interface AiService {
 
 ## Déploiement
 
-- **Développement :** environnement Manus, avec le serveur Vite (`pnpm dev`).
-- **Production (prévue sur Render) :** site statique, à configurer le moment venu avec un `render.yaml` comprenant la commande `pnpm install --frozen-lockfile && pnpm build`, le dossier `dist` et une règle de réécriture `/*` → `/index.html`.
+- **Développement :** environnement Manus, avec `pnpm dev` ; la clé se configure dans les secrets de l’environnement (`GEMINI_API_KEY`).
+- **Production (prévue sur Render) :** un **Web Service** Node (et non un site statique, puisque l’API doit tourner côté serveur) :
+  - Build : `corepack enable && pnpm install --frozen-lockfile && pnpm build`
+  - Start : `pnpm start`
+  - Variables : `GEMINI_API_KEY` (et éventuellement `GEMINI_MODEL`) ; Render fournit `PORT`.
+
+  Le serveur sert aussi les routes de l’application (`/parametres`…) et met en cache les fichiers de `dist/assets`.
 
 ## Principes du projet
 
 - **Honnêteté :** l’interface indique toujours ce qui est connecté, démontré ou à venir.
 - **Respect du texte :** aucune substitution automatique de caractères (par ex. è → ɛ).
 - **Qualité du mooré :** les textes en mooré sont rédigés et validés par des locuteurs ; les corrections des utilisateurs seront relues avant toute utilisation.
-- **Confidentialité :** aucune donnée n’est envoyée à un serveur dans cette version ; les préférences restent sur l’appareil.
+- **Confidentialité :** les conversations ne sont pas stockées par Mizanga (elles restent en mémoire dans le navigateur) et les préférences restent sur l’appareil ; en mode Gemini, les messages transitent par Google pour produire les réponses.

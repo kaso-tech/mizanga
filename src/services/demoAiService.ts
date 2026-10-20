@@ -34,6 +34,7 @@ function buildReply({ messages, preferences }: AiGenerationRequest) {
  */
 export const demoAiService: AiService = {
   isDemonstration: true,
+  label: 'Démonstration (aucun moteur connecté)',
   async *generate(request, { signal }): AsyncGenerator<AiChunk> {
     await abortableDelay(600, signal)
     const tokens = buildReply(request).match(/\S+\s*/g) ?? []

@@ -6,6 +6,7 @@ import { App } from './App'
 
 const instantService: AiService = {
   isDemonstration: true,
+  label: 'Test',
   async *generate() {
     yield { text: 'Réponse de test', language: 'fr' }
   },

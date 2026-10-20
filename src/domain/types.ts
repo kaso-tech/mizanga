@@ -28,6 +28,8 @@ export interface ChatMessage {
   /** Code de langue BCP 47 (ex. « fr », « mos » pour le Mooré) quand il est connu ; jamais deviné. */
   language?: string
   status?: ChatMessageStatus
+  /** Explication montrée quand `status` vaut « error ». */
+  errorMessage?: string
   isDemonstration?: boolean
   /** Avis local de l’utilisateur ; il n’est envoyé nulle part dans cette version. */
   rating?: MessageRating

@@ -77,6 +77,7 @@ function SoonSwitch({ label }: { label: string }) {
 
 interface SettingsViewProps {
   preferences: LinguisticPreferences
+  engine: { label: string; isDemonstration: boolean }
   conversationCount: number
   onChange: (changes: Partial<LinguisticPreferences>) => void
   onResetPreferences: () => void
@@ -84,7 +85,7 @@ interface SettingsViewProps {
   onClearConversations: () => void
 }
 
-export function SettingsView({ preferences, conversationCount, onChange, onResetPreferences, onNewConversation, onClearConversations }: SettingsViewProps) {
+export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onClearConversations }: SettingsViewProps) {
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection)
   const [confirmingClear, setConfirmingClear] = useState(false)
   const tabRefs = useRef<Record<SectionId, HTMLButtonElement | null>>({ general: null, langue: null, donnees: null, voix: null, compte: null })
@@ -157,6 +158,9 @@ export function SettingsView({ preferences, conversationCount, onChange, onReset
                   onChange={(theme) => onChange({ theme })}
                 />
               </SettingRow>
+              <SettingRow label="Moteur de réponses" description={engine.isDemonstration ? 'Aucun moteur d’IA n’est connecté : les réponses sont des messages de démonstration.' : 'Le modèle qui rédige les réponses de Mizanga.'}>
+                <span className="value-pill">{engine.label}</span>
+              </SettingRow>
               <SettingRow label="Langue de l’interface" htmlFor="setting-interface-language" description="Le mooré sera proposé comme langue d’interface dans une prochaine version.">
                 <SelectControl
                   id="setting-interface-language"
@@ -207,7 +211,15 @@ export function SettingsView({ preferences, conversationCount, onChange, onReset
                 <SettingRow label="Historique des conversations" description="Conservé en mémoire pendant la session, effacé à la fermeture ou au rechargement de la page.">
                   <span className="value-pill">{conversationCount === 0 ? 'Aucune' : `${conversationCount} conversation${conversationCount > 1 ? 's' : ''}`}</span>
                 </SettingRow>
-                <SettingRow label="Préférences" description="Enregistrées sur cet appareil uniquement. Aucune donnée n’est envoyée à un serveur dans cette version.">
+                <SettingRow
+                  label="Vos messages"
+                  description={engine.isDemonstration
+                    ? 'Aucun message ne quitte votre navigateur : aucun moteur d’IA n’est connecté.'
+                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations sensibles.'}
+                >
+                  <span className="value-pill">{engine.isDemonstration ? 'Restent sur l’appareil' : 'Envoyés à Google'}</span>
+                </SettingRow>
+                <SettingRow label="Préférences" description="Enregistrées sur cet appareil uniquement.">
                   <button type="button" className="secondary-button" onClick={onResetPreferences}>Réinitialiser</button>
                 </SettingRow>
               </div>

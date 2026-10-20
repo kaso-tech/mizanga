@@ -1,5 +1,9 @@
 # Plan d’implémentation — Phase 1 de Mizanga
 
+## Moteur d’IA : Gemini (octobre 2026)
+
+Le moteur de réponses est Gemini (Google), via son offre gratuite, appelé par un petit relais serveur (`server/`) pour que la clé ne soit jamais exposée au navigateur. Sans clé configurée, l’application reste en démonstration. Les textes de l’interface (paramètres, À propos, mention sous la zone de saisie) indiquent le moteur actif et le fait que les messages transitent par Google. Prochaine étape : évaluer la qualité du mooré avec un jeu de test validé par des locuteurs, et envisager NLLB-200 (traduction) en relais si nécessaire.
+
 ## Design actuel : prototype Lovable (octobre 2026)
 
 L’interface reprend le design du prototype Lovable (dépôt `kaso-tech/mizanga-454f3fb5`), porté dans la base React/Vite de ce dépôt sans changer de pile technique. Il remplace les directions visuelles décrites plus bas.

@@ -16,12 +16,15 @@ export function mockMatchMedia(matches: (query: string) => boolean = () => false
   })) as unknown as typeof window.matchMedia
 }
 
-mockMatchMedia()
-Element.prototype.scrollIntoView = vi.fn()
-
-afterEach(() => {
-  cleanup()
-  localStorage.clear()
-  window.history.replaceState({}, '', '/')
+// Les tests du serveur tournent sous Node, sans DOM : les simulations du navigateur ne s’y appliquent pas.
+if (typeof window !== 'undefined') {
   mockMatchMedia()
-})
+  Element.prototype.scrollIntoView = vi.fn()
+
+  afterEach(() => {
+    cleanup()
+    localStorage.clear()
+    window.history.replaceState({}, '', '/')
+    mockMatchMedia()
+  })
+}

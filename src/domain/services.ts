@@ -25,7 +25,17 @@ export interface AiChunk {
 export interface AiService {
   /** Vrai tant qu’aucun moteur linguistique réel n’est branché : l’interface doit l’afficher. */
   readonly isDemonstration: boolean
+  /** Nom du moteur montré à l’utilisateur (transparence). */
+  readonly label: string
   generate(request: AiGenerationRequest, options: { signal: AbortSignal }): AsyncIterable<AiChunk>
+}
+
+/** Erreur d’un service d’IA dont le message peut être montré tel quel à l’utilisateur. */
+export class AiServiceError extends Error {
+  constructor(readonly userMessage: string) {
+    super(userMessage)
+    this.name = 'AiServiceError'
+  }
 }
 
 export interface ResearchService {

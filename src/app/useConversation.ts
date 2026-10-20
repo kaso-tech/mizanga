@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AiService } from '../domain/services'
+import { AiServiceError, type AiService } from '../domain/services'
 import type { ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
 
 function createId(prefix: string) {
@@ -73,16 +73,19 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
       }
       if (hasReply) updateMessage(conversationId, replyId, (message) => ({ ...message, status: controller.signal.aborted ? 'stopped' : 'complete' }))
     } catch (error) {
+      const errorMessage = error instanceof AiServiceError ? error.userMessage : undefined
       if (hasReply) {
-        updateMessage(conversationId, replyId, (message) => ({ ...message, status: isAbortError(error) ? 'stopped' : 'error' }))
+        updateMessage(conversationId, replyId, (message) => (
+          isAbortError(error) ? { ...message, status: 'stopped' } : { ...message, status: 'error', errorMessage }
+        ))
       } else if (!isAbortError(error)) {
         updateMessages(conversationId, (messages) => [...messages, {
           id: replyId,
           role: 'assistant',
-          content: 'La réponse n’a pas pu être produite. Vous pouvez réessayer.',
+          content: '',
           createdAt: new Date().toISOString(),
-          language: 'fr',
           status: 'error',
+          errorMessage,
           isDemonstration: aiService.isDemonstration,
         }])
       }

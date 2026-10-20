@@ -41,13 +41,20 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, onCopy, o
       <BrandMark />
       <div className="assistant-body">
         {message.isDemonstration && <span className="demo-badge">Démonstration — aucune IA réelle</span>}
-        <div className="assistant-content" lang={message.language} aria-busy={!isDone || undefined} onMouseUp={() => setSelectedPassage(window.getSelection()?.toString() ?? '')}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</ReactMarkdown>
-        </div>
+        {message.content && (
+          <div className="assistant-content" lang={message.language} aria-busy={!isDone || undefined} onMouseUp={() => setSelectedPassage(window.getSelection()?.toString() ?? '')}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</ReactMarkdown>
+          </div>
+        )}
         {message.status === 'stopped' && <p className="message-status">Génération arrêtée.</p>}
-        {message.status === 'error' && <p className="message-error">Une erreur est survenue lors de la génération. Réessayez.</p>}
+        {message.status === 'error' && <p className="message-error" role="alert">{message.errorMessage ?? 'Une erreur est survenue lors de la génération. Réessayez.'}</p>}
 
-        {isDone && (
+        {isDone && !message.content && canRegenerate && (
+          <div className="message-actions">
+            <button type="button" className="has-label" onClick={onRegenerate}><RefreshCw size={16} aria-hidden="true" /> Réessayer</button>
+          </div>
+        )}
+        {isDone && message.content && (
           <div className="message-actions" aria-label="Actions pour cette réponse">
             <button type="button" onClick={() => onCopy(message)} aria-label={isCopied ? 'Copié' : 'Copier'} title={isCopied ? 'Copié' : 'Copier'}>
               {isCopied ? <Check size={16} /> : <Copy size={16} />}

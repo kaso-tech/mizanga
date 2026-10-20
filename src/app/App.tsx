@@ -239,6 +239,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         return (
           <SettingsView
             preferences={preferences}
+            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration }}
             conversationCount={conversation.conversations.length}
             onChange={updatePreferences}
             onResetPreferences={() => {
@@ -254,7 +255,7 @@ export function App({ aiService = demoAiService }: AppProps) {
           />
         )
       case 'about':
-        return <AboutView />
+        return <AboutView engineLabel={aiService.label} isDemonstration={aiService.isDemonstration} />
       default:
         return (
           <ChatView

@@ -121,7 +121,7 @@ export function Composer({ value, isGenerating, isDemonstration, stopLabel, focu
         </div>
       </div>
       <p className="disclaimer">
-        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Mizanga peut faire des erreurs ; vérifiez les informations importantes.'}
+        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Mizanga peut se tromper, y compris en mooré. Vérifiez les informations importantes.'}
       </p>
     </div>
   )
