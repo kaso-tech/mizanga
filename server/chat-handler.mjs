@@ -5,7 +5,11 @@ import { generateGeminiTitle, streamGeminiReply, UpstreamError } from './gemini.
 const MAX_BODY_BYTES = 12 * 1024 * 1024
 const MAX_ATTACHMENTS_PER_MESSAGE = 4
 const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((8 * 1024 * 1024 * 4) / 3)
-const ATTACHMENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf', 'text/plain', 'text/markdown', 'text/csv'])
+const ATTACHMENT_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+  'application/pdf', 'text/plain', 'text/markdown', 'text/csv',
+  'audio/wav', 'audio/mp3', 'audio/aac', 'audio/ogg', 'audio/flac',
+])
 const MAX_MESSAGES = 60
 const MAX_MESSAGE_CHARS = 32_000
 const RATE_LIMIT = { windowMs: 60_000, maxRequests: 20 }

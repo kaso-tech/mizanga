@@ -8,10 +8,25 @@ const MAX_IMAGE_SIDE = 1600
 
 const imageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 const documentTypes = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv']
-export const acceptedTypes = [...imageTypes, ...documentTypes]
-export const acceptAttribute = [...acceptedTypes, '.md', '.csv', '.txt'].join(',')
+/** Formats audio acceptés par Gemini. */
+const audioTypes = ['audio/wav', 'audio/mp3', 'audio/aac', 'audio/ogg', 'audio/flac']
+export const acceptedTypes = [...imageTypes, ...documentTypes, ...audioTypes]
+export const acceptAttribute = [...acceptedTypes, 'audio/mpeg', '.md', '.csv', '.txt', '.mp3', '.wav', '.m4a', '.ogg', '.flac'].join(',')
 
 export const isImage = (attachment: Pick<Attachment, 'mimeType'>) => attachment.mimeType.startsWith('image/')
+export const isAudio = (attachment: Pick<Attachment, 'mimeType'>) => attachment.mimeType.startsWith('audio/')
+
+/** Noms de types audio que les navigateurs emploient pour les formats acceptés par Gemini. */
+const audioAliases: Record<string, string> = {
+  'audio/mpeg': 'audio/mp3',
+  'audio/x-wav': 'audio/wav',
+  'audio/wave': 'audio/wav',
+  'audio/vnd.wave': 'audio/wav',
+  'audio/x-flac': 'audio/flac',
+  'audio/x-aac': 'audio/aac',
+  'audio/mp4': 'audio/aac',
+  'audio/x-m4a': 'audio/aac',
+}
 
 export function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} o`
@@ -21,9 +36,10 @@ export function formatSize(bytes: number) {
 
 /** Type MIME fiable : certains navigateurs laissent vide le type des fichiers .md ou .csv. */
 function mimeTypeOf(file: File) {
-  if (file.type) return file.type === 'image/jpg' ? 'image/jpeg' : file.type
+  if (file.type) return file.type === 'image/jpg' ? 'image/jpeg' : audioAliases[file.type] ?? file.type
   const extension = file.name.split('.').pop()?.toLowerCase()
-  return extension === 'md' ? 'text/markdown' : extension === 'csv' ? 'text/csv' : extension === 'txt' ? 'text/plain' : ''
+  const byExtension: Record<string, string> = { md: 'text/markdown', csv: 'text/csv', txt: 'text/plain', mp3: 'audio/mp3', wav: 'audio/wav', m4a: 'audio/aac', ogg: 'audio/ogg', flac: 'audio/flac' }
+  return byExtension[extension ?? ''] ?? ''
 }
 
 /** Contenu en base64, via FileReader (pris en charge partout, y compris par les navigateurs anciens). */
@@ -72,7 +88,7 @@ export async function prepareAttachments(files: File[], current: Attachment[]): 
     }
     const mimeType = mimeTypeOf(file)
     if (!acceptedTypes.includes(mimeType)) {
-      problems.push(`« ${file.name} » : format non pris en charge (photos, PDF ou texte).`)
+      problems.push(`« ${file.name} » : format non pris en charge (photos, PDF, texte ou audio).`)
       continue
     }
     const { blob, mimeType: finalType } = isImage({ mimeType }) ? await shrinkImage(file, mimeType) : { blob: file, mimeType }

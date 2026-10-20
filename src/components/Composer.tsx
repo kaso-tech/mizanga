@@ -1,6 +1,7 @@
-import { ArrowUp, ClipboardPaste, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Check, ClipboardPaste, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { acceptAttribute, formatSize, isImage } from '../app/attachments'
+import { acceptAttribute, formatSize, isAudio, isImage } from '../app/attachments'
+import { MAX_RECORDING_SECONDS, formatDuration, isVoiceRecordingSupported, useVoiceRecording } from '../app/voiceRecording'
 import { mooreCharacters } from '../data/content'
 import type { Attachment } from '../domain/types'
 
@@ -46,6 +47,9 @@ export function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showCharacters, setShowCharacters] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [canRecord] = useState(isVoiceRecordingSupported)
+  const recording = useVoiceRecording({ onRecorded: (file) => onAddFiles([file]), onError: onNotify })
+  const isRecording = recording.state === 'recording'
   const hasContent = value.trim().length > 0 || attachments.length > 0
 
   useEffect(() => {
@@ -63,7 +67,7 @@ export function Composer({
   }, [focusToken])
 
   const submit = () => {
-    if (!hasContent || isGenerating || isOffline || isPreparingFiles) return
+    if (!hasContent || isGenerating || isOffline || isPreparingFiles || isRecording) return
     onSend(value)
   }
 
@@ -121,18 +125,27 @@ export function Composer({
           onAddFiles([...event.dataTransfer.files])
         }}
       >
-        {(attachments.length > 0 || isPreparingFiles) && (
+        {isRecording && (
+          <div className="recording-bar" role="status">
+            <span className="recording-dot" aria-hidden="true" />
+            <span className="recording-time">{formatDuration(recording.elapsed)} / {formatDuration(MAX_RECORDING_SECONDS)}</span>
+            <span className="recording-note">Enregistrement… La compréhension du mooré parlé n’est pas encore garantie.</span>
+            <button type="button" className="secondary-button" onClick={recording.cancel}>Annuler</button>
+            <button type="button" className="primary-button" onClick={recording.stop}><Check size={16} aria-hidden="true" /> Terminer</button>
+          </div>
+        )}
+        {(attachments.length > 0 || isPreparingFiles || recording.state === 'processing') && (
           <ul className="attachment-list" aria-label="Fichiers joints">
             {attachments.map((attachment) => (
               <li key={attachment.id} className="attachment-chip">
                 {isImage(attachment) && attachment.data
                   ? <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt="" />
-                  : <span className="attachment-icon"><FileText size={18} aria-hidden="true" /></span>}
+                  : <span className="attachment-icon">{isAudio(attachment) ? <Mic size={18} aria-hidden="true" /> : <FileText size={18} aria-hidden="true" />}</span>}
                 <span className="attachment-text"><span className="attachment-name">{attachment.name}</span><span className="attachment-size">{formatSize(attachment.size)}</span></span>
                 <button type="button" aria-label={`Retirer ${attachment.name}`} onClick={() => onRemoveAttachment(attachment.id)}><X size={14} /></button>
               </li>
             ))}
-            {isPreparingFiles && (
+            {(isPreparingFiles || recording.state === 'processing') && (
               <li className="attachment-chip is-loading" aria-live="polite">
                 <LoaderCircle size={18} className="spin" aria-hidden="true" /> Préparation…
               </li>
@@ -211,7 +224,15 @@ export function Composer({
             <Globe size={16} aria-hidden="true" />
             <span className="composer-pill-label">Recherche web</span>
           </button>
-          <button type="button" className="composer-tool" disabled aria-label="Dictée vocale (bientôt disponible)" title="Dictée vocale — bientôt disponible">
+          <button
+            type="button"
+            className={`composer-tool ${isRecording ? 'is-recording' : ''}`}
+            disabled={!canRecord || recording.state === 'processing'}
+            aria-pressed={isRecording}
+            aria-label={!canRecord ? 'Message vocal (non pris en charge par ce navigateur)' : isRecording ? 'Terminer l’enregistrement' : 'Enregistrer un message vocal'}
+            title={!canRecord ? 'Votre navigateur ne permet pas l’enregistrement audio' : isRecording ? 'Terminer l’enregistrement' : 'Enregistrer un message vocal'}
+            onClick={() => (isRecording ? recording.stop() : void recording.start())}
+          >
             <Mic size={20} />
           </button>
           <span className="composer-spacer" />
@@ -220,7 +241,7 @@ export function Composer({
               <Square size={16} fill="currentColor" />
             </button>
           ) : (
-            <button type="button" className="send-button" aria-label="Envoyer" disabled={!hasContent || isOffline || isPreparingFiles} onClick={submit}>
+            <button type="button" className="send-button" aria-label="Envoyer" disabled={!hasContent || isOffline || isPreparingFiles || isRecording} onClick={submit}>
               <ArrowUp size={20} />
             </button>
           )}

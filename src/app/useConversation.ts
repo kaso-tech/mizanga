@@ -153,7 +153,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     if (existing) {
       updateMessages(conversationId, () => history)
     } else {
-      setConversations((current) => [{ id: conversationId, title: createTitle(content.trim() ? content : attachments[0]?.name ?? 'Sans titre'), messages: history, createdAt: now, updatedAt: now }, ...current])
+      setConversations((current) => [{ id: conversationId, title: createTitle(content.trim() ? content : attachments[0]?.name.replace(/\.[a-z0-9]{2,5}$/i, '') ?? 'Sans titre'), messages: history, createdAt: now, updatedAt: now }, ...current])
       setActiveId(conversationId)
     }
     void run(conversationId, history)

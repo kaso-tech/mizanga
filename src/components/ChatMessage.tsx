@@ -2,7 +2,7 @@ import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, Refres
 import { useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { formatSize, isImage } from '../app/attachments'
+import { formatSize, isAudio, isImage } from '../app/attachments'
 import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
 
@@ -59,6 +59,10 @@ function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
         <li key={attachment.id}>
           {isImage(attachment) && attachment.data ? (
             <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt={attachment.name} />
+          ) : isAudio(attachment) && attachment.data ? (
+            <span className="audio-attachment">
+              <audio controls preload="metadata" src={`data:${attachment.mimeType};base64,${attachment.data}`} aria-label={attachment.name} />
+            </span>
           ) : (
             <span className="attachment-chip is-static" title={attachment.data ? undefined : 'Contenu non conservé sur cet appareil'}>
               <span className="attachment-icon"><FileText size={18} aria-hidden="true" /></span>

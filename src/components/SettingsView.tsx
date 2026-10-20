@@ -1,6 +1,7 @@
 import { AudioLines, Database, Info, Languages, Monitor, Moon, SlidersHorizontal, Sun, UserRound, type LucideIcon } from 'lucide-react'
 import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
+import { isVoiceRecordingSupported } from '../app/voiceRecording'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
 import type { LinguisticPreferences, ResponseLanguage, ThemePreference, UserWritingMode } from '../domain/types'
 
@@ -10,7 +11,7 @@ const sections: Array<{ id: SectionId; label: string; description: string; icon:
   { id: 'general', label: 'Général', description: 'Apparence et langue de l’interface.', icon: SlidersHorizontal },
   { id: 'langue', label: 'Langue et écriture', description: 'La langue de vos échanges avec Mizanga et votre façon d’écrire le mooré.', icon: Languages },
   { id: 'donnees', label: 'Conversations et données', description: 'Ce qui est conservé, où, et comment l’effacer.', icon: Database },
-  { id: 'voix', label: 'Voix', description: 'Dictée et lecture audio des réponses.', icon: AudioLines },
+  { id: 'voix', label: 'Voix', description: 'Messages vocaux et lecture audio des réponses.', icon: AudioLines },
   { id: 'compte', label: 'Compte', description: 'Connexion et synchronisation.', icon: UserRound },
 ]
 
@@ -247,7 +248,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   label="Vos messages et fichiers"
                   description={engine.isDemonstration
                     ? 'Aucun message ne quitte votre navigateur : aucun moteur d’IA n’est connecté.'
-                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses ; les fichiers joints ne sont pas conservés sur l’appareil. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations ou documents sensibles.'}
+                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses, y compris les messages vocaux et, si vous l’activez, la recherche web ; les fichiers joints ne sont pas conservés sur l’appareil. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations ou documents sensibles.'}
                 >
                   <span className="value-pill">{engine.isDemonstration ? 'Restent sur l’appareil' : 'Envoyés à Google'}</span>
                 </SettingRow>
@@ -273,8 +274,11 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
 
           {activeSection === 'voix' && (
             <div className="setting-group">
-              <SettingRow label="Dictée vocale" description={<>Parler à Mizanga en français ou en mooré. <span className="soon-badge">Bientôt</span></>}>
-                <SoonSwitch label="Dictée vocale" />
+              <SettingRow
+                label="Messages vocaux"
+                description="Touchez le micro de la zone de saisie pour parler à Mizanga (2 minutes au plus). La compréhension du mooré parlé n’est pas encore garantie : le français est mieux compris pour l’instant."
+              >
+                <span className="value-pill">{isVoiceRecordingSupported() ? 'Disponible' : 'Non pris en charge ici'}</span>
               </SettingRow>
               <SettingRow label="Lecture audio des réponses" description={<>Écouter les réponses à voix haute. <span className="soon-badge">Bientôt</span></>}>
                 <SoonSwitch label="Lecture audio des réponses" />

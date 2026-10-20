@@ -501,6 +501,15 @@ button.close-drawer { display: none; }
 .web-sources-empty { margin: 0; color: var(--muted-foreground); }
 .search-suggestions { display: block; width: 100%; height: 64px; margin-top: 8px; border: 0; color-scheme: normal; }
 
+/* Messages vocaux. */
+.recording-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 12px 0; padding: 8px 10px; border-radius: 14px; background: color-mix(in oklab, var(--destructive) 8%, var(--card)); font-size: 13px; }
+.recording-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--destructive); animation: typing 1.2s infinite ease-in-out; }
+.recording-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+.recording-note { flex: 1; min-width: 160px; color: var(--muted-foreground); font-size: 12px; }
+.recording-bar .secondary-button, .recording-bar .primary-button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
+.composer-tool.is-recording { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 12%, transparent); }
+.audio-attachment audio { display: block; width: min(300px, 75vw); height: 40px; }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }
