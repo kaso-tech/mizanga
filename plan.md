@@ -1,5 +1,17 @@
 # Plan d’implémentation — Phase 1 de Mizanga
 
+## Design actuel : prototype Lovable (octobre 2026)
+
+L’interface reprend le design du prototype Lovable (dépôt `kaso-tech/mizanga-454f3fb5`), porté dans la base React/Vite de ce dépôt sans changer de pile technique. Il remplace les directions visuelles décrites plus bas.
+
+- **Identité :** tons argile, ocre et karité sur fond papier ; titres en Noto Serif, texte en Noto Sans (lettres du mooré couvertes) ; bande tissée inspirée des rayures du Faso Dan Fani, employée avec parcimonie ; signe de marque à deux arcs et un point.
+- **Accueil :** « Comment puis-je vous aider ? », zone de saisie au centre, langue de réponse rappelée, six tâches générales.
+- **Zone de saisie :** clavier des caractères du mooré (ɛ ɩ ʋ ã ẽ ĩ õ ũ Ɛ Ɩ Ʋ) inséré au curseur, collage, dictée « bientôt ».
+- **Conversation :** bulle utilisateur foncée, réponses en Markdown, badge « Démonstration — aucune IA réelle », avis (positif, négatif, « Cette réponse est correcte »), signalement d’erreur en mooré avec passage sélectionné.
+- **Navigation :** barre latérale repliable avec recherche, filtre Toutes / Favoris, étoile et suppression ; sélecteur de langue de réponse dans l’en-tête.
+- **Préférences :** enregistrées sur l’appareil uniquement (stockage local) ; les conversations restent en mémoire.
+- **Conservé de ce dépôt :** langue de réponse « Automatique », régénération, service d’IA remplaçable avec annulation, accessibilité clavier et lecteurs d’écran.
+
 ## Repositionnement (octobre 2026)
 
 Mizanga est un **assistant IA généraliste**, au même titre que Claude, ChatGPT ou Perplexity : rédiger, résumer, expliquer, apprendre, s’organiser. Sa particularité est linguistique : il doit comprendre et répondre en **mooré**, langue encore mal prise en charge par les autres assistants, puis potentiellement dans d’autres langues du Burkina Faso. Le mooré est un atout du produit, pas son unique sujet.

@@ -1,51 +1,61 @@
-import { Menu, PanelLeftOpen, SquarePen } from 'lucide-react'
+import { ChevronDown, PanelLeft, Settings, UserRound } from 'lucide-react'
+import { responseLanguageLabels } from '../data/content'
+import type { ResponseLanguage } from '../domain/types'
+import { Brand } from './Brand'
 
 interface HeaderProps {
-  title: string
-  isDrawerOpen: boolean
-  isSidebarCollapsed: boolean
-  canShare: boolean
-  onMenuToggle: () => void
-  onExpandSidebar: () => void
-  onNewConversation: () => void
-  onNotify: (message: string) => void
+  isMenuOpen: boolean
+  showBrand: boolean
+  responseLanguage: ResponseLanguage
+  onToggleSidebar: () => void
+  onResponseLanguageChange: (language: ResponseLanguage) => void
+  onOpenSettings: () => void
+  onGoHome: () => void
 }
 
 export function Header({
-  title,
-  isDrawerOpen,
-  isSidebarCollapsed,
-  canShare,
-  onMenuToggle,
-  onExpandSidebar,
-  onNewConversation,
-  onNotify,
+  isMenuOpen,
+  showBrand,
+  responseLanguage,
+  onToggleSidebar,
+  onResponseLanguageChange,
+  onOpenSettings,
+  onGoHome,
 }: HeaderProps) {
   return (
     <header className="topbar">
       <div className="topbar-start">
-        <button className="icon-button mobile-menu-button" type="button" aria-label={isDrawerOpen ? 'Fermer le menu' : 'Ouvrir le menu'} onClick={onMenuToggle}>
-          <Menu size={21} strokeWidth={1.9} />
+        <button
+          className="icon-button"
+          type="button"
+          aria-label={isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+          aria-expanded={isMenuOpen}
+          onClick={onToggleSidebar}
+        >
+          <PanelLeft size={20} />
         </button>
-        {isSidebarCollapsed && (
-          <button className="icon-button expand-sidebar" type="button" aria-label="Afficher la barre latérale" title="Afficher la barre latérale" onClick={onExpandSidebar}>
-            <PanelLeftOpen size={18} />
+        {showBrand && (
+          <button type="button" className="topbar-brand" onClick={onGoHome} aria-label="Accueil Mizanga">
+            <Brand />
           </button>
         )}
-        <p className="topbar-title">{title}</p>
       </div>
 
       <div className="topbar-actions">
-        {canShare && (
-          <button className="pill-button share-button" type="button" onClick={() => onNotify('Le partage de conversations sera disponible avec les comptes utilisateurs.')}>
-            Partager
-          </button>
-        )}
-        <button className="pill-button is-strong login-button" type="button" onClick={() => onNotify('Les comptes utilisateurs seront disponibles dans une prochaine phase.')}>
-          Se connecter
+        <label className="language-select">
+          <span className="visually-hidden">Langue de réponse</span>
+          <select value={responseLanguage} onChange={(event) => onResponseLanguageChange(event.target.value as ResponseLanguage)}>
+            {Object.entries(responseLanguageLabels).map(([language, label]) => (
+              <option key={language} value={language}>{label}</option>
+            ))}
+          </select>
+          <ChevronDown size={16} aria-hidden="true" />
+        </label>
+        <button className="icon-button" type="button" aria-label="Paramètres" title="Paramètres" onClick={onOpenSettings}>
+          <Settings size={20} />
         </button>
-        <button className="icon-button mobile-new-chat" type="button" aria-label="Nouvelle conversation" onClick={onNewConversation}>
-          <SquarePen size={19} />
+        <button className="icon-button" type="button" disabled aria-label="Connexion (bientôt disponible)" title="Connexion — bientôt disponible">
+          <UserRound size={20} />
         </button>
       </div>
     </header>

@@ -1,4 +1,4 @@
-import { ChevronUp, CircleHelp, Clock3, Bookmark, LogIn, MessageCircle, PanelLeftClose, Search, Settings2, SquarePen, X } from 'lucide-react'
+import { Info, LogIn, MessageSquarePlus, Search, Settings, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Brand } from './Brand'
 import type { AppView, Conversation } from '../domain/types'
@@ -9,19 +9,12 @@ interface SidebarProps {
   activeConversationId?: string
   isOpen: boolean
   onClose: () => void
-  onCollapse: () => void
   onNavigate: (view: AppView) => void
   onNewConversation: () => void
   onSelectConversation: (conversationId: string) => void
-  onNotify: (message: string) => void
+  onRemoveConversation: (conversationId: string) => void
+  onToggleFavorite: (conversationId: string) => void
 }
-
-const menuItems: Array<{ label: string; view: AppView; icon: typeof Clock3 }> = [
-  { label: 'Paramètres', view: 'settings', icon: Settings2 },
-  { label: 'Historique', view: 'history', icon: Clock3 },
-  { label: 'Favoris', view: 'favorites', icon: Bookmark },
-  { label: 'À propos de Mizanga', view: 'about', icon: CircleHelp },
-]
 
 export function Sidebar({
   activeView,
@@ -29,16 +22,15 @@ export function Sidebar({
   activeConversationId,
   isOpen,
   onClose,
-  onCollapse,
   onNavigate,
   onNewConversation,
   onSelectConversation,
-  onNotify,
+  onRemoveConversation,
+  onToggleFavorite,
 }: SidebarProps) {
   const [query, setQuery] = useState('')
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [onlyFavorites, setOnlyFavorites] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const accountRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
@@ -57,111 +49,88 @@ export function Sidebar({
     }
   }, [isOpen])
 
-  // Menu du compte : fermeture au clic extérieur ou avec Échap.
-  useEffect(() => {
-    if (!menuOpen) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!accountRef.current?.contains(event.target as Node)) setMenuOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [menuOpen])
-
   const normalizedQuery = query.trim().toLocaleLowerCase('fr')
-  const visibleConversations = normalizedQuery
-    ? conversations.filter((conversation) => conversation.title?.toLocaleLowerCase('fr').includes(normalizedQuery))
-    : conversations
+  const visibleConversations = conversations.filter((conversation) => (
+    (!onlyFavorites || conversation.favorite) && (conversation.title ?? '').toLocaleLowerCase('fr').includes(normalizedQuery)
+  ))
+  const emptyMessage = conversations.length === 0 ? 'Aucune conversation pour l’instant.' : onlyFavorites ? 'Aucun favori.' : 'Aucun résultat.'
 
   return (
     <>
       <div className={`drawer-backdrop ${isOpen ? 'is-visible' : ''}`} onClick={onClose} aria-hidden="true" />
       <aside className={`sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Navigation principale">
+        <div className="weave-band sidebar-band" aria-hidden="true" />
         <div className="sidebar-top">
           <Brand />
-          <button className="icon-button collapse-sidebar" type="button" aria-label="Replier la barre latérale" title="Replier la barre latérale" onClick={onCollapse}>
-            <PanelLeftClose size={18} />
-          </button>
           <button ref={closeButtonRef} className="icon-button close-drawer" type="button" aria-label="Fermer le menu" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
 
-        <button className="new-chat-button" type="button" onClick={onNewConversation}>
-          <SquarePen size={17} aria-hidden="true" />
-          Nouvelle conversation
-        </button>
-
-        <label className="sidebar-search">
-          <Search size={16} aria-hidden="true" />
-          <span className="visually-hidden">Rechercher dans les conversations</span>
-          <input type="search" value={query} placeholder="Rechercher" onChange={(event) => setQuery(event.target.value)} />
-        </label>
+        <div className="sidebar-controls">
+          <button className="new-chat-button" type="button" onClick={onNewConversation}>
+            <MessageSquarePlus size={16} aria-hidden="true" />
+            Nouvelle conversation
+          </button>
+          <label className="sidebar-search">
+            <Search size={16} aria-hidden="true" />
+            <span className="visually-hidden">Rechercher dans l’historique</span>
+            <input type="search" value={query} placeholder="Rechercher dans l’historique" onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <div className="filter-tabs" role="group" aria-label="Filtrer les conversations">
+            <button type="button" className={!onlyFavorites ? 'is-selected' : ''} aria-pressed={!onlyFavorites} onClick={() => setOnlyFavorites(false)}>Toutes</button>
+            <button type="button" className={onlyFavorites ? 'is-selected' : ''} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites(true)}>Favoris</button>
+          </div>
+        </div>
 
         <nav className="conversation-list" aria-label="Conversations de cette session">
-          {conversations.length > 0 && <p className="nav-label">Cette session</p>}
-          {visibleConversations.map((conversation) => (
-            <button
-              key={conversation.id}
-              type="button"
-              className={`conversation-item ${conversation.id === activeConversationId && activeView === 'chat' ? 'is-active' : ''}`}
-              aria-current={conversation.id === activeConversationId && activeView === 'chat' ? 'page' : undefined}
-              onClick={() => onSelectConversation(conversation.id)}
-            >
-              {conversation.title}
-            </button>
-          ))}
-          {conversations.length === 0 && (
-            <div className="conversation-empty">
-              <span className="conversation-empty-icon" aria-hidden="true">
-                <MessageCircle size={15} />
-              </span>
-              <p>Vos conversations apparaîtront ici.</p>
-              <small>Aucune n’est enregistrée pour l’instant.</small>
-            </div>
-          )}
-          {conversations.length > 0 && visibleConversations.length === 0 && (
-            <p className="conversation-empty">Aucune conversation ne correspond à « {query.trim()} ».</p>
+          <p className="nav-label">Cette session</p>
+          <p className="nav-note">Non enregistré : l’historique disparaît à la fermeture de la page.</p>
+          {visibleConversations.length === 0 ? (
+            <p className="conversation-empty">{emptyMessage}</p>
+          ) : (
+            <ul>
+              {visibleConversations.map((conversation) => {
+                const isActive = conversation.id === activeConversationId && activeView === 'chat'
+                return (
+                  <li key={conversation.id} className="conversation-row">
+                    <button
+                      type="button"
+                      className={`conversation-item ${isActive ? 'is-active' : ''}`}
+                      aria-current={isActive ? 'page' : undefined}
+                      onClick={() => onSelectConversation(conversation.id)}
+                    >
+                      {conversation.title || 'Sans titre'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`row-action is-star ${conversation.favorite ? 'is-on' : ''}`}
+                      aria-label={conversation.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                      aria-pressed={Boolean(conversation.favorite)}
+                      onClick={() => onToggleFavorite(conversation.id)}
+                    >
+                      <Star size={16} fill={conversation.favorite ? 'currentColor' : 'none'} />
+                    </button>
+                    <button type="button" className="row-action is-delete" aria-label={`Supprimer « ${conversation.title || 'Sans titre'} »`} onClick={() => onRemoveConversation(conversation.id)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
           )}
         </nav>
 
-        <div className="sidebar-foot" ref={accountRef}>
-          {menuOpen && (
-            <div className="account-menu" id="account-menu">
-              {menuItems.map(({ label, view, icon: Icon }) => (
-                <button
-                  key={view}
-                  type="button"
-                  className={activeView === view ? 'is-active' : ''}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    onNavigate(view)
-                  }}
-                >
-                  <Icon size={17} aria-hidden="true" />
-                  {label}
-                </button>
-              ))}
-              <span className="account-menu-divider" />
-              <button type="button" onClick={() => { setMenuOpen(false); onNotify('La connexion sera intégrée avec un backend sécurisé dans une prochaine phase.') }}>
-                <LogIn size={17} aria-hidden="true" />
-                Se connecter
-              </button>
-            </div>
-          )}
-          <button className="account-button" type="button" aria-expanded={menuOpen} aria-controls="account-menu" onClick={() => setMenuOpen((open) => !open)}>
-            <span className="guest-avatar" aria-hidden="true">I</span>
-            <span className="account-text"><strong>Invité</strong><small>Paramètres · À propos</small></span>
-            <ChevronUp size={16} aria-hidden="true" className={menuOpen ? '' : 'is-flipped'} />
+        <div className="sidebar-foot">
+          <button type="button" className={`nav-item ${activeView === 'settings' ? 'is-active' : ''}`} onClick={() => onNavigate('settings')}>
+            <Settings size={16} aria-hidden="true" /> Paramètres
+          </button>
+          <button type="button" className={`nav-item ${activeView === 'about' ? 'is-active' : ''}`} onClick={() => onNavigate('about')}>
+            <Info size={16} aria-hidden="true" /> À propos du projet
+          </button>
+          <button type="button" className="nav-item" disabled>
+            <LogIn size={16} aria-hidden="true" /> Connexion
+            <span className="soon-badge">Bientôt</span>
           </button>
         </div>
       </aside>

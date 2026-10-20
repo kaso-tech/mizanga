@@ -1,5 +1,5 @@
-import { demonstrationReply } from '../data/content'
-import type { AiChunk, AiService } from '../domain/services'
+import { demonstrationReply, responseLanguageLabels, userWritingModeLabels } from '../data/content'
+import type { AiChunk, AiGenerationRequest, AiService } from '../domain/services'
 
 function abortableDelay(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -16,19 +16,30 @@ function abortableDelay(ms: number, signal: AbortSignal) {
   })
 }
 
+/** Réponse de démonstration : elle cite la demande telle quelle et n’en produit aucune interprétation. */
+function buildReply({ messages, preferences }: AiGenerationRequest) {
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content ?? ''
+  return [
+    demonstrationReply,
+    'Votre message a été reçu tel quel, sans modification :',
+    lastUserMessage.split(/\r?\n/).map((line) => `> ${line}`).join('\n'),
+    'Préférences transmises au futur moteur :',
+    `- Écriture de l’utilisateur : ${userWritingModeLabels[preferences.userWritingMode]}\n- Réponse souhaitée : ${responseLanguageLabels[preferences.responseLanguage]}`,
+  ].join('\n\n')
+}
+
 /**
- * Adaptateur de phase 1 : n’appelle aucun moteur et ne lit pas la demande.
- * Il renvoie, par fragments, un message en français qui l’indique explicitement,
- * afin d’exercer le flux et l’annulation de l’interface sans rien simuler de linguistique.
+ * Adaptateur de phase 1 : n’appelle aucun moteur. Il renvoie, par fragments, un message en français
+ * qui l’indique explicitement, afin d’exercer le flux et l’annulation sans rien simuler de linguistique.
  */
 export const demoAiService: AiService = {
   isDemonstration: true,
-  async *generate(_request, { signal }): AsyncGenerator<AiChunk> {
+  async *generate(request, { signal }): AsyncGenerator<AiChunk> {
     await abortableDelay(600, signal)
-    const words = demonstrationReply.split(/(?<= )/)
-    for (const [index, word] of words.entries()) {
-      if (index > 0) await abortableDelay(18, signal)
-      yield { text: word, language: 'fr' }
+    const tokens = buildReply(request).match(/\S+\s*/g) ?? []
+    for (const token of tokens) {
+      await abortableDelay(18, signal)
+      yield { text: token, language: 'fr' }
     }
   },
 }

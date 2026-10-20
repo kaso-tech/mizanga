@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AiService } from '../domain/services'
-import type { ChatMessage, Conversation, LinguisticPreferences } from '../domain/types'
+import type { ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
 
 function createId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`
@@ -134,7 +134,27 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     setActiveId(undefined)
   }
 
-  const sortedConversations = [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const remove = (conversationId: string) => {
+    if (conversationId === activeId) {
+      controllerRef.current?.abort()
+      setActiveId(undefined)
+    }
+    setConversations((current) => current.filter((conversation) => conversation.id !== conversationId))
+  }
+
+  const toggleFavorite = (conversationId: string) => {
+    setConversations((current) => current.map((conversation) => (
+      conversation.id === conversationId ? { ...conversation, favorite: !conversation.favorite } : conversation
+    )))
+  }
+
+  /** Un second clic sur le même avis le retire. */
+  const rate = (messageId: string, rating: MessageRating) => {
+    if (!activeConversation) return
+    updateMessage(activeConversation.id, messageId, (message) => ({ ...message, rating: message.rating === rating ? undefined : rating }))
+  }
+
+  const sortedConversations = [...conversations].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
   return {
     conversations: sortedConversations,
@@ -146,5 +166,8 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     stop,
     select,
     startNew,
+    remove,
+    toggleFavorite,
+    rate,
   }
 }

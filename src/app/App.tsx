@@ -9,7 +9,8 @@ import { Header } from '../components/Header'
 import { SettingsView } from '../components/SettingsView'
 import { Sidebar } from '../components/Sidebar'
 import type { AiService } from '../domain/services'
-import { defaultPreferences, type AppView, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences } from '../domain/types'
+import { responseLanguageLabels } from '../data/content'
+import { defaultPreferences, type AppView, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
 import { demoAiService } from '../services/demoAiService'
 import { useConversation } from './useConversation'
 
@@ -30,8 +31,8 @@ const titleByView: Record<AppView, string> = {
 }
 
 const themeColorByTheme: Record<LinguisticPreferences['theme'], string> = {
-  light: '#ffffff',
-  dark: '#141518',
+  light: '#fcf9f3',
+  dark: '#1a120e',
 }
 
 function getViewFromPath(pathname: string): AppView {
@@ -47,7 +48,36 @@ function syncViewFromLocation(): AppView {
   return view
 }
 
-const isMobileLayout = () => window.matchMedia('(max-width: 780px)').matches
+const mobileQuery = '(max-width: 1023px)'
+const isMobileLayout = () => window.matchMedia(mobileQuery).matches
+
+function useIsMobileLayout() {
+  const [isMobile, setIsMobile] = useState(isMobileLayout)
+  useEffect(() => {
+    const media = window.matchMedia(mobileQuery)
+    const onChange = () => setIsMobile(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+  return isMobile
+}
+
+const preferencesStorageKey = 'mizanga.preferences.v1'
+
+/** Préférences conservées sur cet appareil uniquement ; une valeur illisible ou inconnue est ignorée. */
+function loadPreferences(): LinguisticPreferences {
+  try {
+    const stored = JSON.parse(localStorage.getItem(preferencesStorageKey) ?? '{}') as Partial<LinguisticPreferences>
+    return {
+      ...defaultPreferences,
+      ...(stored.responseLanguage && Object.hasOwn(responseLanguageLabels, stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
+      ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
+      ...(stored.theme === 'light' || stored.theme === 'dark' ? { theme: stored.theme } : {}),
+    }
+  } catch {
+    return defaultPreferences
+  }
+}
 
 type ToastTone = 'success' | 'info'
 
@@ -60,12 +90,14 @@ export function App({ aiService = demoAiService }: AppProps) {
   const [activeView, setActiveView] = useState<AppView>(syncViewFromLocation)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [preferences, setPreferences] = useState<LinguisticPreferences>(defaultPreferences)
+  const [preferences, setPreferences] = useState<LinguisticPreferences>(loadPreferences)
   const conversation = useConversation(aiService, preferences)
   const [draft, setDraft] = useState('')
   const [focusToken, setFocusToken] = useState(0)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
+  const [reportedPassage, setReportedPassage] = useState('')
+  const isMobile = useIsMobileLayout()
   const [toast, setToast] = useState<{ message: string; tone: ToastTone }>()
   const toastTimer = useRef<number>()
   const copiedTimer = useRef<number>()
@@ -74,6 +106,14 @@ export function App({ aiService = demoAiService }: AppProps) {
     document.documentElement.dataset.theme = preferences.theme
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColorByTheme[preferences.theme])
   }, [preferences.theme])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(preferencesStorageKey, JSON.stringify(preferences))
+    } catch {
+      // Stockage indisponible (navigation privée) : les préférences restent valables pour la session.
+    }
+  }, [preferences])
 
   const conversationTitle = conversation.activeConversation?.title
   useEffect(() => {
@@ -146,31 +186,35 @@ export function App({ aiService = demoAiService }: AppProps) {
     copiedTimer.current = window.setTimeout(() => setCopiedMessageId(undefined), 1800)
   }
 
-  const recordFeedback = (_message: ChatMessage, positive: boolean) => {
-    notify(positive ? 'Merci. Cet avis reste local : la collecte des retours n’est pas encore activée.' : 'Merci pour votre retour. Il reste local : la collecte des retours n’est pas encore activée.')
+  const rateMessage = (message: ChatMessage, rating: MessageRating) => {
+    conversation.rate(message.id, rating)
+    if (message.rating !== rating) notify('Avis noté sur cet appareil : la collecte des retours et la validation linguistique ne sont pas encore activées.')
+  }
+
+  const openReport = (message: ChatMessage, selectedPassage: string) => {
+    setReportedPassage(selectedPassage)
+    setReportedMessage(message)
   }
 
   const submitReport = (_feedback: LinguisticFeedback) => {
     setReportedMessage(null)
-    notify('Correction préparée localement : elle n’a été ni enregistrée ni validée.')
+    notify('Merci ! Le signalement est prêt, mais l’enregistrement n’est pas encore connecté : il n’a pas été envoyé.')
   }
 
   const toggleSidebar = () => {
     if (isMobileLayout()) setDrawerOpen((open) => !open)
-    else setSidebarCollapsed(false)
+    else setSidebarCollapsed((collapsed) => !collapsed)
   }
 
   const isEmptyChat = activeView === 'chat' && conversation.messages.length === 0
   const composer = (
     <Composer
       value={draft}
-      placeholder={isEmptyChat ? 'Demandez n’importe quoi à Mizanga…' : 'Répondre à Mizanga…'}
       isGenerating={conversation.isGenerating}
+      isDemonstration={aiService.isDemonstration}
       stopLabel={stopLabel}
-      responseLanguage={preferences.responseLanguage}
       focusToken={focusToken}
       onValueChange={setDraft}
-      onResponseLanguageChange={(responseLanguage) => updatePreferences({ responseLanguage })}
       onSend={sendMessage}
       onStop={stopGeneration}
       onNotify={notify}
@@ -180,11 +224,11 @@ export function App({ aiService = demoAiService }: AppProps) {
   const renderView = () => {
     switch (activeView) {
       case 'history':
-        return <CollectionView kind="history" />
+        return <CollectionView kind="history" conversations={conversation.conversations} onSelectConversation={selectConversation} />
       case 'favorites':
-        return <CollectionView kind="favorites" />
+        return <CollectionView kind="favorites" conversations={conversation.conversations} onSelectConversation={selectConversation} />
       case 'settings':
-        return <SettingsView preferences={preferences} onChange={updatePreferences} onNewConversation={startNewConversation} onNotify={notify} />
+        return <SettingsView preferences={preferences} onChange={updatePreferences} onNewConversation={startNewConversation} />
       case 'about':
         return <AboutView />
       default:
@@ -193,13 +237,15 @@ export function App({ aiService = demoAiService }: AppProps) {
             messages={conversation.messages}
             isGenerating={conversation.isGenerating}
             isDemonstration={aiService.isDemonstration}
+            responseLanguageLabel={responseLanguageLabels[preferences.responseLanguage]}
             composer={composer}
             copiedMessageId={copiedMessageId}
             onSuggestion={(prompt) => { setDraft(prompt); setFocusToken((token) => token + 1) }}
+            onNewConversation={startNewConversation}
             onCopy={copyMessage}
             onRegenerate={conversation.regenerate}
-            onFeedback={recordFeedback}
-            onReport={setReportedMessage}
+            onRate={rateMessage}
+            onReport={openReport}
           />
         )
     }
@@ -213,35 +259,28 @@ export function App({ aiService = demoAiService }: AppProps) {
         activeConversationId={conversation.activeConversation?.id}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onCollapse={() => setSidebarCollapsed(true)}
         onNavigate={navigate}
         onNewConversation={startNewConversation}
         onSelectConversation={selectConversation}
-        onNotify={notify}
+        onRemoveConversation={conversation.remove}
+        onToggleFavorite={conversation.toggleFavorite}
       />
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header
-          title={activeView === 'chat' ? conversationTitle ?? 'Mizanga' : titleByView[activeView]}
-          isDrawerOpen={drawerOpen}
-          isSidebarCollapsed={sidebarCollapsed}
-          canShare={activeView === 'chat' && !isEmptyChat}
-          onMenuToggle={toggleSidebar}
-          onExpandSidebar={() => setSidebarCollapsed(false)}
-          onNewConversation={startNewConversation}
-          onNotify={notify}
+          isMenuOpen={isMobile ? drawerOpen : !sidebarCollapsed}
+          showBrand={isMobile || sidebarCollapsed}
+          responseLanguage={preferences.responseLanguage}
+          onToggleSidebar={toggleSidebar}
+          onResponseLanguageChange={(responseLanguage) => updatePreferences({ responseLanguage })}
+          onOpenSettings={() => navigate('settings')}
+          onGoHome={() => navigate('chat')}
         />
-        {/* Filet signature : le repère textile décrit dans plan.md. Masqué sur
-            l'accueil, où l'en-tête se confond avec le vide de la colonne. */}
-        <div className="thread-filet" aria-hidden="true" />
         <div className="content-scroll"><div className="content-frame">{renderView()}</div></div>
         {activeView === 'chat' && !isEmptyChat && (
-          <div className="composer-zone">
-            {composer}
-            <p className="disclaimer">Mizanga peut faire des erreurs ; vérifiez les informations importantes.</p>
-          </div>
+          <div className="composer-zone">{composer}</div>
         )}
       </main>
-      <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
+      <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} initialPassage={reportedPassage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
       {/* Zone live permanente : les lecteurs d’écran n’annoncent pas toujours une région créée avec son contenu. */}
       <div className="toast-region" role="status" aria-live="polite">
         {toast && <div className="toast">{toast.tone === 'success' ? <CheckCircle2 size={18} aria-hidden="true" /> : <Info size={18} aria-hidden="true" />}<p>{toast.message}</p><button type="button" aria-label="Fermer la notification" onClick={() => setToast(undefined)}><X size={16} /></button></div>}

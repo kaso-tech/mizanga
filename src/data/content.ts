@@ -1,16 +1,19 @@
 import type { LinguisticErrorType, ResponseLanguage, UserWritingMode } from '../domain/types'
 
-export type SuggestionIcon = 'write' | 'summarize' | 'explain' | 'plan' | 'homework' | 'moore'
+export type SuggestionIcon = 'mail' | 'summarize' | 'ideas' | 'code' | 'advice' | 'explain'
 
-/** Tâches variées : Mizanga est un assistant généraliste ; le mooré est un atout, pas le seul sujet. */
-export const suggestions: Array<{ label: string; prompt: string; icon: SuggestionIcon; highlight?: boolean }> = [
-  { label: 'Rédiger un courrier', prompt: 'Rédige un courrier pour ', icon: 'write' },
+/** Tâches variées : Mizanga est un assistant généraliste qui répond aussi en mooré. */
+export const suggestions: Array<{ label: string; prompt: string; icon: SuggestionIcon }> = [
+  { label: 'Rédiger un e-mail', prompt: 'Rédige un e-mail professionnel pour demander un rendez-vous à ', icon: 'mail' },
   { label: 'Résumer un document', prompt: 'Résume ce texte en quelques points clés : ', icon: 'summarize' },
-  { label: 'Expliquer un concept', prompt: 'Explique-moi simplement ', icon: 'explain' },
-  { label: 'Préparer un plan', prompt: 'Aide-moi à préparer un plan pour ', icon: 'plan' },
-  { label: 'Aide aux devoirs', prompt: 'Aide-moi à comprendre cet exercice : ', icon: 'homework' },
-  { label: 'Discuter en mooré', prompt: 'Réponds-moi en mooré : ', icon: 'moore', highlight: true },
+  { label: 'Trouver des idées', prompt: 'Propose-moi 5 idées de petite entreprise rentable au Burkina Faso.', icon: 'ideas' },
+  { label: 'Aide en programmation', prompt: 'Explique-moi ce code et corrige les erreurs : ', icon: 'code' },
+  { label: 'Conseils pratiques', prompt: 'Donne-moi des conseils pour améliorer le rendement de mon champ de maïs.', icon: 'advice' },
+  { label: 'Expliquer un sujet', prompt: 'Explique-moi simplement comment fonctionne ', icon: 'explain' },
 ]
+
+/** Caractères propres au mooré, proposés par le clavier de la zone de saisie. */
+export const mooreCharacters = ['ɛ', 'ɩ', 'ʋ', 'ã', 'ẽ', 'ĩ', 'õ', 'ũ', 'Ɛ', 'Ɩ', 'Ʋ']
 
 export const responseLanguageLabels: Record<ResponseLanguage, string> = {
   auto: 'Automatique',
@@ -20,16 +23,9 @@ export const responseLanguageLabels: Record<ResponseLanguage, string> = {
   english: 'Anglais',
 }
 
-/** Libellés des codes BCP 47 portés par les messages. */
-export const messageLanguageLabels: Record<string, string> = {
-  fr: 'Français',
-  en: 'Anglais',
-  mos: 'Mooré',
-}
-
 export const userWritingModeLabels: Record<UserWritingMode, string> = {
-  standard: 'Écriture standardisée du mooré',
-  informal: 'Écriture informelle sur Internet',
+  standard: 'Écriture standardisée',
+  informal: 'Écriture informelle (Internet)',
 }
 
 export const errorTypeLabels: Record<LinguisticErrorType, string> = {
@@ -42,5 +38,7 @@ export const errorTypeLabels: Record<LinguisticErrorType, string> = {
   autre: 'Autre',
 }
 
-export const demonstrationReply =
-  'Aucune IA n’a produit cette réponse. Le moteur de Mizanga n’est pas encore connecté : votre message est seulement affiché pour tester l’interface, et aucune réponse — en français, en mooré ou dans une autre langue — n’a été générée.'
+export const demonstrationReply = [
+  '### Mode démonstration',
+  'Aucun moteur d’IA n’est encore connecté. **Cette réponse n’est pas une traduction ni une explication en mooré.** Elle sert uniquement à tester l’interface.',
+].join('\n\n')

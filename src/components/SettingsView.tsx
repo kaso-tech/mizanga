@@ -1,34 +1,134 @@
-import { Languages, Mic2, Moon, ShieldCheck, SunMedium, Volume2 } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
-import type { LinguisticPreferences } from '../domain/types'
+import type { LinguisticPreferences, ResponseLanguage, UserWritingMode } from '../domain/types'
 
 interface SettingsViewProps {
   preferences: LinguisticPreferences
   onChange: (changes: Partial<LinguisticPreferences>) => void
   onNewConversation: () => void
-  onNotify: (message: string) => void
 }
 
-export function SettingsView({ preferences, onChange, onNewConversation, onNotify }: SettingsViewProps) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="settings-view page-view">
-      <div className="page-heading"><p className="eyebrow">Votre expérience</p><h1>Paramètres</h1><p>Ces préférences restent dans cette session de démonstration et ne sont pas encore enregistrées.</p></div>
-
-      <div className="settings-section"><div className="section-heading"><span><Languages size={18} /></span><div><h2>Préférences linguistiques</h2><p>Choisissez comment vous écrivez et dans quelle langue Mizanga vous répond.</p></div></div>
-        <div className="settings-card">
-          <label><span>Langue de l’interface<small>Le français est actuellement la langue disponible.</small></span><select value="fr" disabled><option value="fr">Français</option></select></label>
-          <label><span>Votre mode d’écriture<small>Le texte original sera toujours conservé ; aucune substitution automatique n’est appliquée.</small></span><select value={preferences.userWritingMode} onChange={(event) => onChange({ userWritingMode: event.target.value as LinguisticPreferences['userWritingMode'] })}>{Object.entries(userWritingModeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option value="automatic" disabled>Automatique — bientôt disponible</option></select></label>
-          <label><span>Langue et écriture des réponses<small>« Automatique » répond dans la langue de votre message. Ce choix est aussi accessible depuis la zone de saisie.</small></span><select value={preferences.responseLanguage} onChange={(event) => onChange({ responseLanguage: event.target.value as LinguisticPreferences['responseLanguage'] })}>{Object.entries(responseLanguageLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option value="other" disabled>Autre langue — bientôt disponible</option></select></label>
-        </div>
-      </div>
-
-      <div className="settings-section"><div className="section-heading"><span>{preferences.theme === 'light' ? <SunMedium size={18} /> : <Moon size={18} />}</span><div><h2>Apparence</h2><p>Choisissez le contraste qui vous convient.</p></div></div>
-        <div className="theme-toggle" role="group" aria-label="Choix du thème"><button className={preferences.theme === 'light' ? 'is-selected' : ''} type="button" onClick={() => onChange({ theme: 'light' })}><SunMedium size={17} /> Clair</button><button className={preferences.theme === 'dark' ? 'is-selected' : ''} type="button" onClick={() => onChange({ theme: 'dark' })}><Moon size={17} /> Sombre</button></div>
-      </div>
-
-      <div className="settings-section split-settings"><div className="settings-action-card"><ShieldCheck size={21} /><div><h2>Confidentialité</h2><p>Aucune conversation n’est enregistrée dans cette version. Les règles de stockage seront expliquées avant toute connexion de compte.</p></div></div><div className="settings-action-card is-muted"><Volume2 size={21} /><div><h2>Voix et lecture audio</h2><p>Dictée, lecture, vitesse et variétés vocales seront configurables quand les services seront testés.</p></div><span className="coming-label">Bientôt</span></div></div>
-
-      <div className="settings-footer"><button className="secondary-button" type="button" onClick={onNewConversation}>Démarrer une nouvelle conversation</button><button className="text-button" type="button" onClick={() => onNotify('La dictée vocale et la lecture audio ne sont pas encore disponibles.') }><Mic2 size={16} /> En savoir plus sur les fonctions vocales</button></div>
+    <section className="settings-section">
+      <h2>{title}</h2>
+      <div className="settings-section-body">{children}</div>
     </section>
+  )
+}
+
+interface ChoiceOption<T extends string> {
+  value: T
+  label: string
+  icon?: ReactNode
+  /** Option visible mais pas encore disponible. */
+  soon?: boolean
+}
+
+/** Groupe de choix exclusifs présenté en pastilles (sémantique de boutons radio). */
+function Choice<T extends string>({ label, hint, value, options, onChange }: {
+  label: string
+  hint?: string
+  value: T
+  options: ChoiceOption<T>[]
+  onChange: (value: T) => void
+}) {
+  const id = `choice-${label.replace(/\W+/g, '-').toLowerCase()}`
+  return (
+    <div className="choice-group">
+      <p className="field-label" id={id}>{label}</p>
+      {hint && <p className="field-hint">{hint}</p>}
+      <div className="choice-row" role="radiogroup" aria-labelledby={id}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={value === option.value}
+            disabled={option.soon}
+            className={`choice ${value === option.value ? 'is-selected' : ''}`}
+            onClick={() => onChange(option.value)}
+          >
+            {option.icon}
+            {option.label}
+            {option.soon && ' · bientôt'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Upcoming({ label }: { label: string }) {
+  return (
+    <div className="upcoming-row">
+      <span>{label}</span>
+      <span className="soon-badge">Bientôt disponible</span>
+    </div>
+  )
+}
+
+export function SettingsView({ preferences, onChange, onNewConversation }: SettingsViewProps) {
+  return (
+    <div className="page-view settings-view">
+      <h1>Paramètres</h1>
+      <p className="page-intro">Vos préférences sont enregistrées uniquement sur cet appareil.</p>
+
+      <Section title="Préférences linguistiques">
+        <Choice
+          label="Langue de l’interface"
+          value="fr"
+          options={[{ value: 'fr', label: 'Français' }, { value: 'mos', label: 'Mooré', soon: true }]}
+          onChange={() => undefined}
+        />
+        <Choice<ResponseLanguage>
+          label="Langue des réponses"
+          hint="« Automatique » répond dans la langue de votre message."
+          value={preferences.responseLanguage}
+          options={(Object.entries(responseLanguageLabels) as Array<[ResponseLanguage, string]>).map(([value, label]) => ({ value, label }))}
+          onChange={(responseLanguage) => onChange({ responseLanguage })}
+        />
+        <Choice<UserWritingMode | 'automatic'>
+          label="Ma façon d’écrire le mooré"
+          hint="Votre texte original est toujours conservé. Aucune substitution automatique de caractères (par ex. è → ɛ) n’est appliquée."
+          value={preferences.userWritingMode}
+          options={[
+            ...(Object.entries(userWritingModeLabels) as Array<[UserWritingMode, string]>).map(([value, label]) => ({ value, label })),
+            { value: 'automatic', label: 'Automatique', soon: true },
+          ]}
+          onChange={(userWritingMode) => {
+            if (userWritingMode !== 'automatic') onChange({ userWritingMode })
+          }}
+        />
+        <Choice
+          label="Apparence"
+          value={preferences.theme}
+          options={[
+            { value: 'light', label: 'Clair', icon: <Sun size={16} aria-hidden="true" /> },
+            { value: 'dark', label: 'Sombre', icon: <Moon size={16} aria-hidden="true" /> },
+          ]}
+          onChange={(theme) => onChange({ theme })}
+        />
+      </Section>
+
+      <Section title="Conversations">
+        <div>
+          <button type="button" className="primary-button" onClick={onNewConversation}>Démarrer une nouvelle conversation</button>
+        </div>
+        <div className="settings-text">
+          <p className="field-label">Confidentialité</p>
+          <p>Les conversations ne sont pas enregistrées : elles restent dans la mémoire de votre navigateur et disparaissent quand vous fermez ou rechargez la page. Aucune donnée n’est envoyée à un serveur dans cette version de démonstration.</p>
+          <p>Vous pouvez supprimer une conversation depuis le menu (icône corbeille).</p>
+        </div>
+      </Section>
+
+      <Section title="Fonctions vocales">
+        <Upcoming label="Dictée vocale" />
+        <Upcoming label="Lecture audio des réponses" />
+        <Upcoming label="Vitesse de lecture" />
+        <Upcoming label="Langue et variété vocale" />
+      </Section>
+    </div>
   )
 }

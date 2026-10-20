@@ -1,43 +1,29 @@
-import { ArrowUp, ChevronDown, Globe2, Languages, Mic, Plus, Square } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { responseLanguageLabels } from '../data/content'
-import type { ResponseLanguage } from '../domain/types'
+import { ArrowUp, ClipboardPaste, Keyboard, Mic, Square } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { mooreCharacters } from '../data/content'
 
 interface ComposerProps {
   value: string
-  placeholder: string
   isGenerating: boolean
+  isDemonstration: boolean
   stopLabel: string
-  responseLanguage: ResponseLanguage
   /** Change de valeur pour redonner le focus au champ (ex. après le choix d’une suggestion). */
   focusToken: number
   onValueChange: (value: string) => void
-  onResponseLanguageChange: (language: ResponseLanguage) => void
   onSend: (content: string) => void
   onStop: () => void
   onNotify: (message: string) => void
 }
 
-export function Composer({
-  value,
-  placeholder,
-  isGenerating,
-  stopLabel,
-  responseLanguage,
-  focusToken,
-  onValueChange,
-  onResponseLanguageChange,
-  onSend,
-  onStop,
-  onNotify,
-}: ComposerProps) {
+export function Composer({ value, isGenerating, isDemonstration, stopLabel, focusToken, onValueChange, onSend, onStop, onNotify }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showCharacters, setShowCharacters] = useState(false)
 
   useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
-    textarea.style.height = '0px'
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+    textarea.style.height = 'auto'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`
   }, [value])
 
   useEffect(() => {
@@ -52,67 +38,91 @@ export function Composer({
     onSend(value)
   }
 
+  /** Insère le texte à la position du curseur, sans jamais modifier le reste de la saisie. */
+  const insert = (text: string) => {
+    const textarea = textareaRef.current
+    const start = textarea?.selectionStart ?? value.length
+    const end = textarea?.selectionEnd ?? value.length
+    onValueChange(value.slice(0, start) + text + value.slice(end))
+    requestAnimationFrame(() => {
+      textarea?.focus()
+      textarea?.setSelectionRange(start + text.length, start + text.length)
+    })
+  }
+
+  const paste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) insert(text)
+      else onNotify('Le presse-papiers est vide.')
+    } catch {
+      onNotify('Accès au presse-papiers refusé. Collez avec un appui long ou Ctrl+V.')
+    }
+  }
+
   return (
-    <div className="composer" data-active={value.length > 0}>
-      <textarea
-        ref={textareaRef}
-        value={value}
-        rows={1}
-        aria-label="Votre message"
-        placeholder={placeholder}
-        onChange={(event) => onValueChange(event.target.value)}
-        onKeyDown={(event) => {
-          const isDesktop = window.matchMedia('(min-width: 768px)').matches
-          // Pendant une composition (touches mortes, IME), Entrée valide le caractère et ne doit pas envoyer.
-          const isComposing = event.nativeEvent.isComposing || event.keyCode === 229
-          if (event.key === 'Enter' && !event.shiftKey && isDesktop && !isComposing) {
-            event.preventDefault()
-            submit()
-          }
-        }}
-      />
-      <div className="composer-toolbar">
-        <button
-          className="composer-icon is-outlined"
-          type="button"
-          aria-label="Joindre un fichier"
-          title="Joindre un fichier"
-          onClick={() => {
-            textareaRef.current?.focus()
-            onNotify('Vous pouvez coller votre texte dans la zone de saisie. L’import de fichiers arrive bientôt.')
+    <div className="composer-wrap">
+      {showCharacters && (
+        <div className="character-palette" role="group" aria-label="Caractères du mooré">
+          {mooreCharacters.map((character) => (
+            <button key={character} type="button" lang="mos" aria-label={`Insérer ${character}`} onClick={() => insert(character)}>
+              {character}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="composer">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          rows={1}
+          spellCheck={false}
+          enterKeyHint="enter"
+          aria-label="Votre message"
+          placeholder="Demandez n’importe quoi, en français ou en mooré…"
+          onChange={(event) => onValueChange(event.target.value)}
+          onKeyDown={(event) => {
+            const isTouch = window.matchMedia('(pointer: coarse)').matches
+            // Pendant une composition (touches mortes, IME), Entrée valide le caractère et ne doit pas envoyer.
+            const isComposing = event.nativeEvent.isComposing || event.keyCode === 229
+            if (event.key === 'Enter' && !event.shiftKey && !isTouch && !isComposing) {
+              event.preventDefault()
+              submit()
+            }
           }}
-        >
-          <Plus size={18} />
-        </button>
-        <button className="composer-pill web-search-pill" type="button" disabled title="Bientôt disponible">
-          <Globe2 size={16} aria-hidden="true" />
-          Recherche web
-          <span className="soon-badge">bientôt</span>
-        </button>
-        <label className="composer-pill language-pill" title="Langue des réponses">
-          <Languages size={16} aria-hidden="true" />
-          <span className="visually-hidden">Langue des réponses</span>
-          <select value={responseLanguage} onChange={(event) => onResponseLanguageChange(event.target.value as ResponseLanguage)}>
-            {Object.entries(responseLanguageLabels).map(([language, label]) => (
-              <option key={language} value={language}>{language === 'auto' ? 'Langue : Automatique' : label}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} aria-hidden="true" />
-        </label>
-        <span className="composer-spacer" />
-        <button className="composer-icon" type="button" disabled aria-label="Dictée vocale — bientôt disponible" title="Dictée vocale — bientôt disponible">
-          <Mic size={18} />
-        </button>
-        {isGenerating ? (
-          <button className="send-button is-stop" type="button" aria-label={stopLabel} title={stopLabel} onClick={onStop}>
-            <Square size={14} fill="currentColor" />
+        />
+        <div className="composer-toolbar">
+          <button
+            type="button"
+            className={`composer-tool ${showCharacters ? 'is-active' : ''}`}
+            aria-label="Caractères du mooré"
+            aria-pressed={showCharacters}
+            title="Caractères du mooré"
+            onClick={() => setShowCharacters((shown) => !shown)}
+          >
+            <Keyboard size={20} />
           </button>
-        ) : (
-          <button className="send-button" type="button" aria-label="Envoyer le message" disabled={!value.trim()} onClick={submit}>
-            <ArrowUp size={18} strokeWidth={2.4} />
+          <button type="button" className="composer-tool" aria-label="Coller du texte" title="Coller du texte" onClick={paste}>
+            <ClipboardPaste size={20} />
           </button>
-        )}
+          <button type="button" className="composer-tool" disabled aria-label="Dictée vocale (bientôt disponible)" title="Dictée vocale — bientôt disponible">
+            <Mic size={20} />
+          </button>
+          <span className="composer-spacer" />
+          {isGenerating ? (
+            <button type="button" className="send-button is-stop" aria-label={stopLabel} title={stopLabel} onClick={onStop}>
+              <Square size={16} fill="currentColor" />
+            </button>
+          ) : (
+            <button type="button" className="send-button" aria-label="Envoyer" disabled={!value.trim()} onClick={submit}>
+              <ArrowUp size={20} />
+            </button>
+          )}
+        </div>
       </div>
+      <p className="disclaimer">
+        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Mizanga peut faire des erreurs ; vérifiez les informations importantes.'}
+      </p>
     </div>
   )
 }

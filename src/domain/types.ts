@@ -28,12 +28,17 @@ export interface ChatMessage {
   language?: string
   status?: ChatMessageStatus
   isDemonstration?: boolean
+  /** Avis local de l’utilisateur ; il n’est envoyé nulle part dans cette version. */
+  rating?: MessageRating
 }
+
+export type MessageRating = 'positive' | 'negative' | 'correct'
 
 /** Prévu pour la persistance future ; aucune conversation n’est stockée en phase 1. */
 export interface Conversation {
   id: string
   title?: string
+  favorite?: boolean
   messages: ChatMessage[]
   createdAt: string
   updatedAt: string

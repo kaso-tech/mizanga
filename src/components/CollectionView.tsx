@@ -1,19 +1,36 @@
-import { Bookmark, Clock3, Search } from 'lucide-react'
+import { MessageSquare, Star } from 'lucide-react'
+import type { Conversation } from '../domain/types'
 
 interface CollectionViewProps {
   kind: 'history' | 'favorites'
+  conversations: Conversation[]
+  onSelectConversation: (conversationId: string) => void
 }
 
-export function CollectionView({ kind }: CollectionViewProps) {
+/** Historique et favoris de la session (aussi accessibles depuis la barre latérale). */
+export function CollectionView({ kind, conversations, onSelectConversation }: CollectionViewProps) {
   const isHistory = kind === 'history'
-  const Icon = isHistory ? Clock3 : Bookmark
-  const title = isHistory ? 'Historique des conversations' : 'Favoris de démonstration'
+  const items = isHistory ? conversations : conversations.filter((conversation) => conversation.favorite)
+  const Icon = isHistory ? MessageSquare : Star
 
   return (
-    <section className="collection-view page-view">
-      <div className="page-heading"><p className="eyebrow">{isHistory ? 'Vos échanges' : 'Vos repères'}</p><h1>{title}</h1><p>Cette première version ne conserve pas les conversations entre les sessions.</p></div>
-      {isHistory && <label className="history-search"><Search size={18} /><input disabled placeholder="Rechercher dans l’historique — bientôt disponible" /></label>}
-      <div className="empty-collection"><span><Icon size={25} /></span><h2>{isHistory ? 'Aucun historique enregistré' : 'Aucun favori enregistré'}</h2><p>La persistance, la recherche et l’enregistrement de favoris seront ajoutés avec l’authentification et un stockage sécurisé.</p><small>État de démonstration — aucune donnée n’est actuellement sauvegardée.</small></div>
-    </section>
+    <div className="page-view collection-view">
+      <h1>{isHistory ? 'Historique' : 'Favoris'}</h1>
+      <p className="page-intro">Non enregistré : l’historique de cette session disparaît à la fermeture de la page.</p>
+      {items.length === 0 ? (
+        <p className="conversation-empty">{isHistory ? 'Aucune conversation pour l’instant.' : 'Aucun favori. Ajoutez-en avec l’étoile, dans le menu.'}</p>
+      ) : (
+        <ul className="collection-list">
+          {items.map((conversation) => (
+            <li key={conversation.id}>
+              <button type="button" onClick={() => onSelectConversation(conversation.id)}>
+                <Icon size={16} aria-hidden="true" />
+                <span>{conversation.title || 'Sans titre'}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
