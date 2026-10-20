@@ -471,6 +471,23 @@ button.close-drawer { display: none; }
 .offline-banner { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 10px 14px; border-radius: 14px; color: var(--foreground); background: var(--ochre-soft); font-size: 13px; }
 .offline-banner > svg { flex: 0 0 auto; color: var(--primary); }
 
+/* Fichiers joints : dans la zone de saisie et dans les messages. */
+.composer.is-dragging { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent); }
+.attachment-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 10px 12px 0; list-style: none; }
+.attachment-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 240px; min-height: 44px; padding: 4px 4px 4px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--muted); font-size: 13px; }
+.attachment-chip img, .attachment-icon { display: grid; place-items: center; flex: 0 0 auto; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; color: var(--primary); background: var(--card); }
+.attachment-text { display: flex; flex-direction: column; min-width: 0; padding-right: 2px; }
+.attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-size { color: var(--muted-foreground); font-size: 11px; }
+.attachment-chip button { display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; color: var(--muted-foreground); background: transparent; }
+.attachment-chip button:hover { color: var(--foreground); background: var(--accent); }
+.attachment-chip.is-loading { padding: 0 12px; color: var(--muted-foreground); }
+.attachment-chip.is-static { padding-right: 10px; background: var(--card); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.message-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin: 0 0 6px; padding: 0; list-style: none; }
+.message-attachments img { display: block; max-width: min(260px, 70vw); max-height: 260px; border: 1px solid var(--border); border-radius: 14px; object-fit: cover; }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }

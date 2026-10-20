@@ -89,4 +89,18 @@ describe('remoteAiService', () => {
     expect(await createRemoteAiService({ label: 'Gemini' }).suggestTitle?.('Explique la photosynthèse')).toBe('Photosynthèse expliquée')
     expect(fetchMock.mock.calls[0][0]).toBe('/api/title')
   })
+
+  it('renvoie le contenu des fichiers récents et signale ceux qui ne sont plus disponibles', () => {
+    const at = '2026-10-20T00:00:00.000Z'
+    const history = selectHistory([
+      { id: '1', role: 'user', content: 'Ancienne photo', createdAt: at, attachments: [{ id: 'a', name: 'vieille.jpg', mimeType: 'image/jpeg', size: 10 }] },
+      { id: '2', role: 'assistant', content: 'Vu.', createdAt: at },
+      { id: '3', role: 'user', content: '', createdAt: at, attachments: [{ id: 'b', name: 'cours.pdf', mimeType: 'application/pdf', size: 3, data: 'QUFB' }] },
+    ])
+    expect(history).toEqual([
+      { role: 'user', content: 'Ancienne photo\n[Fichier joint non disponible : vieille.jpg]' },
+      { role: 'assistant', content: 'Vu.' },
+      { role: 'user', content: '', attachments: [{ name: 'cours.pdf', mimeType: 'application/pdf', data: 'QUFB' }] },
+    ])
+  })
 })

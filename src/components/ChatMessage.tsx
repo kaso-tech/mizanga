@@ -1,8 +1,9 @@
-import { Check, CheckCheck, Copy, Flag, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { Check, CheckCheck, Copy, FileText, Flag, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
+import { formatSize, isImage } from '../app/attachments'
+import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
 
 /** Bloc de code avec son langage et un bouton de copie. */
@@ -50,6 +51,26 @@ const markdownComponents: Components = {
   pre: ({ node: _node, children }) => <CodeBlock>{children}</CodeBlock>,
 }
 
+/** Fichiers joints à un message : aperçu des photos, sinon nom et taille. */
+function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
+  return (
+    <ul className="message-attachments" aria-label="Fichiers joints">
+      {attachments.map((attachment) => (
+        <li key={attachment.id}>
+          {isImage(attachment) && attachment.data ? (
+            <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt={attachment.name} />
+          ) : (
+            <span className="attachment-chip is-static" title={attachment.data ? undefined : 'Contenu non conservé sur cet appareil'}>
+              <span className="attachment-icon"><FileText size={18} aria-hidden="true" /></span>
+              <span className="attachment-text"><span className="attachment-name">{attachment.name}</span><span className="attachment-size">{attachment.data ? formatSize(attachment.size) : 'non conservé'}</span></span>
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** Message de l’utilisateur, avec copie et — pour le dernier — modification puis relance. */
 function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessageType; canEdit: boolean; onCopy: (message: ChatMessageType) => void; onEdit: (content: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -90,7 +111,8 @@ function UserMessage({ message, canEdit, onCopy, onEdit }: { message: ChatMessag
   return (
     <article className="message-row is-user fade-up" aria-label="Votre message">
       <div className="user-message">
-        <div className="user-bubble">{message.content}</div>
+        {message.attachments && message.attachments.length > 0 && <MessageAttachments attachments={message.attachments} />}
+        {message.content && <div className="user-bubble">{message.content}</div>}
         <div className="message-actions user-actions">
           <button type="button" onClick={() => onCopy(message)} aria-label="Copier le message" title="Copier le message"><Copy size={15} /></button>
           {canEdit && (

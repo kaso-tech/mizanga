@@ -10,9 +10,10 @@ import { SettingsView } from '../components/SettingsView'
 import { Sidebar } from '../components/Sidebar'
 import type { AiService } from '../domain/services'
 import { responseLanguageLabels } from '../data/content'
-import { defaultPreferences, type AppView, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
+import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
 import { demoAiService } from '../services/demoAiService'
 import { MAX_MESSAGE_CHARS } from '../services/remoteAiService'
+import { prepareAttachments } from './attachments'
 import { useConversation } from './useConversation'
 
 const routeByView: Record<AppView, string> = {
@@ -117,6 +118,8 @@ export function App({ aiService = demoAiService }: AppProps) {
     },
   })
   const [draft, setDraft] = useState('')
+  const [draftAttachments, setDraftAttachments] = useState<Attachment[]>([])
+  const [isPreparingFiles, setIsPreparingFiles] = useState(false)
   const [focusToken, setFocusToken] = useState(0)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
@@ -186,6 +189,7 @@ export function App({ aiService = demoAiService }: AppProps) {
   const startNewConversation = () => {
     conversation.startNew()
     setDraft('')
+    setDraftAttachments([])
     navigate('chat')
     setFocusToken((token) => token + 1)
   }
@@ -200,8 +204,23 @@ export function App({ aiService = demoAiService }: AppProps) {
       notify(`Message trop long (${content.length.toLocaleString('fr')} caractères). La limite est de ${MAX_MESSAGE_CHARS.toLocaleString('fr')} : découpez-le en plusieurs messages.`)
       return
     }
-    conversation.send(content)
+    conversation.send(content, draftAttachments)
     setDraft('')
+    setDraftAttachments([])
+  }
+
+  const addFiles = async (files: File[]) => {
+    if (files.length === 0) return
+    setIsPreparingFiles(true)
+    try {
+      const { attachments, problems } = await prepareAttachments(files, draftAttachments)
+      setDraftAttachments((current) => [...current, ...attachments])
+      if (problems.length > 0) notify(problems.join(' '))
+    } catch {
+      notify('Le fichier n’a pas pu être lu. Essayez un autre format ou une image plus petite.')
+    } finally {
+      setIsPreparingFiles(false)
+    }
   }
 
   const stopLabel = aiService.isDemonstration ? 'Arrêter la démonstration' : 'Arrêter la génération'
@@ -253,6 +272,10 @@ export function App({ aiService = demoAiService }: AppProps) {
       isOffline={isOffline}
       stopLabel={stopLabel}
       focusToken={focusToken}
+      attachments={draftAttachments}
+      isPreparingFiles={isPreparingFiles}
+      onAddFiles={(files) => void addFiles(files)}
+      onRemoveAttachment={(id) => setDraftAttachments((current) => current.filter((attachment) => attachment.id !== id))}
       onValueChange={setDraft}
       onSend={sendMessage}
       onStop={stopGeneration}

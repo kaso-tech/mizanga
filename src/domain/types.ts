@@ -21,6 +21,17 @@ export interface LinguisticPreferences {
 /** streaming : en cours de génération ; stopped : interrompue par l’utilisateur ; error : échec du service. */
 export type ChatMessageStatus = 'streaming' | 'complete' | 'stopped' | 'error'
 
+/** Fichier joint à un message. Son contenu (`data`) n’est jamais enregistré sur l’appareil. */
+export interface Attachment {
+  id: string
+  name: string
+  mimeType: string
+  /** Taille en octets du contenu envoyé (après réduction éventuelle d’une image). */
+  size: number
+  /** Contenu encodé en base64 ; absent pour une pièce jointe relue depuis l’historique. */
+  data?: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -33,6 +44,7 @@ export interface ChatMessage {
   /** Explication montrée quand `status` vaut « error ». */
   errorMessage?: string
   isDemonstration?: boolean
+  attachments?: Attachment[]
   /** Avis local de l’utilisateur ; il n’est envoyé nulle part dans cette version. */
   rating?: MessageRating
 }

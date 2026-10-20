@@ -8,6 +8,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 
 - Conversation avec réponse progressive, arrêt et régénération ; réponses en Markdown (tableaux, code, liens).
 - Langue des réponses : automatique (même langue que l’utilisateur), mooré standardisé ou informel, français, anglais.
+- Fichiers joints : photos (réduites avant l’envoi pour économiser les données), PDF et fichiers texte, par bouton, glisser-déposer ou collage ; 4 fichiers et 8 Mo au plus par message. Leur contenu n’est pas conservé dans l’historique.
 - Clavier des caractères du mooré (ɛ ɩ ʋ ã ẽ ĩ õ ũ Ɛ Ɩ Ʋ) inséré au curseur ; le texte saisi n’est jamais normalisé.
 - Historique avec recherche, favoris et suppression, enregistré sur l’appareil (désactivable dans les paramètres, par exemple sur un appareil partagé).
 - Avis sur les réponses et signalement d’erreurs en mooré (préparés localement, pas encore envoyés).

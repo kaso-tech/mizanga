@@ -129,4 +129,22 @@ describe('API Mizanga', () => {
     expect(await response.json()).toEqual({ title: 'Photosynthèse expliquée' })
     expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-test:generateContent')
   })
+
+  it('transmet les fichiers joints à Gemini et refuse les formats non autorisés', async () => {
+    upstreamReply = { status: 200, events: [textEvent('ok')] }
+    const base = await startApi({ apiKey: 'cle', model: 'gemini-test', apiBase: geminiBase })
+    const withFile = { messages: [{ role: 'user', content: 'Résume ce document', attachments: [{ name: 'cours.pdf', mimeType: 'application/pdf', data: 'QUFB' }] }] }
+    expect((await post(base, withFile)).status).toBe(200)
+    expect(lastUpstreamRequest.body.contents).toEqual([
+      { role: 'user', parts: [{ inlineData: { mimeType: 'application/pdf', data: 'QUFB' } }, { text: 'Résume ce document' }] },
+    ])
+
+    const onlyFile = { messages: [{ role: 'user', content: '', attachments: [{ name: 'photo.png', mimeType: 'image/png', data: 'QUFB' }] }] }
+    expect((await post(base, onlyFile)).status).toBe(200)
+
+    const executable = { messages: [{ role: 'user', content: 'x', attachments: [{ name: 'a.exe', mimeType: 'application/x-msdownload', data: 'QUFB' }] }] }
+    expect((await post(base, executable)).status).toBe(400)
+    const notBase64 = { messages: [{ role: 'user', content: 'x', attachments: [{ name: 'a.png', mimeType: 'image/png', data: '<script>' }] }] }
+    expect((await post(base, notBase64)).status).toBe(400)
+  })
 })

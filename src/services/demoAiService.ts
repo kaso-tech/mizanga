@@ -18,11 +18,14 @@ function abortableDelay(ms: number, signal: AbortSignal) {
 
 /** Réponse de démonstration : elle cite la demande telle quelle et n’en produit aucune interprétation. */
 function buildReply({ messages, preferences }: AiGenerationRequest) {
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content ?? ''
+  const lastUser = [...messages].reverse().find((message) => message.role === 'user')
+  const lastUserMessage = lastUser?.content ?? ''
+  const files = lastUser?.attachments?.map((attachment) => `- ${attachment.name}`).join('\n')
   return [
     demonstrationReply,
     'Votre message a été reçu tel quel, sans modification :',
-    lastUserMessage.split(/\r?\n/).map((line) => `> ${line}`).join('\n'),
+    lastUserMessage ? lastUserMessage.split(/\r?\n/).map((line) => `> ${line}`).join('\n') : '> (aucun texte)',
+    ...(files ? ['Fichiers joints reçus, mais non lus en démonstration :', files] : []),
     'Préférences transmises au futur moteur :',
     `- Écriture de l’utilisateur : ${userWritingModeLabels[preferences.userWritingMode]}\n- Réponse souhaitée : ${responseLanguageLabels[preferences.responseLanguage]}`,
   ].join('\n\n')

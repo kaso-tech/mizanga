@@ -6,13 +6,15 @@ import { demoAiService } from './demoAiService'
 export const MAX_MESSAGE_CHARS = 32_000
 const MAX_HISTORY_MESSAGES = 40
 const MAX_HISTORY_CHARS = 60_000
+/** Contenu des fichiers renvoyé au moteur : ceux des échanges les plus récents, dans ce budget. */
+const MAX_HISTORY_ATTACHMENT_BYTES = 8 * 1024 * 1024
 
 /**
  * Garde les échanges les plus récents dans un budget de taille, pour préserver le quota gratuit
  * sur les longues conversations. L’historique envoyé commence toujours par un message de l’utilisateur.
  */
 export function selectHistory(messages: ChatMessage[]) {
-  const usable = messages.filter((message) => message.content.trim() && message.status !== 'error')
+  const usable = messages.filter((message) => (message.content.trim() || message.attachments?.length) && message.status !== 'error')
   const selected: ChatMessage[] = []
   let total = 0
   for (let index = usable.length - 1; index >= 0; index--) {
@@ -22,7 +24,23 @@ export function selectHistory(messages: ChatMessage[]) {
     total += message.content.length
   }
   while (selected.length > 1 && selected[0].role !== 'user') selected.shift()
-  return selected.map(({ role, content }) => ({ role, content }))
+
+  let attachmentBytes = 0
+  const withFiles = selected.reverse().map(({ role, content, attachments = [] }) => {
+    const sent = attachments.filter((attachment) => {
+      if (!attachment.data || attachmentBytes + attachment.size > MAX_HISTORY_ATTACHMENT_BYTES) return false
+      attachmentBytes += attachment.size
+      return true
+    })
+    // Un fichier relu depuis l’historique n’a plus son contenu : le moteur en est informé par son nom.
+    const missing = attachments.filter((attachment) => !sent.includes(attachment)).map((attachment) => `[Fichier joint non disponible : ${attachment.name}]`)
+    return {
+      role,
+      content: [content, ...missing].filter(Boolean).join('\n'),
+      ...(sent.length > 0 ? { attachments: sent.map(({ name, mimeType, data }) => ({ name, mimeType, data })) } : {}),
+    }
+  })
+  return withFiles.reverse()
 }
 
 /**

@@ -46,19 +46,32 @@ export function buildSystemInstruction(preferences) {
 }
 
 /**
+ * @typedef {{ name: string, mimeType: string, data: string }} ChatAttachment
+ * @typedef {{ role: 'user' | 'assistant', content: string, attachments?: ChatAttachment[] }} RelayMessage
+ */
+
+/**
  * Transforme l’historique en contenus Gemini (« model » pour les réponses de l’assistant).
- * @param {Array<{ role: 'user' | 'assistant', content: string }>} messages
+ * Les fichiers joints deviennent des parties `inlineData`, placées avant le texte du message.
+ * @param {RelayMessage[]} messages
  */
 export function toGeminiContents(messages) {
   return messages
-    .filter((message) => message.content.trim().length > 0)
-    .map((message) => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] }))
+    .filter((message) => message.content.trim().length > 0 || (message.attachments?.length ?? 0) > 0)
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [
+        ...(message.attachments ?? []).map((attachment) => ({ inlineData: { mimeType: attachment.mimeType, data: attachment.data } })),
+        ...(message.content.trim() ? [{ text: message.content }] : []),
+      ],
+    }))
 }
 
 /** @param {number} status */
 function errorForStatus(status) {
   if (status === 429) return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte pour le moment. Réessayez dans quelques minutes.', 429)
-  if (status === 400 || status === 404) return new UpstreamError('Le moteur a refusé la demande (modèle ou paramètres invalides).', 502)
+  if (status === 400) return new UpstreamError('Le moteur a refusé la demande (fichier illisible, format ou paramètres invalides).', 502)
+  if (status === 404) return new UpstreamError('Le moteur a refusé la demande (modèle introuvable).', 502)
   if (status === 401 || status === 403) return new UpstreamError('Le moteur n’est pas correctement configuré (clé d’API refusée).', 502)
   if (status === 503) return new UpstreamError('Le moteur est momentanément indisponible. Réessayez plus tard.', 503)
   return new UpstreamError('Le moteur est momentanément indisponible. Réessayez plus tard.', 502)
@@ -70,7 +83,7 @@ function errorForStatus(status) {
  *   apiKey: string,
  *   model: string,
  *   apiBase?: string,
- *   messages: Array<{ role: 'user' | 'assistant', content: string }>,
+ *   messages: RelayMessage[],
  *   preferences: { responseLanguage?: string, userWritingMode?: string },
  *   signal?: AbortSignal,
  * }} options

@@ -35,4 +35,14 @@ describe('conversationStorage', () => {
     clearStoredConversations()
     expect(loadConversations()).toEqual([])
   })
+
+  it('n’enregistre jamais le contenu des fichiers joints, seulement leur nom', () => {
+    const withFile: Conversation = {
+      ...conversation,
+      messages: [{ ...conversation.messages[0], attachments: [{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 2048, data: 'AAAA' }] }],
+    }
+    saveConversations([withFile])
+    expect(localStorage.getItem('mizanga.conversations.v1')).not.toContain('AAAA')
+    expect(loadConversations()[0].messages[0].attachments).toEqual([{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 2048 }])
+  })
 })

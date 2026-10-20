@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { mockMatchMedia } from '../test/setup'
+import type { Attachment } from '../domain/types'
 import { Composer } from './Composer'
 
-function renderComposer(initialValue = '') {
+function renderComposer(initialValue = '', attachments: Attachment[] = []) {
   const onSend = vi.fn()
+  const onAddFiles = vi.fn()
   function Harness() {
     const [value, setValue] = useState(initialValue)
     return (
@@ -16,6 +18,10 @@ function renderComposer(initialValue = '') {
         isDemonstration
         stopLabel="Arrêter"
         focusToken={0}
+        attachments={attachments}
+        isPreparingFiles={false}
+        onAddFiles={onAddFiles}
+        onRemoveAttachment={vi.fn()}
         onValueChange={setValue}
         onSend={onSend}
         onStop={vi.fn()}
@@ -24,7 +30,7 @@ function renderComposer(initialValue = '') {
     )
   }
   render(<Harness />)
-  return { onSend, textarea: screen.getByRole('textbox', { name: 'Votre message' }) as HTMLTextAreaElement }
+  return { onSend, onAddFiles, textarea: screen.getByRole('textbox', { name: 'Votre message' }) as HTMLTextAreaElement }
 }
 
 describe('Composer', () => {
@@ -61,5 +67,19 @@ describe('Composer', () => {
     textarea.setSelectionRange(1, 1)
     await userEvent.click(screen.getByRole('button', { name: 'Insérer ʋ' }))
     expect(textarea.value).toBe('aʋb')
+  })
+
+  it('permet d’envoyer une pièce jointe seule et transmet les fichiers collés', async () => {
+    const photo: Attachment = { id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 2048, data: 'AAAA' }
+    const { onSend, onAddFiles, textarea } = renderComposer('', [photo])
+    expect(screen.getByRole('list', { name: 'Fichiers joints' })).toHaveTextContent('photo.jpg')
+    const send = screen.getByRole('button', { name: 'Envoyer' })
+    expect(send).toBeEnabled()
+    await userEvent.click(send)
+    expect(onSend).toHaveBeenCalledWith('')
+
+    const file = new File(['bonjour'], 'notes.txt', { type: 'text/plain' })
+    fireEvent.paste(textarea, { clipboardData: { files: [file], getData: () => '' } })
+    expect(onAddFiles).toHaveBeenCalledWith([file])
   })
 })

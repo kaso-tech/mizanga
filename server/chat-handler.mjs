@@ -1,7 +1,11 @@
 import { generateGeminiTitle, streamGeminiReply, UpstreamError } from './gemini.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
-const MAX_BODY_BYTES = 512 * 1024
+// Fichiers joints compris (8 Mo au plus, encodés en base64, soit environ 11 Mo de texte).
+const MAX_BODY_BYTES = 12 * 1024 * 1024
+const MAX_ATTACHMENTS_PER_MESSAGE = 4
+const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((8 * 1024 * 1024 * 4) / 3)
+const ATTACHMENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf', 'text/plain', 'text/markdown', 'text/csv'])
 const MAX_MESSAGES = 60
 const MAX_MESSAGE_CHARS = 32_000
 const RATE_LIMIT = { windowMs: 60_000, maxRequests: 20 }
@@ -37,13 +41,26 @@ async function readJson(req) {
 export function validateChatRequest(body) {
   const messages = body?.messages
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) return null
+  let attachmentChars = 0
   for (const message of messages) {
     if ((message?.role !== 'user' && message?.role !== 'assistant') || typeof message.content !== 'string' || message.content.length > MAX_MESSAGE_CHARS) return null
+    if (message.attachments === undefined) continue
+    if (message.role !== 'user' || !Array.isArray(message.attachments) || message.attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) return null
+    for (const attachment of message.attachments) {
+      if (typeof attachment?.name !== 'string' || !ATTACHMENT_TYPES.has(attachment.mimeType) || typeof attachment.data !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(attachment.data)) return null
+      attachmentChars += attachment.data.length
+    }
   }
-  if (messages.at(-1).role !== 'user') return null
+  if (attachmentChars > MAX_ATTACHMENT_BASE64_CHARS) return null
+  const last = messages.at(-1)
+  if (last.role !== 'user' || (!last.content.trim() && !last.attachments?.length)) return null
   const preferences = body.preferences ?? {}
   return {
-    messages: messages.map(({ role, content }) => ({ role, content })),
+    messages: messages.map(({ role, content, attachments }) => ({
+      role,
+      content,
+      ...(attachments?.length ? { attachments: attachments.map((/** @type {any} */ { name, mimeType, data }) => ({ name, mimeType, data })) } : {}),
+    })),
     preferences: {
       responseLanguage: RESPONSE_LANGUAGES.has(preferences.responseLanguage) ? preferences.responseLanguage : 'auto',
       userWritingMode: WRITING_MODES.has(preferences.userWritingMode) ? preferences.userWritingMode : 'standard',

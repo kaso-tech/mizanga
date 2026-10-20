@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AiServiceError, type AiService } from '../domain/services'
 import { clearStoredConversations, loadConversations, saveConversations } from './conversationStorage'
-import type { ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
+import type { Attachment, ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
 
 function createId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`
@@ -125,15 +125,15 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     }
 
     // Premier échange réussi : le moteur peut proposer un titre plus parlant que la première ligne.
-    if (completed && history.length === 1 && aiService.suggestTitle) {
+    if (completed && history.length === 1 && history[0].content.trim() && aiService.suggestTitle) {
       const title = await aiService.suggestTitle(history[0].content).catch(() => null)
       if (title) setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? { ...conversation, title } : conversation)))
     }
   }
 
-  const send = (content: string) => {
+  const send = (content: string, attachments: Attachment[] = []) => {
     const now = new Date().toISOString()
-    const userMessage: ChatMessage = { id: createId('user'), role: 'user', content, createdAt: now }
+    const userMessage: ChatMessage = { id: createId('user'), role: 'user', content, createdAt: now, ...(attachments.length > 0 ? { attachments } : {}) }
     const existing = conversationsRef.current.find((conversation) => conversation.id === activeId)
     const conversationId = existing?.id ?? createId('conversation')
     const history = [...(existing?.messages ?? []), userMessage]
@@ -141,7 +141,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     if (existing) {
       updateMessages(conversationId, () => history)
     } else {
-      setConversations((current) => [{ id: conversationId, title: createTitle(content), messages: history, createdAt: now, updatedAt: now }, ...current])
+      setConversations((current) => [{ id: conversationId, title: createTitle(content.trim() ? content : attachments[0]?.name ?? 'Sans titre'), messages: history, createdAt: now, updatedAt: now }, ...current])
       setActiveId(conversationId)
     }
     void run(conversationId, history)

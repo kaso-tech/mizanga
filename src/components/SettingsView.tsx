@@ -244,10 +244,10 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   <span className="value-pill">{conversationCount === 0 ? 'Aucune' : `${conversationCount} conversation${conversationCount > 1 ? 's' : ''}`}</span>
                 </SettingRow>
                 <SettingRow
-                  label="Vos messages"
+                  label="Vos messages et fichiers"
                   description={engine.isDemonstration
                     ? 'Aucun message ne quitte votre navigateur : aucun moteur d’IA n’est connecté.'
-                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations sensibles.'}
+                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses ; les fichiers joints ne sont pas conservés sur l’appareil. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations ou documents sensibles.'}
                 >
                   <span className="value-pill">{engine.isDemonstration ? 'Restent sur l’appareil' : 'Envoyés à Google'}</span>
                 </SettingRow>
