@@ -1,5 +1,5 @@
-import { Code2, FileText, Lightbulb, Mail, RotateCcw, Search, Sprout } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { ArrowDown, Code2, FileText, Lightbulb, Mail, RotateCcw, Search, Sprout } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { suggestions, type SuggestionIcon } from '../data/content'
 import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
@@ -52,12 +52,44 @@ export function ChatView({
   // L’indicateur d’attente disparaît dès que le premier fragment de réponse s’affiche.
   const isStreaming = lastMessage?.status === 'streaming'
   const endRef = useRef<HTMLDivElement>(null)
+  // La réponse n’est suivie que si l’on est déjà en bas : on peut remonter lire sans être ramené de force.
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const isAtBottomRef = useRef(true)
+  const previousCount = useRef(messages.length)
+  // Pendant un défilement lancé par l’application, les positions intermédiaires ne signifient pas que l’on remonte.
+  const ignoreScrollUntil = useRef(0)
+
+  const scrollToEnd = (smooth = false) => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const useSmooth = smooth && !reduceMotion
+    isAtBottomRef.current = true
+    setIsAtBottom(true)
+    if (useSmooth) ignoreScrollUntil.current = Date.now() + 800
+    endRef.current?.scrollIntoView({ behavior: useSmooth ? 'smooth' : 'auto', block: 'end' })
+  }
+
+  useEffect(() => {
+    const container = endRef.current?.closest('.content-scroll')
+    if (!container) return
+    const onScroll = () => {
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120
+      if (!atBottom && Date.now() < ignoreScrollUntil.current) return
+      isAtBottomRef.current = atBottom
+      setIsAtBottom(atBottom)
+    }
+    onScroll()
+    container.addEventListener('scroll', onScroll, { passive: true })
+    return () => container.removeEventListener('scroll', onScroll)
+  }, [isEmpty])
 
   useEffect(() => {
     if (isEmpty) return
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'end' })
-  }, [messages.length, isGenerating, isEmpty, lastMessage?.content.length])
+    // Un message que l’on vient d’envoyer ramène toujours en bas.
+    const sentByUser = messages.length > previousCount.current && lastMessage?.role === 'user'
+    previousCount.current = messages.length
+    // Défilement instantané pendant la diffusion : un défilement doux serait plus lent que le texte.
+    if (sentByUser || isAtBottomRef.current) scrollToEnd(sentByUser)
+  }, [messages.length, isGenerating, isEmpty, lastMessage?.content.length, lastMessage?.role])
 
   if (isEmpty) {
     return (
@@ -116,6 +148,11 @@ export function ChatView({
           </div>
         )}
         <div ref={endRef} aria-hidden="true" />
+        {!isAtBottom && (
+          <button type="button" className="scroll-bottom-button" onClick={() => scrollToEnd(true)} aria-label="Aller à la fin de la conversation">
+            <ArrowDown size={16} aria-hidden="true" /> {isGenerating ? 'Suivre la réponse' : 'Aller en bas'}
+          </button>
+        )}
       </div>
     </section>
   )

@@ -550,6 +550,16 @@ button.close-drawer { display: none; }
 .choice.is-partial.is-selected { border-color: var(--ochre); color: var(--foreground); background: var(--ochre); }
 .choice.is-incorrect.is-selected { border-color: var(--destructive); color: #fff; background: var(--destructive); }
 
+.scroll-bottom-button { position: sticky; bottom: 12px; z-index: 5; display: inline-flex; align-items: center; gap: 6px; align-self: center; min-height: 36px; margin-top: -24px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); box-shadow: var(--shadow-pop); font-size: 13px; animation: fade-up .2s ease-out both; }
+.scroll-bottom-button:hover { background: var(--accent); }
+
+.crash-screen { display: grid; justify-items: center; gap: 12px; max-width: 520px; margin: 12vh auto 0; padding: 24px; text-align: center; }
+.crash-screen h1 { margin: 8px 0 0; font-family: var(--font-display); font-size: 26px; }
+.crash-screen p { margin: 0; color: var(--muted-foreground); line-height: 1.55; }
+.crash-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.crash-screen details { margin-top: 12px; color: var(--muted-foreground); font-size: 13px; }
+.crash-screen pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; text-align: left; }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }

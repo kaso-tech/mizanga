@@ -6,6 +6,7 @@ import '@fontsource/noto-sans/600.css'
 import '@fontsource/noto-sans/700.css'
 import '@fontsource/noto-serif/600.css'
 import { App } from './app/App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { registerServiceWorker } from './app/installPrompt'
 import { detectAiService } from './services/remoteAiService'
 import './styles/global.css'
@@ -16,7 +17,9 @@ registerServiceWorker()
 void detectAiService().then((aiService) => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App aiService={aiService} />
+      <ErrorBoundary>
+        <App aiService={aiService} />
+      </ErrorBoundary>
     </StrictMode>,
   )
 })

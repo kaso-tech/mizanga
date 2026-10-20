@@ -79,4 +79,24 @@ describe('App', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Confirmer la suppression' }))
     expect(screen.getByText('Aucune')).toBeInTheDocument()
   })
+
+  it('arrête la génération avec Échap et ouvre une nouvelle conversation avec Ctrl+Maj+O', async () => {
+    const hanging: AiService = {
+      isDemonstration: false,
+      label: 'Test',
+      async *generate(_request, { signal }) {
+        yield { text: 'Début' }
+        await new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))))
+      },
+    }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={hanging} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Question{Enter}')
+    await screen.findByText('Début')
+    await userEvent.keyboard('{Escape}')
+    expect(await screen.findByText('Génération arrêtée.', { selector: '.message-status' })).toBeInTheDocument()
+
+    await userEvent.keyboard('{Control>}{Shift>}o{/Shift}{/Control}')
+    expect(await screen.findByRole('heading', { name: /Comment puis-je vous aider/ })).toBeInTheDocument()
+  })
 })

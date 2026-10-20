@@ -233,6 +233,24 @@ export function App({ aiService = demoAiService }: AppProps) {
     notify(aiService.isDemonstration ? 'La démonstration a été arrêtée. Aucun appel IA n’était en cours.' : 'Génération arrêtée.')
   }
 
+  // Raccourcis : Échap arrête la génération, Ctrl/Cmd + Maj + O ouvre une nouvelle conversation.
+  const shortcutsRef = useRef({ isGenerating: false, stop: stopGeneration, startNew: () => {} })
+  shortcutsRef.current = { isGenerating: conversation.isGenerating, stop: stopGeneration, startNew: () => startNewConversation() }
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || document.querySelector('[role="dialog"]')) return
+      if (event.key === 'Escape' && shortcutsRef.current.isGenerating) {
+        event.preventDefault()
+        shortcutsRef.current.stop()
+      } else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'o') {
+        event.preventDefault()
+        shortcutsRef.current.startNew()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   const copyMessage = async (message: ChatMessage) => {
     try {
       // navigator.clipboard est absent hors contexte sécurisé (HTTP) : l’appel échoue alors comme un refus.
