@@ -2,13 +2,28 @@ interface BrandMarkProps {
   size?: number
 }
 
-/** Signe de marque vectoriel (même dessin que public/mizanga-mark.svg), coloré par --accent. */
+/**
+ * Signe de marque vectoriel (même tracé que public/mizanga-mark.svg).
+ * Anneau ouvert formant une bulle de dialogue, ponctué d'un point de
+ * diacritique dans l'ouverture — le point « diacritique » du nom comme du
+ * projet : une langue que les autres n'écrivent pas.
+ */
 export function BrandMark({ size = 26 }: BrandMarkProps) {
   return (
     <svg className="brand-mark" width={size} height={size} viewBox="0 0 128 128" aria-hidden="true">
-      <rect width="128" height="128" rx="32" fill="var(--accent)" />
-      <path d="M35 42c0-9 7-16 16-16h20c9 0 16 7 16 16v18c0 9-7 16-16 16H57l-13 12V76c-5-3-9-9-9-16V42Z" fill="#F9FBFF" />
-      <circle cx="89" cy="36" r="8" fill="#F9FBFF" />
+      <circle
+        cx="64"
+        cy="64"
+        r="44"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="13"
+        strokeLinecap="round"
+        /* L'ouverture se situe en haut à droite : le motif se lit comme une
+           bulle dont le sommet reste ouvert. */
+        strokeDasharray="234 42"
+      />
+      <circle cx="100" cy="40" r="10" fill="var(--accent)" />
     </svg>
   )
 }

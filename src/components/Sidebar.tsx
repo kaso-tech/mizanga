@@ -1,4 +1,4 @@
-import { ChevronUp, CircleHelp, Clock3, Bookmark, LogIn, PanelLeftClose, Search, Settings2, SquarePen, X } from 'lucide-react'
+import { ChevronUp, CircleHelp, Clock3, Bookmark, LogIn, MessageCircle, PanelLeftClose, Search, Settings2, SquarePen, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Brand } from './Brand'
 import type { AppView, Conversation } from '../domain/types'
@@ -121,7 +121,13 @@ export function Sidebar({
             </button>
           ))}
           {conversations.length === 0 && (
-            <p className="conversation-empty">Vos conversations apparaîtront ici. Elles ne sont pas encore enregistrées après la fermeture de la page.</p>
+            <div className="conversation-empty">
+              <span className="conversation-empty-icon" aria-hidden="true">
+                <MessageCircle size={15} />
+              </span>
+              <p>Vos conversations apparaîtront ici.</p>
+              <small>Aucune n’est enregistrée pour l’instant.</small>
+            </div>
           )}
           {conversations.length > 0 && visibleConversations.length === 0 && (
             <p className="conversation-empty">Aucune conversation ne correspond à « {query.trim()} ».</p>

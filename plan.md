@@ -6,7 +6,7 @@ Mizanga est un **assistant IA généraliste**, au même titre que Claude, ChatGP
 
 Conséquences sur l’interface (elles remplacent la direction visuelle « Tissage conversationnel discret » décrite plus bas) :
 
-- **Accueil :** salutation simple, zone de saisie au centre, suggestions de tâches variées dont une seule porte sur le mooré.
+- **Accueil :** salutation simple, zone de saisie au centre, suggestions de tâches variées dont une seule porte sur le mooré. Sur téléphone, les six suggestions restent accessibles (grille de deux colonnes, libellés sur deux lignes) : aucune n'est masquée arbitrairement.
 - **Langue des réponses :** « Automatique » par défaut (même langue que l’utilisateur), modifiable depuis la zone de saisie et les paramètres.
 - **Conversation :** réponses sans bulle et rendues en Markdown complet, pastille de langue sous chaque réponse, actions en icônes (copier, régénérer, avis) ; « Proposer une correction » seulement sous les réponses en mooré.
 - **Navigation :** barre latérale repliable avec les conversations de la session et une recherche ; paramètres, historique, favoris et À propos dans le menu du compte.
@@ -33,18 +33,24 @@ Cette première livraison est une interface web statique, responsive et interact
 
 ### Direction retenue : « Tissage conversationnel discret »
 
-- **Mouvement de design :** minimalisme conversationnel africain contemporain, inspiré par le rythme d’une trame, pas par l’imagerie touristique.
+- **Mouvement de design :** minimalisme conversationnel africain contemporain, inspiré par le rythme d'une trame, pas par l'imagerie touristique.
 - **Principes :** lisibilité avant décoration ; hiérarchie éditoriale calme ; une interaction par intention ; densité réduite sur mobile.
-- **Philosophie colorielle :** blanc bleuté pour le fond, bleu nuit pour le texte, bleu cobalt pour l’action et bleu clair pour les informations positives. Le bleu cobalt devient la couleur propriétaire de Mizanga.
-- **Paradigme de mise en page :** une colonne de lecture « carnet » centrée, bordée d’une navigation latérale sur grand écran ; le compositeur de message forme une base stable. La ligne de trame fine guide le regard entre identité, contexte et conversation.
-- **Éléments signatures :** monogramme circulaire composé de deux formes de dialogue ; filet textile ponctué ; badges de statut francs (« Démonstration », « Bientôt disponible »).
+- **Philosophie colorielle :** blanc bleuté pour le fond, bleu nuit pour le texte, bleu cobalt pour la structure et l'action. Le bleu cobalt est la couleur propriétaire de Mizanga.
+- **Discipline du noir :** le noir absolu (`--ink-inverse`) est réservé à **une seule action primaire par écran** — ici « Se connecter ». Il ne sert ni aux cartes décoratives ni aux blocs de bas de page : la carte « Prochaine étape » de la page À propos est une surface de marque, pas un bloc noir.
+- **Paradigme de mise en page :** une colonne de lecture centrée (780 px) bordée d'une navigation latérale sur grand écran ; le compositeur de message forme une base stable. Le filet de trame guide le regard entre identité, contexte et conversation.
+- **Éléments signatures :** anneau ouvert ponctué d'un point de diacritique (monogramme) ; filet signature en dégradé sous l'en-tête ; badges de statut francs (« Démonstration », « Bientôt disponible »).
 - **Interactions :** actions directes et locales avec retour visuel discret ; tout état non connecté explique son absence au lieu de simuler un service.
 - **Animation :** transitions de panneau courtes (160–220 ms), apparition douce des messages, respect de `prefers-reduced-motion`.
-- **Typographie :** `system-ui` / `Segoe UI` / `Noto Sans` pour une excellente prise en charge de ɛ, ɩ, ʋ et des diacritiques ; titres légèrement serrés, texte courant généreux.
+- **Typographie :** `Noto Sans` embarquée pour une excellente prise en charge de ɛ, ɩ, ʋ et des diacritiques, déclinée en **sept tokens** (`--text-xs` → `--text-hero`). Aucun `px` littéral dans les composants : une valeur en dur signale un jeton manquant.
+- **Rayons :** trois valeurs seulement — 6 px (contrôles), 12 px (cartes), pastille (badges). Quand tout est arrondi, plus rien ne l'est.
 - **Essence de marque :** « Une porte de savoir numérique pensée pour le Mooré, avec rigueur linguistique et simplicité. » Personnalité : accueillante, fiable, attentive.
 - **Voix :** claire, jamais emphatique ni trompeuse. Exemples : « Écrivez comme vous le faites habituellement. » et « Le moteur linguistique arrive progressivement ; votre texte reste le vôtre. »
-- **Logo :** symbole de dialogue circulaire bleu cobalt avec un point de diacritique, associé au mot-signe « Mizanga ».
+- **Logo :** anneau ouvert formant une bulle de dialogue, ponctué d'un point de diacritique dans l'ouverture — bleu cobalt, fond transparent.
 - **Couleur de signature :** Bleu du savoir — `#2563D4`.
+
+### Accessibilité de la couche visuelle
+
+Les trois niveaux d'encre secondaires (`--ink-soft`, `--ink-muted`, `--ink-faint`) sont calés pour tenir le seuil **WCAG AA (4.5:1) sur toutes les surfaces** réellement utilisées — pas seulement sur le blanc. Les valeurs ont été mesurées au rendu, en thème clair comme en thème sombre, sur `--bg`, `--bg-sidebar`, `--surface-muted`, `--surface-hover`, `--accent-soft` et `--warning-soft`. Le focus est un contour **plein** de 2 px, jamais translucide.
 
 ## Écrans et parcours de phase 1
 
@@ -60,7 +66,7 @@ Cette première livraison est une interface web statique, responsive et interact
 ### Navigation et vues secondaires
 
 - Barre latérale sur bureau, tiroir sur mobile : Nouvelle conversation, historique, recherche, favoris, paramètres, à propos, état invité.
-- Historique et favoris sont des états d’interface explicitement non persistants ; ils n’affirment pas que des conversations sont stockées.
+- Historique et favoris sont des états d'interface explicitement non persistants ; ils n'affirment pas que des conversations sont stockées. L'état vide de la barre latérale tient en deux lignes (« Vos conversations apparaîtront ici. / Aucune n'est enregistrée pour l'instant. ») : il enseigne l'usage et rappelle la limite, sans la réciter en quatre lignes.
 - Vue Paramètres : langue de l’interface, langue de réponse, écriture utilisateur et écriture des réponses, thème (basculable localement), confidentialité, fonctions vocales à venir et nouvelle conversation.
 - Vue À propos : mission, principes de transparence, périmètre de démonstration et prochaines intégrations, sans promesse de qualité linguistique non évaluée.
 

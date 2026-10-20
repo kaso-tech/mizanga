@@ -230,6 +230,9 @@ export function App({ aiService = demoAiService }: AppProps) {
           onNewConversation={startNewConversation}
           onNotify={notify}
         />
+        {/* Filet signature : le repère textile décrit dans plan.md. Masqué sur
+            l'accueil, où l'en-tête se confond avec le vide de la colonne. */}
+        <div className="thread-filet" aria-hidden="true" />
         <div className="content-scroll"><div className="content-frame">{renderView()}</div></div>
         {activeView === 'chat' && !isEmptyChat && (
           <div className="composer-zone">

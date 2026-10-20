@@ -57,7 +57,8 @@ export function ChatView({
       <section className="welcome" aria-labelledby="welcome-title">
         <div className="welcome-head">
           <BrandMark size={44} />
-          <h1 id="welcome-title">Bonjour, que puis-je faire pour vous&#8239;?</h1>
+          <h1 id="welcome-title">Bonjour, que puis-je faire&nbsp;?</h1>
+          <p className="welcome-subtitle">Assistant généraliste, à l’aise en français comme en mooré.</p>
         </div>
         <div className="welcome-composer">
           {composer}
@@ -71,7 +72,7 @@ export function ChatView({
             return (
               <button type="button" key={label} className={`suggestion-chip ${highlight ? 'is-highlight' : ''}`} onClick={() => onSuggestion(prompt)}>
                 <Icon size={16} aria-hidden="true" />
-                {label}
+                <span>{label}</span>
               </button>
             )
           })}
