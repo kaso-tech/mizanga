@@ -7,6 +7,7 @@ interface SidebarProps {
   activeView: AppView
   conversations: Conversation[]
   activeConversationId?: string
+  savesConversations: boolean
   isOpen: boolean
   onClose: () => void
   onNavigate: (view: AppView) => void
@@ -20,6 +21,7 @@ export function Sidebar({
   activeView,
   conversations,
   activeConversationId,
+  savesConversations,
   isOpen,
   onClose,
   onNavigate,
@@ -84,8 +86,8 @@ export function Sidebar({
         </div>
 
         <nav className="conversation-list" aria-label="Conversations de cette session">
-          <p className="nav-label">Cette session</p>
-          <p className="nav-note">Non enregistré : l’historique disparaît à la fermeture de la page.</p>
+          <p className="nav-label">{savesConversations ? 'Conversations' : 'Cette session'}</p>
+          <p className="nav-note">{savesConversations ? 'Enregistré sur cet appareil uniquement.' : 'Non enregistré : l’historique disparaît à la fermeture de la page.'}</p>
           {visibleConversations.length === 0 ? (
             <p className="conversation-empty">{emptyMessage}</p>
           ) : (

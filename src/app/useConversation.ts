@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AiServiceError, type AiService } from '../domain/services'
+import { clearStoredConversations, loadConversations, saveConversations } from './conversationStorage'
 import type { ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
 
 function createId(prefix: string) {
@@ -16,11 +17,11 @@ function createTitle(content: string) {
 }
 
 /**
- * Conversations de la session, alimentées par un AiService remplaçable.
- * Elles restent en mémoire : rien n’est enregistré après la fermeture de la page.
+ * Conversations alimentées par un AiService remplaçable. Si `preferences.saveConversations` est vrai,
+ * elles sont enregistrées sur cet appareil (stockage du navigateur) ; sinon elles restent en mémoire.
  */
-export function useConversation(aiService: AiService, preferences: LinguisticPreferences) {
-  const [conversations, setConversations] = useState<Conversation[]>([])
+export function useConversation(aiService: AiService, preferences: LinguisticPreferences, { onStorageError }: { onStorageError?: () => void } = {}) {
+  const [conversations, setConversations] = useState<Conversation[]>(() => (preferences.saveConversations ? loadConversations() : []))
   const [activeId, setActiveId] = useState<string>()
   const [isGenerating, setIsGenerating] = useState(false)
   const conversationsRef = useRef(conversations)
@@ -30,6 +31,31 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
   const controllerRef = useRef<AbortController>()
 
   useEffect(() => () => controllerRef.current?.abort(), [])
+
+  // Enregistrement différé : une réponse en cours de diffusion ne déclenche pas une écriture par fragment.
+  const onStorageErrorRef = useRef(onStorageError)
+  onStorageErrorRef.current = onStorageError
+  useEffect(() => {
+    if (!preferences.saveConversations) {
+      clearStoredConversations()
+      return
+    }
+    const timer = window.setTimeout(() => {
+      if (!saveConversations(conversations)) onStorageErrorRef.current?.()
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [conversations, preferences.saveConversations])
+
+  // À la fermeture de la page, l’enregistrement différé n’aurait pas le temps de partir.
+  const saveEnabledRef = useRef(preferences.saveConversations)
+  saveEnabledRef.current = preferences.saveConversations
+  useEffect(() => {
+    const flush = () => {
+      if (saveEnabledRef.current) saveConversations(conversationsRef.current)
+    }
+    window.addEventListener('pagehide', flush)
+    return () => window.removeEventListener('pagehide', flush)
+  }, [])
 
   const activeConversation = conversations.find((conversation) => conversation.id === activeId)
 

@@ -12,6 +12,7 @@ import type { AiService } from '../domain/services'
 import { responseLanguageLabels } from '../data/content'
 import { defaultPreferences, type AppView, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
 import { demoAiService } from '../services/demoAiService'
+import { MAX_MESSAGE_CHARS } from '../services/remoteAiService'
 import { useConversation } from './useConversation'
 
 const routeByView: Record<AppView, string> = {
@@ -73,6 +74,7 @@ function loadPreferences(): LinguisticPreferences {
       ...(stored.responseLanguage && Object.hasOwn(responseLanguageLabels, stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
       ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
       ...(stored.theme === 'light' || stored.theme === 'dark' || stored.theme === 'system' ? { theme: stored.theme } : {}),
+      ...(typeof stored.saveConversations === 'boolean' ? { saveConversations: stored.saveConversations } : {}),
     }
   } catch {
     return defaultPreferences
@@ -91,7 +93,15 @@ export function App({ aiService = demoAiService }: AppProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [preferences, setPreferences] = useState<LinguisticPreferences>(loadPreferences)
-  const conversation = useConversation(aiService, preferences)
+  const storageErrorShown = useRef(false)
+  const conversation = useConversation(aiService, preferences, {
+    // Appelé plus tard, depuis un effet : `notify` est alors défini.
+    onStorageError: () => {
+      if (storageErrorShown.current) return
+      storageErrorShown.current = true
+      notify('L’historique n’a pas pu être enregistré sur cet appareil (stockage plein ou indisponible). Les conversations restent disponibles jusqu’à la fermeture de la page.')
+    },
+  })
   const [draft, setDraft] = useState('')
   const [focusToken, setFocusToken] = useState(0)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
@@ -170,6 +180,10 @@ export function App({ aiService = demoAiService }: AppProps) {
   }
 
   const sendMessage = (content: string) => {
+    if (content.length > MAX_MESSAGE_CHARS) {
+      notify(`Message trop long (${content.length.toLocaleString('fr')} caractères). La limite est de ${MAX_MESSAGE_CHARS.toLocaleString('fr')} : découpez-le en plusieurs messages.`)
+      return
+    }
     conversation.send(content)
     setDraft('')
   }
@@ -232,9 +246,9 @@ export function App({ aiService = demoAiService }: AppProps) {
   const renderView = () => {
     switch (activeView) {
       case 'history':
-        return <CollectionView kind="history" conversations={conversation.conversations} onSelectConversation={selectConversation} />
+        return <CollectionView kind="history" conversations={conversation.conversations} savesConversations={preferences.saveConversations} onSelectConversation={selectConversation} />
       case 'favorites':
-        return <CollectionView kind="favorites" conversations={conversation.conversations} onSelectConversation={selectConversation} />
+        return <CollectionView kind="favorites" conversations={conversation.conversations} savesConversations={preferences.saveConversations} onSelectConversation={selectConversation} />
       case 'settings':
         return (
           <SettingsView
@@ -282,6 +296,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         activeView={activeView}
         conversations={conversation.conversations}
         activeConversationId={conversation.activeConversation?.id}
+        savesConversations={preferences.saveConversations}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onNavigate={navigate}

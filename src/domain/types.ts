@@ -11,6 +11,8 @@ export type ResponseLanguage = 'auto' | 'moore-standard' | 'moore-informal' | 'f
 
 export interface LinguisticPreferences {
   interfaceLanguage: 'fr'
+  /** Enregistrer les conversations sur cet appareil (stockage du navigateur). */
+  saveConversations: boolean
   responseLanguage: ResponseLanguage
   userWritingMode: UserWritingMode
   theme: ThemePreference
@@ -66,6 +68,7 @@ export interface LinguisticFeedback {
 
 export const defaultPreferences: LinguisticPreferences = {
   interfaceLanguage: 'fr',
+  saveConversations: true,
   responseLanguage: 'auto',
   userWritingMode: 'standard',
   theme: 'light',

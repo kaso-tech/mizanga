@@ -9,7 +9,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Conversation avec réponse progressive, arrêt et régénération ; réponses en Markdown (tableaux, code, liens).
 - Langue des réponses : automatique (même langue que l’utilisateur), mooré standardisé ou informel, français, anglais.
 - Clavier des caractères du mooré (ɛ ɩ ʋ ã ẽ ĩ õ ũ Ɛ Ɩ Ʋ) inséré au curseur ; le texte saisi n’est jamais normalisé.
-- Historique de la session avec recherche, favoris et suppression (en mémoire uniquement).
+- Historique avec recherche, favoris et suppression, enregistré sur l’appareil (désactivable dans les paramètres, par exemple sur un appareil partagé).
 - Avis sur les réponses et signalement d’erreurs en mooré (préparés localement, pas encore envoyés).
 - Paramètres : thème clair, sombre ou système, langue et écriture, données, voix et compte (ces deux dernières sections arrivent bientôt).
 - Accessible au clavier et aux lecteurs d’écran, utilisable sur téléphone, tablette et ordinateur.
@@ -96,4 +96,4 @@ Le serveur sert aussi les routes de l’application (`/parametres`…) et met en
 - **Honnêteté :** l’interface indique toujours ce qui est connecté, démontré ou à venir.
 - **Respect du texte :** aucune substitution automatique de caractères (par ex. è → ɛ).
 - **Qualité du mooré :** les textes en mooré sont rédigés et validés par des locuteurs ; les corrections des utilisateurs seront relues avant toute utilisation.
-- **Confidentialité :** les conversations ne sont pas stockées par Mizanga (elles restent en mémoire dans le navigateur) et les préférences restent sur l’appareil ; en mode Gemini, les messages transitent par Google pour produire les réponses.
+- **Confidentialité :** Mizanga ne stocke aucune conversation sur un serveur : l’historique et les préférences restent dans le navigateur de l’utilisateur (désactivable) ; en mode Gemini, les messages transitent par Google pour produire les réponses. Seuls les derniers échanges (dans une limite de taille) sont envoyés au moteur.

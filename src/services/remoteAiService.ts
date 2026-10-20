@@ -1,5 +1,29 @@
 import { AiServiceError, type AiChunk, type AiService } from '../domain/services'
+import type { ChatMessage } from '../domain/types'
 import { demoAiService } from './demoAiService'
+
+/** Plafonds alignés sur le serveur (server/chat-handler.mjs). */
+export const MAX_MESSAGE_CHARS = 32_000
+const MAX_HISTORY_MESSAGES = 40
+const MAX_HISTORY_CHARS = 60_000
+
+/**
+ * Garde les échanges les plus récents dans un budget de taille, pour préserver le quota gratuit
+ * sur les longues conversations. L’historique envoyé commence toujours par un message de l’utilisateur.
+ */
+export function selectHistory(messages: ChatMessage[]) {
+  const usable = messages.filter((message) => message.content.trim() && message.status !== 'error')
+  const selected: ChatMessage[] = []
+  let total = 0
+  for (let index = usable.length - 1; index >= 0; index--) {
+    const message = usable[index]
+    if (selected.length >= MAX_HISTORY_MESSAGES || (selected.length > 0 && total + message.content.length > MAX_HISTORY_CHARS)) break
+    selected.unshift(message)
+    total += message.content.length
+  }
+  while (selected.length > 1 && selected[0].role !== 'user') selected.shift()
+  return selected.map(({ role, content }) => ({ role, content }))
+}
 
 /**
  * Moteur distant : le serveur Mizanga (/api/chat) relaie la demande vers le modèle configuré
@@ -15,7 +39,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: messages.map(({ role, content }) => ({ role, content })),
+          messages: selectHistory(messages),
           preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode },
         }),
         signal,

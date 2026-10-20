@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiServiceError } from '../domain/services'
 import { defaultPreferences } from '../domain/types'
-import { createRemoteAiService, detectAiService } from './remoteAiService'
+import { createRemoteAiService, detectAiService, selectHistory } from './remoteAiService'
 import { demoAiService } from './demoAiService'
 
 const request = {
@@ -62,5 +62,19 @@ describe('remoteAiService', () => {
     // Site statique sans API : la route renvoie la page HTML.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<!doctype html>', { headers: { 'Content-Type': 'text/html' } })))
     expect(await detectAiService()).toBe(demoAiService)
+  })
+
+  it('envoie un historique plafonné qui commence par un message de l’utilisateur', () => {
+    const at = '2026-10-20T00:00:00.000Z'
+    const long = 'x'.repeat(25_000)
+    const history = selectHistory([
+      { id: '1', role: 'user', content: long, createdAt: at },
+      { id: '2', role: 'assistant', content: long, createdAt: at },
+      { id: '3', role: 'user', content: 'Question', createdAt: at },
+      { id: '4', role: 'assistant', content: '', createdAt: at, status: 'error' },
+      { id: '5', role: 'assistant', content: long, createdAt: at },
+      { id: '6', role: 'user', content: 'Dernière', createdAt: at },
+    ])
+    expect(history.map((message) => message.content.slice(0, 8))).toEqual(['Question', 'xxxxxxxx', 'Dernière'])
   })
 })

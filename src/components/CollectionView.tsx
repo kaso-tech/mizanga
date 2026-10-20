@@ -4,11 +4,12 @@ import type { Conversation } from '../domain/types'
 interface CollectionViewProps {
   kind: 'history' | 'favorites'
   conversations: Conversation[]
+  savesConversations: boolean
   onSelectConversation: (conversationId: string) => void
 }
 
 /** Historique et favoris de la session (aussi accessibles depuis la barre latérale). */
-export function CollectionView({ kind, conversations, onSelectConversation }: CollectionViewProps) {
+export function CollectionView({ kind, conversations, savesConversations, onSelectConversation }: CollectionViewProps) {
   const isHistory = kind === 'history'
   const items = isHistory ? conversations : conversations.filter((conversation) => conversation.favorite)
   const Icon = isHistory ? MessageSquare : Star
@@ -16,7 +17,7 @@ export function CollectionView({ kind, conversations, onSelectConversation }: Co
   return (
     <div className="page-view collection-view">
       <h1>{isHistory ? 'Historique' : 'Favoris'}</h1>
-      <p className="page-intro">Non enregistré : l’historique de cette session disparaît à la fermeture de la page.</p>
+      <p className="page-intro">{savesConversations ? 'Enregistré sur cet appareil uniquement.' : 'Non enregistré : l’historique de cette session disparaît à la fermeture de la page.'}</p>
       {items.length === 0 ? (
         <p className="conversation-empty">{isHistory ? 'Aucune conversation pour l’instant.' : 'Aucun favori. Ajoutez-en avec l’étoile, dans le menu.'}</p>
       ) : (

@@ -71,6 +71,10 @@ function SegmentedControl<T extends string>({ name, label, value, options, onCha
   )
 }
 
+function Switch({ id, checked, onChange }: { id: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return <button type="button" id={id} role="switch" aria-checked={checked} className="switch" onClick={() => onChange(!checked)} />
+}
+
 function SoonSwitch({ label }: { label: string }) {
   return <button type="button" role="switch" aria-checked="false" aria-label={`${label} — bientôt disponible`} className="switch" disabled />
 }
@@ -208,7 +212,16 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 <SettingRow label="Nouvelle conversation" description="Repartir d’une conversation vide. Les précédentes restent dans le menu.">
                   <button type="button" className="secondary-button" onClick={onNewConversation}>Démarrer</button>
                 </SettingRow>
-                <SettingRow label="Historique des conversations" description="Conservé en mémoire pendant la session, effacé à la fermeture ou au rechargement de la page.">
+                <SettingRow
+                  label="Enregistrer les conversations sur cet appareil"
+                  htmlFor="setting-save-conversations"
+                  description={preferences.saveConversations
+                    ? 'Vos conversations sont gardées dans ce navigateur, même après fermeture. Désactivez-le sur un appareil partagé : l’historique enregistré sera effacé.'
+                    : 'Les conversations restent en mémoire et disparaissent à la fermeture ou au rechargement de la page.'}
+                >
+                  <Switch id="setting-save-conversations" checked={preferences.saveConversations} onChange={(saveConversations) => onChange({ saveConversations })} />
+                </SettingRow>
+                <SettingRow label="Historique des conversations" description="Recherche, favoris et suppression depuis le menu latéral.">
                   <span className="value-pill">{conversationCount === 0 ? 'Aucune' : `${conversationCount} conversation${conversationCount > 1 ? 's' : ''}`}</span>
                 </SettingRow>
                 <SettingRow
@@ -225,7 +238,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
               </div>
 
               <div className="danger-zone">
-                <SettingRow label="Supprimer toutes les conversations" description="Efface définitivement l’historique de cette session, favoris compris.">
+                <SettingRow label="Supprimer toutes les conversations" description="Efface définitivement l’historique, favoris compris, y compris sur cet appareil.">
                   {confirmingClear ? (
                     <span className="confirm-actions">
                       <button type="button" className="secondary-button" onClick={() => setConfirmingClear(false)}>Annuler</button>

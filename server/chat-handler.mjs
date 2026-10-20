@@ -1,9 +1,9 @@
 import { streamGeminiReply, UpstreamError } from './gemini.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
-const MAX_BODY_BYTES = 256 * 1024
+const MAX_BODY_BYTES = 512 * 1024
 const MAX_MESSAGES = 60
-const MAX_MESSAGE_CHARS = 12_000
+const MAX_MESSAGE_CHARS = 32_000
 const RATE_LIMIT = { windowMs: 60_000, maxRequests: 20 }
 const RESPONSE_LANGUAGES = new Set(['auto', 'moore-standard', 'moore-informal', 'french', 'english'])
 const WRITING_MODES = new Set(['standard', 'informal'])
