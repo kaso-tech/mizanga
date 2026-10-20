@@ -68,22 +68,29 @@ export function validateChatRequest(body) {
   }
 }
 
+/**
+ * Limiteur par visiteur. Renvoie `null` si la demande est acceptée, sinon le moment où elle le sera.
+ * @returns {(key: string) => Date | null}
+ */
 function createRateLimiter({ windowMs, maxRequests } = RATE_LIMIT, now = () => Date.now()) {
   /** @type {Map<string, number[]>} */
   const hits = new Map()
-  return (/** @type {string} */ key) => {
+  return (key) => {
     const current = now()
     const recent = (hits.get(key) ?? []).filter((time) => current - time < windowMs)
     if (recent.length >= maxRequests) {
       hits.set(key, recent)
-      return false
+      return new Date(recent[0] + windowMs)
     }
     recent.push(current)
     hits.set(key, recent)
     if (hits.size > 10_000) hits.clear()
-    return true
+    return null
   }
 }
+
+/** Corps d’erreur JSON, avec l’heure de réinitialisation quand elle est connue. */
+const errorBody = (/** @type {string} */ message, /** @type {Date | undefined} */ retryAt) => (retryAt ? { error: message, retryAt: retryAt.toISOString() } : { error: message })
 
 /**
  * Gestionnaire Node pour `/api/health` et `/api/chat`, partagé par le serveur de développement Vite
@@ -93,7 +100,7 @@ function createRateLimiter({ windowMs, maxRequests } = RATE_LIMIT, now = () => D
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
 export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBase, rateLimit } = {}) {
-  const allow = createRateLimiter(rateLimit)
+  const limit = createRateLimiter(rateLimit)
 
   return async (req, res, next) => {
     const path = (req.url ?? '').split('?')[0]
@@ -109,7 +116,8 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
     if (!apiKey) return sendJson(res, 503, { error: 'Aucun moteur d’IA n’est configuré sur ce serveur.' })
 
     const client = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnu'
-    if (!allow(client)) return sendJson(res, 429, { error: 'Trop de demandes en peu de temps. Patientez une minute.' })
+    const blockedUntil = limit(client)
+    if (blockedUntil) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blockedUntil))
 
     if (path === '/api/title') {
       try {
@@ -118,8 +126,8 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
         const title = await generateGeminiTitle({ apiKey, model, apiBase, text: body.text })
         return sendJson(res, 200, { title })
       } catch (error) {
-        const { status = 502, message = 'Titre indisponible.' } = /** @type {{ status?: number, message?: string }} */ (error)
-        return sendJson(res, status, { error: message })
+        const { status = 502, message = 'Titre indisponible.', retryAt } = /** @type {{ status?: number, message?: string, retryAt?: Date }} */ (error)
+        return sendJson(res, status, errorBody(message, retryAt))
       }
     }
 
@@ -151,10 +159,11 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', apiBas
       if (controller.signal.aborted) return
       const message = error instanceof UpstreamError ? error.message : 'Le moteur est momentanément indisponible. Réessayez plus tard.'
       if (!(error instanceof UpstreamError)) console.error('[mizanga] Erreur du moteur :', error)
+      const retryAt = error instanceof UpstreamError ? error.retryAt : undefined
       if (started) {
-        res.end(`${JSON.stringify({ error: message })}\n`)
+        res.end(`${JSON.stringify(errorBody(message, retryAt))}\n`)
       } else {
-        sendJson(res, error instanceof UpstreamError ? error.status : 502, { error: message })
+        sendJson(res, error instanceof UpstreamError ? error.status : 502, errorBody(message, retryAt))
       }
     }
   }

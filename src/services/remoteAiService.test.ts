@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiServiceError } from '../domain/services'
 import { defaultPreferences } from '../domain/types'
-import { createRemoteAiService, detectAiService, selectHistory } from './remoteAiService'
+import { createRemoteAiService, detectAiService, formatResetTime, selectHistory } from './remoteAiService'
 import { demoAiService } from './demoAiService'
 
 const request = {
@@ -45,7 +45,7 @@ describe('remoteAiService', () => {
 
   it('remonte les erreurs du serveur avec leur message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Quota atteint.' }), { status: 429 })))
-    await expect(collect()).rejects.toEqual(new AiServiceError('Quota atteint.'))
+    await expect(collect()).rejects.toEqual(new AiServiceError('Quota atteint. Réessayez dans quelques minutes.'))
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamedResponse(['{"text":"Début"}\n{"error":"Coupure."}\n'])))
     await expect(collect()).rejects.toEqual(new AiServiceError('Coupure.'))
@@ -102,5 +102,21 @@ describe('remoteAiService', () => {
       { role: 'assistant', content: 'Vu.' },
       { role: 'user', content: '', attachments: [{ name: 'cours.pdf', mimeType: 'application/pdf', data: 'QUFB' }] },
     ])
+  })
+
+  it('indique l’heure de réinitialisation quand la limite est atteinte', async () => {
+    const retryAt = new Date(Date.now() + 90_000)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'La limite d’utilisation gratuite du moteur est atteinte.', retryAt: retryAt.toISOString() }, { status: 429 })))
+    const error = await collect().catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(AiServiceError)
+    expect((error as AiServiceError).userMessage).toBe(`La limite d’utilisation gratuite du moteur est atteinte. Elle sera réinitialisée ${formatResetTime(retryAt)}.`)
+    expect((error as AiServiceError).retryAt?.toISOString()).toBe(retryAt.toISOString())
+  })
+
+  it('formate l’heure de réinitialisation à la française, à la minute supérieure', () => {
+    const now = new Date(2026, 9, 20, 14, 5)
+    expect(formatResetTime(new Date(2026, 9, 20, 14, 31, 10), now)).toBe('à 14 h 32')
+    expect(formatResetTime(new Date(2026, 9, 21, 9, 0), now)).toBe('demain à 9 h 00')
+    expect(formatResetTime(new Date(2026, 9, 23, 8, 0), now)).toBe('le 23 octobre à 8 h 00')
   })
 })

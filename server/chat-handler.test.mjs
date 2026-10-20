@@ -2,8 +2,9 @@
 import { createServer } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApiHandler } from './chat-handler.mjs'
+import { nextMidnight, quotaResetTime } from './gemini.mjs'
 
-/** @type {{ status: number, events: unknown[] }} */
+/** @type {{ status: number, events: unknown[], body?: unknown }} */
 let upstreamReply = { status: 200, events: [] }
 /** @type {{ url?: string, headers?: import('node:http').IncomingHttpHeaders, body?: any }} */
 let lastUpstreamRequest = {}
@@ -19,7 +20,7 @@ const fakeGemini = createServer(async (req, res) => {
     return
   }
   if (upstreamReply.status !== 200) {
-    res.writeHead(upstreamReply.status, { 'Content-Type': 'application/json' }).end('{}')
+    res.writeHead(upstreamReply.status, { 'Content-Type': 'application/json' }).end(JSON.stringify(upstreamReply.body ?? {}))
     return
   }
   res.writeHead(200, { 'Content-Type': 'text/event-stream' })
@@ -108,19 +109,37 @@ describe('API Mizanga', () => {
     expect(instruction).toContain('ne prétends jamais maîtriser')
   })
 
-  it('traduit un dépassement de quota en message clair', async () => {
-    upstreamReply = { status: 429, events: [] }
+  it('traduit un dépassement de quota en message clair, avec l’heure de réinitialisation', async () => {
+    upstreamReply = { status: 429, events: [], body: { error: { code: 429, details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '37s' }] } } }
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase })
+    const before = Date.now()
     const response = await post(base, validBody)
     expect(response.status).toBe(429)
-    expect(/** @type {{ error: string }} */ (await response.json()).error).toContain('limite d’utilisation gratuite')
+    const body = /** @type {{ error: string, retryAt: string }} */ (await response.json())
+    expect(body.error).toContain('limite d’utilisation gratuite')
+    const delay = new Date(body.retryAt).getTime() - before
+    expect(delay).toBeGreaterThanOrEqual(36_000)
+    expect(delay).toBeLessThanOrEqual(40_000)
+  })
+
+  it('situe la réinitialisation d’un quota journalier à minuit, heure du Pacifique', () => {
+    const daily = { error: { details: [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }, { retryDelay: '20s' }] } }
+    expect(quotaResetTime(daily, null, new Date('2026-10-20T17:00:00Z'))?.toISOString()).toBe('2026-10-21T07:00:00.000Z')
+    // Passage à l’heure d’hiver aux États-Unis le 1er novembre 2026.
+    expect(nextMidnight(new Date('2026-10-31T20:00:00Z')).toISOString()).toBe('2026-11-01T07:00:00.000Z')
+    expect(nextMidnight(new Date('2026-11-01T20:00:00Z')).toISOString()).toBe('2026-11-02T08:00:00.000Z')
+    expect(quotaResetTime({}, '12', new Date('2026-10-20T17:00:00Z'))?.toISOString()).toBe('2026-10-20T17:00:12.000Z')
+    expect(quotaResetTime({}, null)).toBeUndefined()
   })
 
   it('limite le nombre de demandes par visiteur', async () => {
     upstreamReply = { status: 200, events: [textEvent('ok')] }
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, rateLimit: { windowMs: 60_000, maxRequests: 1 } })
     expect((await post(base, validBody)).status).toBe(200)
-    expect((await post(base, validBody)).status).toBe(429)
+    const blocked = await post(base, validBody)
+    expect(blocked.status).toBe(429)
+    const { retryAt } = /** @type {{ retryAt: string }} */ (await blocked.json())
+    expect(new Date(retryAt).getTime()).toBeGreaterThan(Date.now() + 50_000)
   })
 
   it('propose un titre court et nettoyé', async () => {

@@ -2,6 +2,30 @@ import { AiServiceError, type AiChunk, type AiService } from '../domain/services
 import type { ChatMessage } from '../domain/types'
 import { demoAiService } from './demoAiService'
 
+/**
+ * Heure de réinitialisation d’une limite, dans le fuseau de l’utilisateur, à la minute supérieure :
+ * « à 14 h 32 », « demain à 9 h 00 » ou « le 22 octobre à 9 h 00 ».
+ */
+export function formatResetTime(retryAt: Date, now = new Date()) {
+  const rounded = new Date(Math.ceil(retryAt.getTime() / 60_000) * 60_000)
+  const time = `${rounded.getHours()} h ${String(rounded.getMinutes()).padStart(2, '0')}`
+  const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  if (dayKey(rounded) === dayKey(now)) return `à ${time}`
+  if (dayKey(rounded) === dayKey(tomorrow)) return `demain à ${time}`
+  return `le ${rounded.toLocaleDateString('fr', { day: 'numeric', month: 'long' })} à ${time}`
+}
+
+/** Message d’erreur du serveur, complété par l’heure de réinitialisation quand une limite est atteinte. */
+function errorFrom(body: { error?: string; retryAt?: string } | null, status?: number) {
+  const retryAt = body?.retryAt ? new Date(body.retryAt) : undefined
+  const message = body?.error ?? 'Le serveur de Mizanga est injoignable. Vérifiez votre connexion et réessayez.'
+  if (retryAt && !Number.isNaN(retryAt.getTime())) {
+    return new AiServiceError(`${message} Elle sera réinitialisée ${formatResetTime(retryAt)}.`, retryAt)
+  }
+  return new AiServiceError(status === 429 ? `${message} Réessayez dans quelques minutes.` : message)
+}
+
 /** Plafonds alignés sur le serveur (server/chat-handler.mjs). */
 export const MAX_MESSAGE_CHARS = 32_000
 const MAX_HISTORY_MESSAGES = 40
@@ -80,8 +104,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
         throw new AiServiceError(navigator.onLine ? 'Le serveur de Mizanga est injoignable. Réessayez dans un instant.' : 'Vous êtes hors connexion. Vérifiez votre réseau puis réessayez.')
       }
       if (!response.ok || !response.body) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new AiServiceError(body?.error ?? 'Le serveur de Mizanga est injoignable. Vérifiez votre connexion et réessayez.')
+        throw errorFrom((await response.json().catch(() => null)) as { error?: string; retryAt?: string } | null, response.status)
       }
 
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -94,8 +117,8 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (!line.trim()) continue
-          const event = JSON.parse(line) as { text?: string; error?: string }
-          if (event.error) throw new AiServiceError(event.error)
+          const event = JSON.parse(line) as { text?: string; error?: string; retryAt?: string }
+          if (event.error) throw errorFrom(event)
           // La langue réelle de la réponse n’est pas connue : elle n’est pas indiquée plutôt que devinée.
           if (event.text) yield { text: event.text }
         }

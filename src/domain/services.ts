@@ -34,7 +34,8 @@ export interface AiService {
 
 /** Erreur d’un service d’IA dont le message peut être montré tel quel à l’utilisateur. */
 export class AiServiceError extends Error {
-  constructor(readonly userMessage: string) {
+  /** `retryAt` : moment où la limite d’utilisation sera réinitialisée, quand le moteur l’indique. */
+  constructor(readonly userMessage: string, readonly retryAt?: Date) {
     super(userMessage)
     this.name = 'AiServiceError'
   }

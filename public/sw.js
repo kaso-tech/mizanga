@@ -1,7 +1,7 @@
 // Service worker de Mizanga : rend l’application installable et utilisable hors connexion
 // pour son interface. Les échanges avec le moteur d’IA (/api/*) ne sont jamais mis en cache.
-const CACHE = 'mizanga-v1'
-const SHELL = ['/', '/manifest.webmanifest', '/mizanga-mark.svg', '/icons/icon-192.png']
+const CACHE = 'mizanga-v2'
+const SHELL = ['/', '/manifest.webmanifest', '/favicon.png', '/brand/mark.png', '/icons/icon-192.png']
 
 // Met en cache l’interface et les fichiers compilés qu’elle référence (script et feuille de style à empreinte),
 // pour que l’application s’ouvre hors connexion dès le deuxième lancement.
@@ -47,7 +47,7 @@ self.addEventListener('fetch', (event) => {
   // Fichiers à empreinte (dist/assets), polices et icônes : cache d’abord, ils ne changent jamais.
   event.respondWith(
     caches.match(request).then((cached) => cached ?? fetch(request).then((response) => {
-      if (response.ok && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/'))) {
+      if (response.ok && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname.startsWith('/brand/'))) {
         const copy = response.clone()
         caches.open(CACHE).then((cache) => cache.put(request, copy))
       }

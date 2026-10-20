@@ -8,12 +8,58 @@ export class UpstreamError extends Error {
   /**
    * @param {string} userMessage
    * @param {number} status
+   * @param {Date} [retryAt] Moment où la limite d’utilisation sera réinitialisée, s’il est connu.
    */
-  constructor(userMessage, status) {
+  constructor(userMessage, status, retryAt) {
     super(userMessage)
     this.name = 'UpstreamError'
     this.status = status
+    this.retryAt = retryAt
   }
+}
+
+/** Les quotas journaliers de l’API Gemini sont remis à zéro à minuit, heure du Pacifique. */
+const QUOTA_TIME_ZONE = 'America/Los_Angeles'
+
+/**
+ * Écart (ms) entre l’heure murale d’un fuseau et l’UTC, à un instant donné.
+ * @param {Date} date @param {string} timeZone
+ */
+function timeZoneOffset(date, timeZone) {
+  /** @type {Record<string, number>} */
+  const parts = {}
+  for (const { type, value } of new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(date)) {
+    if (type !== 'literal') parts[type] = Number(value)
+  }
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - Math.floor(date.getTime() / 1000) * 1000
+}
+
+/**
+ * Prochain minuit dans un fuseau horaire, en tenant compte du changement d’heure.
+ * @param {Date} now @param {string} [timeZone]
+ */
+export function nextMidnight(now, timeZone = QUOTA_TIME_ZONE) {
+  const local = new Date(now.getTime() + timeZoneOffset(now, timeZone))
+  const midnightAsUtc = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1)
+  const guess = new Date(midnightAsUtc - timeZoneOffset(now, timeZone))
+  return new Date(midnightAsUtc - timeZoneOffset(guess, timeZone))
+}
+
+/**
+ * Lit, dans une erreur 429 de Gemini, quand la limite sera réinitialisée : minuit (heure du Pacifique)
+ * pour un quota journalier, sinon le délai indiqué (RetryInfo ou en-tête Retry-After).
+ * @param {unknown} body @param {string | null} retryAfterHeader @param {Date} [now]
+ * @returns {Date | undefined}
+ */
+export function quotaResetTime(body, retryAfterHeader, now = new Date()) {
+  /** @type {Array<{ '@type'?: string, retryDelay?: string, violations?: Array<{ quotaId?: string, quotaMetric?: string }> }>} */
+  const details = /** @type {any} */ (body)?.error?.details ?? []
+  const isDaily = details.some((detail) => detail.violations?.some((violation) => /PerDay/i.test(`${violation.quotaId ?? ''} ${violation.quotaMetric ?? ''}`)))
+  if (isDaily) return nextMidnight(now)
+  const delay = details.find((detail) => typeof detail.retryDelay === 'string')?.retryDelay
+  const seconds = delay ? Number.parseFloat(delay) : Number.parseFloat(retryAfterHeader ?? '')
+  if (Number.isFinite(seconds) && seconds >= 0) return new Date(now.getTime() + Math.ceil(seconds) * 1000)
+  return undefined
 }
 
 /** @type {Record<string, string>} */
@@ -67,9 +113,16 @@ export function toGeminiContents(messages) {
     }))
 }
 
+/** @param {Response} response */
+async function errorForResponse(response) {
+  if (response.status !== 429) return errorForStatus(response.status)
+  const body = await response.json().catch(() => null)
+  return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte.', 429, quotaResetTime(body, response.headers.get('retry-after')))
+}
+
 /** @param {number} status */
 function errorForStatus(status) {
-  if (status === 429) return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte pour le moment. Réessayez dans quelques minutes.', 429)
+  if (status === 429) return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte.', 429)
   if (status === 400) return new UpstreamError('Le moteur a refusé la demande (fichier illisible, format ou paramètres invalides).', 502)
   if (status === 404) return new UpstreamError('Le moteur a refusé la demande (modèle introuvable).', 502)
   if (status === 401 || status === 403) return new UpstreamError('Le moteur n’est pas correctement configuré (clé d’API refusée).', 502)
@@ -99,7 +152,7 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
     }),
     signal,
   })
-  if (!response.ok || !response.body) throw errorForStatus(response.status)
+  if (!response.ok || !response.body) throw await errorForResponse(response)
 
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
@@ -143,7 +196,7 @@ export async function generateGeminiTitle({ apiKey, model, apiBase = DEFAULT_API
     }),
     signal,
   })
-  if (!response.ok) throw errorForStatus(response.status)
+  if (!response.ok) throw await errorForResponse(response)
   const payload = /** @type {{ candidates?: Array<{ content?: { parts?: Array<{ text?: string, thought?: boolean }> } }> }} */ (await response.json())
   const parts = payload.candidates?.[0]?.content?.parts ?? []
   const raw = parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('')
