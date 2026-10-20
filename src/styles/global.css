@@ -518,6 +518,38 @@ button.close-drawer { display: none; }
 .row-menu button.is-danger { color: var(--destructive); }
 .rename-input { width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--ring); border-radius: 10px; outline: 0; background: var(--card); font-size: 14px; }
 
+.text-button { display: inline-flex; align-items: center; gap: 6px; justify-self: start; min-height: 36px; padding: 0 10px; border: 0; border-radius: 10px; color: var(--muted-foreground); background: transparent; font-size: 13px; }
+.text-button:hover { color: var(--foreground); background: var(--accent); }
+
+/* Outil d’évaluation du mooré. */
+.evaluation-view { max-width: 820px; }
+.evaluation-help { margin: 0 0 12px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }
+.evaluation-actions, .evaluation-run, .evaluation-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.evaluation-actions button, .evaluation-run button { display: inline-flex; align-items: center; gap: 8px; }
+.evaluation-delay { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.evaluation-delay .select-control select { min-width: 90px; }
+.evaluation-run { margin-bottom: 10px; }
+.evaluation-summary { margin-bottom: 14px; }
+.value-pill.is-correct { color: oklch(0.42 0.11 150); background: oklch(0.93 0.05 150); }
+.value-pill.is-partial { color: oklch(0.45 0.1 75); background: var(--ochre-soft); }
+.value-pill.is-incorrect { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 10%, transparent); }
+:root[data-theme='dark'] .value-pill.is-correct { color: oklch(0.85 0.1 150); background: oklch(0.3 0.05 150); }
+:root[data-theme='dark'] .value-pill.is-partial { color: var(--ochre); }
+.evaluation-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.evaluation-item { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--background); }
+.evaluation-item.is-running { border-color: var(--ring); }
+.evaluation-item p { margin: 0; }
+.evaluation-question, .evaluation-expected, .evaluation-answer { font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.evaluation-question > span, .evaluation-expected > span, .evaluation-answer > span { display: block; margin-bottom: 2px; color: var(--muted-foreground); font-size: 12px; font-weight: 600; }
+.evaluation-question { font-weight: 500; }
+.evaluation-text { padding: 10px 12px; border-radius: 10px; background: var(--muted); }
+.evaluation-muted { color: var(--muted-foreground); font-style: italic; }
+.evaluation-rating { display: grid; gap: 8px; }
+.evaluation-rating .choice-row { margin-top: 0; }
+.choice.is-correct.is-selected { border-color: oklch(0.5 0.12 150); color: #fff; background: oklch(0.5 0.12 150); }
+.choice.is-partial.is-selected { border-color: var(--ochre); color: var(--foreground); background: var(--ochre); }
+.choice.is-incorrect.is-selected { border-color: var(--destructive); color: #fff; background: var(--destructive); }
+
 /* ---------- Pages ---------- */
 
 .page-view { width: 100%; max-width: 672px; margin: 0 auto; padding: 24px 16px 48px; }

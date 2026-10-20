@@ -11,6 +11,8 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Fichiers joints : photos (réduites avant l’envoi pour économiser les données), PDF et fichiers texte, par bouton, glisser-déposer ou collage ; 4 fichiers et 8 Mo au plus par message. Leur contenu n’est pas conservé dans l’historique.
 - Recherche web à la demande : la réponse cite ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
 - Messages vocaux (2 minutes au plus, convertis en WAV 16 kHz) et fichiers audio ; la compréhension du mooré parlé n’est pas encore garantie.
+- Conversations renommables, exportables en Markdown et réponses partageables (WhatsApp, SMS…) via le partage du téléphone.
+- **Outil d’évaluation du mooré** (`/evaluation`, aussi dans Paramètres › Langue et écriture) : importer des questions préparées par des locuteurs (CSV), obtenir les réponses une à une en respectant le quota, les noter et exporter les résultats pour Excel.
 - Clavier des caractères du mooré (ɛ ɩ ʋ ã ẽ ĩ õ ũ Ɛ Ɩ Ʋ) inséré au curseur ; le texte saisi n’est jamais normalisé.
 - Historique avec recherche, favoris et suppression, enregistré sur l’appareil (désactivable dans les paramètres, par exemple sur un appareil partagé).
 - Avis sur les réponses et signalement d’erreurs en mooré (préparés localement, pas encore envoyés).

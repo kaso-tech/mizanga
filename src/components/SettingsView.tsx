@@ -105,10 +105,11 @@ interface SettingsViewProps {
   onChange: (changes: Partial<LinguisticPreferences>) => void
   onResetPreferences: () => void
   onNewConversation: () => void
+  onOpenEvaluation: () => void
   onClearConversations: () => void
 }
 
-export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onClearConversations }: SettingsViewProps) {
+export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onOpenEvaluation, onClearConversations }: SettingsViewProps) {
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection)
   const [confirmingClear, setConfirmingClear] = useState(false)
   const tabRefs = useRef<Record<SectionId, HTMLButtonElement | null>>({ general: null, langue: null, donnees: null, voix: null, compte: null })
@@ -217,6 +218,11 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                     ]}
                     onChange={(userWritingMode) => onChange({ userWritingMode })}
                   />
+                </SettingRow>
+              </div>
+              <div className="setting-group">
+                <SettingRow label="Évaluer la qualité du mooré" description="Outil pour les locuteurs : importer des questions, obtenir les réponses de Mizanga, les noter et exporter les résultats.">
+                  <button type="button" className="secondary-button" onClick={onOpenEvaluation}>Ouvrir l’outil</button>
                 </SettingRow>
               </div>
               <p className="settings-callout">

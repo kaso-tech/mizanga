@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AboutView } from '../components/AboutView'
 import { ChatView } from '../components/ChatView'
 import { CollectionView } from '../components/CollectionView'
+import { EvaluationView } from '../components/EvaluationView'
 import { Composer } from '../components/Composer'
 import { FeedbackDialog } from '../components/FeedbackDialog'
 import { Header } from '../components/Header'
@@ -22,6 +23,7 @@ const routeByView: Record<AppView, string> = {
   favorites: '/favoris',
   settings: '/parametres',
   about: '/a-propos',
+  evaluation: '/evaluation',
 }
 
 const titleByView: Record<AppView, string> = {
@@ -30,6 +32,7 @@ const titleByView: Record<AppView, string> = {
   favorites: 'Favoris',
   settings: 'Paramètres',
   about: 'À propos',
+  evaluation: 'Évaluation du mooré',
 }
 
 const themeColorByTheme: Record<'light' | 'dark', string> = {
@@ -304,6 +307,7 @@ export function App({ aiService = demoAiService }: AppProps) {
               notify('Préférences réinitialisées.', 'success')
             }}
             onNewConversation={startNewConversation}
+            onOpenEvaluation={() => navigate('evaluation')}
             onClearConversations={() => {
               conversation.clearAll()
               setDraft('')
@@ -311,6 +315,8 @@ export function App({ aiService = demoAiService }: AppProps) {
             }}
           />
         )
+      case 'evaluation':
+        return <EvaluationView aiService={aiService} preferences={preferences} onNotify={notify} />
       case 'about':
         return <AboutView engineLabel={aiService.label} isDemonstration={aiService.isDemonstration} />
       default:
