@@ -30,7 +30,7 @@ const titleByView: Record<AppView, string> = {
   about: 'À propos',
 }
 
-const themeColorByTheme: Record<LinguisticPreferences['theme'], string> = {
+const themeColorByTheme: Record<'light' | 'dark', string> = {
   light: '#fcf9f3',
   dark: '#1a120e',
 }
@@ -72,7 +72,7 @@ function loadPreferences(): LinguisticPreferences {
       ...defaultPreferences,
       ...(stored.responseLanguage && Object.hasOwn(responseLanguageLabels, stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
       ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
-      ...(stored.theme === 'light' || stored.theme === 'dark' ? { theme: stored.theme } : {}),
+      ...(stored.theme === 'light' || stored.theme === 'dark' || stored.theme === 'system' ? { theme: stored.theme } : {}),
     }
   } catch {
     return defaultPreferences
@@ -103,8 +103,16 @@ export function App({ aiService = demoAiService }: AppProps) {
   const copiedTimer = useRef<number>()
 
   useEffect(() => {
-    document.documentElement.dataset.theme = preferences.theme
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColorByTheme[preferences.theme])
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = () => {
+      const theme = preferences.theme === 'system' ? (media.matches ? 'dark' : 'light') : preferences.theme
+      document.documentElement.dataset.theme = theme
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColorByTheme[theme])
+    }
+    applyTheme()
+    if (preferences.theme !== 'system') return
+    media.addEventListener('change', applyTheme)
+    return () => media.removeEventListener('change', applyTheme)
   }, [preferences.theme])
 
   useEffect(() => {
@@ -228,7 +236,23 @@ export function App({ aiService = demoAiService }: AppProps) {
       case 'favorites':
         return <CollectionView kind="favorites" conversations={conversation.conversations} onSelectConversation={selectConversation} />
       case 'settings':
-        return <SettingsView preferences={preferences} onChange={updatePreferences} onNewConversation={startNewConversation} />
+        return (
+          <SettingsView
+            preferences={preferences}
+            conversationCount={conversation.conversations.length}
+            onChange={updatePreferences}
+            onResetPreferences={() => {
+              setPreferences(defaultPreferences)
+              notify('Préférences réinitialisées.', 'success')
+            }}
+            onNewConversation={startNewConversation}
+            onClearConversations={() => {
+              conversation.clearAll()
+              setDraft('')
+              notify('Toutes les conversations de cette session ont été supprimées.', 'success')
+            }}
+          />
+        )
       case 'about':
         return <AboutView />
       default:

@@ -1,6 +1,7 @@
 export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about'
 
-export type ThemePreference = 'light' | 'dark'
+/** « system » suit le réglage clair/sombre de l’appareil. */
+export type ThemePreference = 'light' | 'dark' | 'system'
 export type UserWritingMode = 'standard' | 'informal'
 /**
  * Langue et registre d’écriture des réponses, réunis en un seul choix pour éviter les combinaisons contradictoires.

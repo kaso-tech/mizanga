@@ -142,6 +142,12 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     setConversations((current) => current.filter((conversation) => conversation.id !== conversationId))
   }
 
+  const clearAll = () => {
+    controllerRef.current?.abort()
+    setActiveId(undefined)
+    setConversations([])
+  }
+
   const toggleFavorite = (conversationId: string) => {
     setConversations((current) => current.map((conversation) => (
       conversation.id === conversationId ? { ...conversation, favorite: !conversation.favorite } : conversation
@@ -167,6 +173,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     select,
     startNew,
     remove,
+    clearAll,
     toggleFavorite,
     rate,
   }
