@@ -1,8 +1,8 @@
-# Plan d’implémentation — Phase 1 de Mizanga
+# Plan d’implémentation — Mizanga
 
-## Moteur d’IA : Gemini (octobre 2026)
+## Moteur d’IA : Gemini via relais serveur (octobre 2026)
 
-Le moteur de réponses est Gemini (Google), via son offre gratuite, appelé par un petit relais serveur (`server/`) pour que la clé ne soit jamais exposée au navigateur. Sans clé configurée, l’application reste en démonstration. Les textes de l’interface (paramètres, À propos, mention sous la zone de saisie) indiquent le moteur actif et le fait que les messages transitent par Google. Prochaine étape : évaluer la qualité du mooré avec un jeu de test validé par des locuteurs, et envisager NLLB-200 (traduction) en relais si nécessaire.
+Le moteur de réponses est Gemini (Google), appelé par un relais Node dans `server/` afin que `GEMINI_API_KEY` ne soit jamais exposée au navigateur. La clé est une valeur secrète injectée uniquement à l’exécution ; elle n’est présente ni dans le code, ni dans Git, ni dans les ressources frontend. L’hébergement passe d’un site statique à un conteneur avec la capacité Manus `server:true`, activée sans base de données. Le `Dockerfile` compile le frontend puis exécute `server/index.mjs`, qui sert l’application et les routes `/api/*`; `/api/health` est la sonde non authentifiée. Les requêtes de conversation passent par `/api/chat`, sont limitées en taille et en fréquence, et restent transitoires : aucune conversation n’est persistée. Sans clé, l’application affiche explicitement le mode démonstration ; avec la clé configurée, le client détecte le relais et affiche Gemini comme moteur actif. Prochaine étape : évaluer la qualité du mooré avec un jeu de test validé par des locuteurs, et envisager NLLB-200 (traduction) en relais si nécessaire.
 
 ## Design actuel : prototype Lovable (octobre 2026)
 
@@ -31,13 +31,13 @@ Conséquences sur l’interface (elles remplacent la direction visuelle « Tissa
 
 ## Portée approuvée
 
-Cette première livraison est une interface web statique, responsive et interactive pour **Mizanga**. Elle rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité, sans prétendre qu’un moteur comprend le Mooré, sans persistance et sans service externe. Les intégrations IA, recherche, authentification, audio et base de connaissances restent matérialisées par des contrats et états explicitement indisponibles.
+Mizanga est une interface web responsive et interactive qui rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité. Le moteur Gemini est désormais accessible exclusivement par un relais serveur sécurisé, sans promesse de maîtrise linguistique du mooré et sans persistance des conversations. La recherche, l’authentification, l’audio, la base de connaissances et l’administration restent explicitement indisponibles.
 
 ## Choix d’implémentation
 
-- **Socle :** React, TypeScript et Vite. Le site est servi en développement sur le port Manus prévu et compilé comme frontend statique.
-- **État local :** composants React et données de démonstration typées ; aucun appel réseau, aucune clé et aucune donnée utilisateur conservée entre deux chargements.
-- **Architecture évolutive :** les types `Conversation`, `ChatMessage`, `LinguisticPreferences`, `AiService` et `ResearchService` isolent les futurs branchements ; les implémentations de phase 1 renvoient seulement un état « non connecté ».
+- **Socle :** React, TypeScript et Vite côté client, avec un serveur Node minimal de production. Le conteneur construit `dist/`, sert les ressources et relaie les appels Gemini.
+- **État local :** composants React, préférences locales et conversations en mémoire ; les demandes Gemini transitent sans stockage applicatif.
+- **Architecture évolutive :** les types `Conversation`, `ChatMessage`, `LinguisticPreferences`, `AiService` et `ResearchService` isolent les branchements. `remoteAiService` parle au relais local `/api/chat`, tandis que `demoAiService` reste le repli transparent si le moteur est indisponible.
 - **Accessibilité :** HTML sémantique, contrôles avec libellés, focus visible, zones tactiles de 44 px minimum, contrastes élevés, respect des diacritiques du Mooré.
 - **Images :** le produit est une interface conversationnelle ; aucun visuel décoratif externe n’est requis. Le signe de marque est vectoriel/CSS pour rester léger et net sur mobile.
 
@@ -103,6 +103,8 @@ src/
   main.tsx          # point d’entrée
 public/
   manus-routes.json # manifeste des routes publiques
+server/             # relais Gemini, validation et sonde de santé
+Dockerfile           # build et démarrage du conteneur de production
 plan.md             # décision de phase 1
 TODO.md             # résultats à livrer et leur état
 ```
@@ -114,6 +116,6 @@ Les contrats seront centralisés et sans fournisseur imposé : une future implé
 ## Limites explicites de cette phase
 
 - Pas d’authentification, de compte, de stockage permanent, d’administration ni de RLS.
-- Pas de moteur IA, de recherche web, de traduction, de dictée, de synthèse vocale ou de lecture audio.
+- Gemini est un moteur généraliste : son exactitude en mooré reste à évaluer avec des locuteurs. Pas de recherche web, de traduction spécialisée, de dictée, de synthèse vocale ou de lecture audio.
 - Pas de sources, citations, corrections ou traductions fictives.
 - Les préférences et retours sont manipulables pour démontrer l’ergonomie, mais ne sont pas enregistrés durablement.

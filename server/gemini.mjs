@@ -60,6 +60,7 @@ function errorForStatus(status) {
   if (status === 429) return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte pour le moment. Réessayez dans quelques minutes.', 429)
   if (status === 400 || status === 404) return new UpstreamError('Le moteur a refusé la demande (modèle ou paramètres invalides).', 502)
   if (status === 401 || status === 403) return new UpstreamError('Le moteur n’est pas correctement configuré (clé d’API refusée).', 502)
+  if (status === 503) return new UpstreamError('Le moteur est momentanément indisponible. Réessayez plus tard.', 503)
   return new UpstreamError('Le moteur est momentanément indisponible. Réessayez plus tard.', 502)
 }
 

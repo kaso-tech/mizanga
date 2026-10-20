@@ -51,7 +51,7 @@ src/
   components/   Barre latérale, en-tête, conversation, zone de saisie, paramètres…
   data/         Libellés, suggestions et caractères du mooré
   domain/       Types et contrats des services (IA, recherche, stockage, voix, administration)
-  services/     Adaptateur de démonstration du moteur d’IA
+  services/     Adaptateurs de démonstration et de relais du moteur d’IA
   styles/       Feuille de style unique et jetons de design
   test/         Configuration des tests
 public/         Favicon et manifeste des routes (manus-routes.json)
@@ -86,12 +86,10 @@ Pour changer de fournisseur, il suffit d’un autre `AiService` (contrat dans `s
 ## Déploiement
 
 - **Développement :** environnement Manus, avec `pnpm dev` ; la clé se configure dans les secrets de l’environnement (`GEMINI_API_KEY`).
-- **Production (prévue sur Render) :** un **Web Service** Node (et non un site statique, puisque l’API doit tourner côté serveur) :
-  - Build : `corepack enable && pnpm install --frozen-lockfile && pnpm build`
-  - Start : `pnpm start`
-  - Variables : `GEMINI_API_KEY` (et éventuellement `GEMINI_MODEL`) ; Render fournit `PORT`.
+- **Production Manus :** un conteneur Node, et non un site statique, car l’API doit rester côté serveur. Le `Dockerfile` active pnpm, installe le verrouillé, construit `dist/`, puis lance `server/index.mjs` avec `pnpm start`. La sonde `/api/health` est publique et ne révèle pas la clé.
+- **Variables :** `GEMINI_API_KEY` (et éventuellement `GEMINI_MODEL`) sont des secrets injectés à l’exécution ; `PORT` est fourni par l’hébergement. La clé ne doit jamais être placée dans un fichier versionné ou dans une variable `VITE_*`.
 
-  Le serveur sert aussi les routes de l’application (`/parametres`…) et met en cache les fichiers de `dist/assets`.
+Le serveur sert aussi les routes de l’application (`/parametres`…) et met en cache les fichiers de `dist/assets`.
 
 ## Principes du projet
 
