@@ -1,8 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AiService } from '../domain/services'
 import { App } from './App'
+import { createBackup } from './conversationStorage'
 
 const instantService: AiService = {
   isDemonstration: true,
@@ -69,7 +70,7 @@ describe('App', () => {
 
     const general = screen.getByRole('tab', { name: 'Général' })
     general.focus()
-    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}')
     const data = screen.getByRole('tab', { name: 'Conversations et données' })
     expect(data).toHaveAttribute('aria-selected', 'true')
     expect(window.location.hash).toBe('#donnees')
@@ -98,5 +99,59 @@ describe('App', () => {
 
     await userEvent.keyboard('{Control>}{Shift>}o{/Shift}{/Control}')
     expect(await screen.findByRole('heading', { name: /Comment puis-je vous aider/ })).toBeInTheDocument()
+  })
+
+  it('transmet les instructions personnelles enregistrées au moteur', async () => {
+    const requests: Array<{ customInstructions: string }> = []
+    const recording: AiService = {
+      ...instantService,
+      async *generate(request) {
+        requests.push({ customInstructions: request.preferences.customInstructions })
+        yield { text: 'ok' }
+      },
+    }
+    window.history.replaceState({}, '', '/parametres#personnalisation')
+    render(<App aiService={recording} />)
+    const field = await screen.findByRole('textbox', { name: 'Instructions personnelles' })
+    await userEvent.type(field, 'Réponds brièvement.')
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+    expect(JSON.parse(localStorage.getItem('mizanga.preferences.v1') ?? '{}').customInstructions).toBe('Réponds brièvement.')
+
+    await userEvent.click(screen.getAllByRole('button', { name: /Nouvelle conversation/ })[0])
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
+    await screen.findByText('ok')
+    expect(requests).toEqual([{ customInstructions: 'Réponds brièvement.' }])
+  })
+
+  it('restaure une sauvegarde sans dupliquer les conversations', async () => {
+    renderApp('/parametres#donnees')
+    const backup = createBackup([{ id: 'c1', title: 'Sauvegardée', createdAt: '2026-10-20T10:00:00.000Z', updatedAt: '2026-10-20T10:00:00.000Z', messages: [{ id: 'm1', role: 'user', content: 'Bonjour', createdAt: '2026-10-20T10:00:00.000Z' }] }])
+    const input = await screen.findByLabelText('Fichier de sauvegarde')
+    await userEvent.upload(input, new File([backup], 'sauvegarde.json', { type: 'application/json' }))
+    expect(await screen.findByText(/1 conversation ajoutée/)).toBeInTheDocument()
+    expect(screen.getByText('1 conversation')).toBeInTheDocument()
+    expect(screen.getAllByText('Sauvegardée').length).toBeGreaterThan(0)
+
+    await userEvent.upload(input, new File([backup], 'sauvegarde.json', { type: 'application/json' }))
+    expect(await screen.findByText(/déjà à jour/)).toBeInTheDocument()
+  })
+
+  it('lit une réponse à voix haute et arrête la lecture', async () => {
+    const speak = vi.fn()
+    const cancel = vi.fn()
+    vi.stubGlobal('speechSynthesis', { speak, cancel, getVoices: () => [], addEventListener: vi.fn(), removeEventListener: vi.fn() })
+    vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(public text: string) {} })
+    try {
+      renderApp()
+      await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
+      await userEvent.click(await screen.findByRole('button', { name: 'Écouter la réponse' }))
+      expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: 'Réponse de test' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Arrêter la lecture' }))
+      expect(cancel).toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Écouter la réponse' })).toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

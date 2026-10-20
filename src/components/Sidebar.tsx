@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Brand } from './Brand'
 import { downloadConversation } from '../app/exportConversation'
 import type { AppView, Conversation } from '../domain/types'
+import { searchConversations } from '../app/searchConversations'
 
 interface SidebarProps {
   activeView: AppView
@@ -54,10 +55,7 @@ export function Sidebar({
     }
   }, [isOpen])
 
-  const normalizedQuery = query.trim().toLocaleLowerCase('fr')
-  const visibleConversations = conversations.filter((conversation) => (
-    (!onlyFavorites || conversation.favorite) && (conversation.title ?? '').toLocaleLowerCase('fr').includes(normalizedQuery)
-  ))
+  const visibleConversations = searchConversations(conversations, query).filter((conversation) => !onlyFavorites || conversation.favorite)
   const emptyMessage = conversations.length === 0 ? 'Aucune conversation pour l’instant.' : onlyFavorites ? 'Aucun favori.' : 'Aucun résultat.'
 
   return (
@@ -79,7 +77,7 @@ export function Sidebar({
           </button>
           <label className="sidebar-search">
             <Search size={16} aria-hidden="true" />
-            <span className="visually-hidden">Rechercher dans l’historique</span>
+            <span className="visually-hidden">Rechercher dans les conversations</span>
             <input type="search" value={query} placeholder="Rechercher dans l’historique" onChange={(event) => setQuery(event.target.value)} />
           </label>
           <div className="filter-tabs" role="group" aria-label="Filtrer les conversations">

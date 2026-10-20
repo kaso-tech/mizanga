@@ -29,6 +29,9 @@ interface ChatViewProps {
   onEditLastMessage: (content: string) => void
   onRate: (message: ChatMessageType, rating: MessageRating) => void
   onReport: (message: ChatMessageType, selectedPassage: string) => void
+  /** Lecture à voix haute ; absent quand elle est désactivée ou non prise en charge. */
+  onSpeak?: (message: ChatMessageType) => void
+  speakingMessageId?: string
 }
 
 export function ChatView({
@@ -45,6 +48,8 @@ export function ChatView({
   onEditLastMessage,
   onRate,
   onReport,
+  onSpeak,
+  speakingMessageId,
 }: ChatViewProps) {
   const isEmpty = messages.length === 0
   const lastMessage = messages.at(-1)
@@ -131,6 +136,8 @@ export function ChatView({
             onRegenerate={onRegenerate}
             onRate={onRate}
             onReport={onReport}
+            onSpeak={onSpeak}
+            isSpeaking={speakingMessageId === message.id}
           />
         ))}
         {isGenerating && !isStreaming && (

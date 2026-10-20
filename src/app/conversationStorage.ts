@@ -37,41 +37,82 @@ function readMessage(value: unknown): ChatMessage | null {
   }
 }
 
+/** Valide une liste de conversations (enregistrement local ou sauvegarde importée) ; toute entrée illisible est ignorée. */
+export function parseConversations(stored: unknown): Conversation[] {
+  if (!Array.isArray(stored)) return []
+  return stored.flatMap((value): Conversation[] => {
+    const conversation = value as Partial<Conversation> | null
+    if (!conversation || !isString(conversation.id) || !Array.isArray(conversation.messages) || !isString(conversation.createdAt) || !isString(conversation.updatedAt)) return []
+    const messages = conversation.messages.map(readMessage).filter((message): message is ChatMessage => message !== null)
+    if (messages.length === 0) return []
+    return [{
+      id: conversation.id,
+      title: isString(conversation.title) ? conversation.title : undefined,
+      favorite: conversation.favorite === true,
+      messages,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    }]
+  })
+}
+
 /** Conversations enregistrées sur cet appareil ; toute donnée illisible est ignorée plutôt que de bloquer l’application. */
 export function loadConversations(): Conversation[] {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown
-    if (!Array.isArray(stored)) return []
-    return stored.flatMap((value): Conversation[] => {
-      const conversation = value as Partial<Conversation> | null
-      if (!conversation || !isString(conversation.id) || !Array.isArray(conversation.messages) || !isString(conversation.createdAt) || !isString(conversation.updatedAt)) return []
-      const messages = conversation.messages.map(readMessage).filter((message): message is ChatMessage => message !== null)
-      if (messages.length === 0) return []
-      return [{
-        id: conversation.id,
-        title: isString(conversation.title) ? conversation.title : undefined,
-        favorite: conversation.favorite === true,
-        messages,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt,
-      }]
-    })
+    return parseConversations(JSON.parse(localStorage.getItem(storageKey) ?? '[]'))
   } catch {
     return []
   }
+}
+
+const withoutFileContents = (conversations: Conversation[]) => conversations.map((conversation) => ({
+  ...conversation,
+  messages: conversation.messages.map((message) => (
+    message.attachments ? { ...message, attachments: message.attachments.map(({ data: _data, ...meta }) => meta) } : message
+  )),
+}))
+
+const backupFormat = 'mizanga-conversations'
+
+/** Fichier de sauvegarde de l’historique (JSON), sans le contenu des fichiers joints. */
+export function createBackup(conversations: Conversation[], now = new Date()): string {
+  return JSON.stringify({ format: backupFormat, version: 1, exportedAt: now.toISOString(), conversations: withoutFileContents(conversations) }, null, 2)
+}
+
+/** Lit un fichier de sauvegarde ; renvoie null s’il ne vient pas de Mizanga ou est illisible. */
+export function readBackup(text: string): Conversation[] | null {
+  try {
+    const backup = JSON.parse(text) as { format?: unknown; conversations?: unknown } | null
+    if (backup?.format !== backupFormat || !Array.isArray(backup.conversations)) return null
+    return parseConversations(backup.conversations)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Ajoute les conversations importées à l’historique. Une conversation déjà présente n’est remplacée
+ * que si la version importée est plus récente.
+ */
+export function mergeConversations(current: Conversation[], imported: Conversation[]): { conversations: Conversation[]; added: number; updated: number } {
+  const byId = new Map(current.map((conversation) => [conversation.id, conversation]))
+  let added = 0
+  let updated = 0
+  for (const conversation of imported) {
+    const existing = byId.get(conversation.id)
+    if (!existing) added++
+    else if (conversation.updatedAt > existing.updatedAt) updated++
+    else continue
+    byId.set(conversation.id, conversation)
+  }
+  return { conversations: [...byId.values()], added, updated }
 }
 
 /** Renvoie false si l’enregistrement a échoué (stockage plein ou indisponible). */
 export function saveConversations(conversations: Conversation[]): boolean {
   try {
     // Le contenu des fichiers joints (souvent volumineux) n’est pas enregistré, seulement leur nom.
-    const withoutFileContents = conversations.map((conversation) => ({
-      ...conversation,
-      messages: conversation.messages.map((message) => (
-        message.attachments ? { ...message, attachments: message.attachments.map(({ data: _data, ...meta }) => meta) } : message
-      )),
-    }))
-    localStorage.setItem(storageKey, JSON.stringify(withoutFileContents))
+    localStorage.setItem(storageKey, JSON.stringify(withoutFileContents(conversations)))
     return true
   } catch {
     return false

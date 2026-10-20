@@ -14,11 +14,14 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Recherche web à la demande : la réponse cite ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
 - Messages vocaux (2 minutes au plus, convertis en WAV 16 kHz) et fichiers audio ; la compréhension du mooré parlé n’est pas encore garantie.
 - Conversations renommables, exportables en Markdown et réponses partageables (WhatsApp, SMS…) via le partage du téléphone.
+- **Instructions personnelles** (Paramètres › Personnalisation) : métier, région, ton ou longueur de réponse préférés, pris en compte dans toutes les conversations (1 500 caractères au plus, placés après les règles de Mizanga).
+- **Lecture à voix haute** des réponses avec la synthèse vocale de l’appareil (vitesse et voix réglables, sans envoi de données) ; aucune voix mooré n’existe encore, l’interface le signale.
 - **Outil d’évaluation du mooré** (`/evaluation`, aussi dans Paramètres › Langue et écriture) : importer des questions préparées par des locuteurs (CSV), obtenir les réponses une à une en respectant le quota, les noter et exporter les résultats pour Excel.
 - Clavier des caractères du mooré (ɛ ɩ ʋ ã ẽ ĩ õ ũ Ɛ Ɩ Ʋ) inséré au curseur ; le texte saisi n’est jamais normalisé.
-- Historique avec recherche, favoris et suppression, enregistré sur l’appareil (désactivable dans les paramètres, par exemple sur un appareil partagé).
+- Historique avec recherche dans les titres et le contenu des messages, favoris et suppression, enregistré sur l’appareil (désactivable dans les paramètres, par exemple sur un appareil partagé).
+- Sauvegarde de l’historique dans un fichier JSON et restauration sur un autre appareil, sans doublons (Paramètres › Conversations et données).
 - Avis sur les réponses et signalement d’erreurs en mooré (préparés localement, pas encore envoyés).
-- Paramètres : thème clair, sombre ou système, langue et écriture, données, voix et compte (ces deux dernières sections arrivent bientôt).
+- Paramètres : général (thème, installation), personnalisation, langue et écriture, données, voix, et compte (à venir).
 - Accessible au clavier et aux lecteurs d’écran, utilisable sur téléphone, tablette et ordinateur.
 - Installable comme une application (PWA) sur Android, iPhone et ordinateur ; l’interface et l’historique s’ouvrent hors connexion (les réponses du moteur demandent le réseau).
 

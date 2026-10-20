@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { Check, CheckCheck, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { formatSize, isAudio, isImage } from '../app/attachments'
 import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
@@ -147,9 +147,11 @@ interface ChatMessageProps {
   onRegenerate: () => void
   onRate: (message: ChatMessageType, rating: MessageRating) => void
   onReport: (message: ChatMessageType, selectedPassage: string) => void
+  onSpeak?: (message: ChatMessageType) => void
+  isSpeaking?: boolean
 }
 
-export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport }: ChatMessageProps) {
+export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false }: ChatMessageProps) {
   // Le passage sélectionné dans la réponse pré-remplit le formulaire de signalement.
   const [selectedPassage, setSelectedPassage] = useState('')
 
@@ -186,6 +188,11 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
             <button type="button" onClick={() => onCopy(message)} aria-label={isCopied ? 'Copié' : 'Copier'} title={isCopied ? 'Copié' : 'Copier'}>
               {isCopied ? <Check size={16} /> : <Copy size={16} />}
             </button>
+            {onSpeak && (
+              <button type="button" className={isSpeaking ? 'is-active' : ''} aria-pressed={isSpeaking} onClick={() => onSpeak(message)} aria-label={isSpeaking ? 'Arrêter la lecture' : 'Écouter la réponse'} title={isSpeaking ? 'Arrêter la lecture' : 'Écouter'}>
+                {isSpeaking ? <Square size={14} fill="currentColor" /> : <Volume2 size={16} />}
+              </button>
+            )}
             {canShare() && (
               <button type="button" onClick={() => void shareReply(message)} aria-label="Partager la réponse" title="Partager (WhatsApp, SMS…)"><Share2 size={16} /></button>
             )}

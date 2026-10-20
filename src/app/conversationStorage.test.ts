@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Conversation } from '../domain/types'
-import { clearStoredConversations, loadConversations, saveConversations } from './conversationStorage'
+import { clearStoredConversations, createBackup, loadConversations, mergeConversations, readBackup, saveConversations } from './conversationStorage'
 
 const conversation: Conversation = {
   id: 'c1',
@@ -44,5 +44,30 @@ describe('conversationStorage', () => {
     saveConversations([withFile])
     expect(localStorage.getItem('mizanga.conversations.v1')).not.toContain('AAAA')
     expect(loadConversations()[0].messages[0].attachments).toEqual([{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 2048 }])
+  })
+
+  it('crée une sauvegarde relisible, sans le contenu des fichiers joints', () => {
+    const withFile: Conversation = { ...conversation, messages: [{ ...conversation.messages[0], attachments: [{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 10, data: 'AAAA' }] }] }
+    const backup = createBackup([withFile], new Date('2026-10-20T12:00:00Z'))
+    expect(backup).not.toContain('AAAA')
+    const [restored] = readBackup(backup) ?? []
+    expect(restored.title).toBe('Bonjour ɛ')
+    expect(restored.messages[0].attachments).toEqual([{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 10 }])
+  })
+
+  it('refuse un fichier qui n’est pas une sauvegarde de Mizanga', () => {
+    expect(readBackup('pas du JSON')).toBeNull()
+    expect(readBackup(JSON.stringify([conversation]))).toBeNull()
+  })
+
+  it('fusionne une sauvegarde : ajoute les nouvelles conversations, ne remplace que par plus récent', () => {
+    const older = { ...conversation, title: 'Ancien', updatedAt: '2026-10-19T00:00:00.000Z' }
+    const newer = { ...conversation, title: 'Récent', updatedAt: '2026-10-21T00:00:00.000Z' }
+    const other = { ...conversation, id: 'c2' }
+    expect(mergeConversations([conversation], [older, other])).toMatchObject({ added: 1, updated: 0 })
+    expect(mergeConversations([conversation], [older]).conversations[0].title).toBe('Bonjour ɛ')
+    const merged = mergeConversations([conversation], [newer])
+    expect(merged).toMatchObject({ added: 0, updated: 1 })
+    expect(merged.conversations[0].title).toBe('Récent')
   })
 })

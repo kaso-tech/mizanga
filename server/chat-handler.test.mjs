@@ -2,7 +2,7 @@
 import { createServer } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApiHandler } from './chat-handler.mjs'
-import { nextMidnight, quotaResetTime } from './gemini.mjs'
+import { buildSystemInstruction, nextMidnight, quotaResetTime } from './gemini.mjs'
 
 /** @type {{ status: number, events: unknown[], body?: unknown }} */
 let upstreamReply = { status: 200, events: [] }
@@ -195,5 +195,17 @@ describe('API Mizanga', () => {
     upstreamReply = { status: 200, events: [textEvent('ok')] }
     await (await post(base, validBody)).text()
     expect(lastUpstreamRequest.body.tools).toBeUndefined()
+  })
+
+  it('ajoute les instructions personnelles, bornées et après les règles de Mizanga', async () => {
+    upstreamReply = { status: 200, events: [textEvent('ok')] }
+    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase })
+    await (await post(base, { ...validBody, preferences: { ...validBody.preferences, customInstructions: `  Je suis enseignant à Koudougou.${'x'.repeat(2000)}` } })).text()
+    const instruction = lastUpstreamRequest.body.systemInstruction.parts[0].text
+    expect(instruction).toContain('Instructions personnelles de l’utilisateur')
+    expect(instruction).toContain('Je suis enseignant à Koudougou.')
+    expect(instruction.indexOf('ne prétends jamais maîtriser')).toBeLessThan(instruction.indexOf('Je suis enseignant'))
+    expect(instruction.length).toBeLessThan(buildSystemInstruction(validBody.preferences).length + 1700)
+    expect(buildSystemInstruction({ customInstructions: '   ' })).not.toContain('Instructions personnelles')
   })
 })

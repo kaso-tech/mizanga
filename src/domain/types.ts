@@ -16,6 +16,14 @@ export interface LinguisticPreferences {
   responseLanguage: ResponseLanguage
   userWritingMode: UserWritingMode
   theme: ThemePreference
+  /** Ce que Mizanga doit savoir sur l’utilisateur et sa façon de répondre ; transmis au moteur avec chaque demande. */
+  customInstructions: string
+  /** Affiche le bouton « Écouter » sous les réponses (synthèse vocale du navigateur). */
+  readAloud: boolean
+  /** Vitesse de lecture à voix haute (1 = normale). */
+  speechRate: number
+  /** Voix choisie parmi celles de l’appareil ; vide : une voix française si possible. */
+  voiceName: string
 }
 
 /** streaming : en cours de génération ; stopped : interrompue par l’utilisateur ; error : échec du service. */
@@ -89,4 +97,8 @@ export const defaultPreferences: LinguisticPreferences = {
   responseLanguage: 'auto',
   userWritingMode: 'standard',
   theme: 'light',
+  customInstructions: '',
+  readAloud: true,
+  speechRate: 1,
+  voiceName: '',
 }

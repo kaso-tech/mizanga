@@ -15,6 +15,7 @@ const MAX_MESSAGE_CHARS = 32_000
 const RATE_LIMIT = { windowMs: 60_000, maxRequests: 20 }
 const RESPONSE_LANGUAGES = new Set(['auto', 'moore-standard', 'moore-informal', 'french', 'english'])
 const WRITING_MODES = new Set(['standard', 'informal'])
+export const MAX_CUSTOM_INSTRUCTIONS_CHARS = 1500
 
 /** @param {import('node:http').ServerResponse} res @param {number} status @param {unknown} body */
 function sendJson(res, status, body) {
@@ -69,6 +70,7 @@ export function validateChatRequest(body) {
     preferences: {
       responseLanguage: RESPONSE_LANGUAGES.has(preferences.responseLanguage) ? preferences.responseLanguage : 'auto',
       userWritingMode: WRITING_MODES.has(preferences.userWritingMode) ? preferences.userWritingMode : 'standard',
+      customInstructions: typeof preferences.customInstructions === 'string' ? preferences.customInstructions.trim().slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS) : '',
     },
   }
 }

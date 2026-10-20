@@ -31,13 +31,18 @@ export function exportFileName(conversation: Conversation) {
   return `mizanga-${base || 'conversation'}.md`
 }
 
-export function downloadConversation(conversation: Conversation) {
-  const url = URL.createObjectURL(new Blob([conversationToMarkdown(conversation)], { type: 'text/markdown;charset=utf-8' }))
+/** Télécharge un fichier produit dans le navigateur. */
+export function downloadFile(fileName: string, content: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }))
   const link = document.createElement('a')
   link.href = url
-  link.download = exportFileName(conversation)
+  link.download = fileName
   document.body.append(link)
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export function downloadConversation(conversation: Conversation) {
+  downloadFile(exportFileName(conversation), conversationToMarkdown(conversation), 'text/markdown;charset=utf-8')
 }

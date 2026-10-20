@@ -8,8 +8,11 @@ import type { AiService } from '../domain/services'
 import { responseLanguageLabels } from '../data/content'
 import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
 import { demoAiService } from '../services/demoAiService'
-import { MAX_MESSAGE_CHARS } from '../services/remoteAiService'
+import { MAX_CUSTOM_INSTRUCTIONS_CHARS, MAX_MESSAGE_CHARS } from '../services/remoteAiService'
 import { prepareAttachments } from './attachments'
+import { createBackup, readBackup } from './conversationStorage'
+import { downloadFile } from './exportConversation'
+import { isSpeechSupported, speak, speechRates, stopSpeaking } from './speech'
 import { useConversation } from './useConversation'
 
 // Pages secondaires chargées à la demande : l’accueil s’affiche plus vite sur réseau mobile.
@@ -95,6 +98,10 @@ function loadPreferences(): LinguisticPreferences {
       ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
       ...(stored.theme === 'light' || stored.theme === 'dark' || stored.theme === 'system' ? { theme: stored.theme } : {}),
       ...(typeof stored.saveConversations === 'boolean' ? { saveConversations: stored.saveConversations } : {}),
+      ...(typeof stored.customInstructions === 'string' ? { customInstructions: stored.customInstructions.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS) } : {}),
+      ...(typeof stored.readAloud === 'boolean' ? { readAloud: stored.readAloud } : {}),
+      ...(typeof stored.speechRate === 'number' && speechRates.includes(stored.speechRate) ? { speechRate: stored.speechRate } : {}),
+      ...(typeof stored.voiceName === 'string' ? { voiceName: stored.voiceName } : {}),
     }
   } catch {
     return defaultPreferences
@@ -102,6 +109,14 @@ function loadPreferences(): LinguisticPreferences {
 }
 
 type ToastTone = 'success' | 'info'
+
+/** FileReader plutôt que `file.text()`, absent des navigateurs anciens. */
+const readTextFile = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result ?? ''))
+  reader.onerror = () => reject(reader.error)
+  reader.readAsText(file)
+})
 
 interface AppProps {
   /** Fournisseur d’IA injecté : remplacer l’adaptateur de démonstration ne touche pas l’interface. */
@@ -130,6 +145,7 @@ export function App({ aiService = demoAiService }: AppProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
   const [reportedPassage, setReportedPassage] = useState('')
+  const [speakingMessageId, setSpeakingMessageId] = useState<string>()
   const isMobile = useIsMobileLayout()
   // La démonstration fonctionne sans réseau ; un vrai moteur, non.
   const isOffline = !useIsOnline() && !aiService.isDemonstration
@@ -190,6 +206,45 @@ export function App({ aiService = demoAiService }: AppProps) {
 
   const updatePreferences = (changes: Partial<LinguisticPreferences>) => {
     setPreferences((current) => ({ ...current, ...changes }))
+  }
+
+  // La lecture à voix haute s’arrête quand on change de conversation ou de page.
+  const activeConversationId = conversation.activeConversation?.id
+  useEffect(() => {
+    stopSpeaking()
+    setSpeakingMessageId(undefined)
+  }, [activeConversationId, activeView])
+
+  const toggleSpeech = (message: ChatMessage) => {
+    if (speakingMessageId === message.id) {
+      stopSpeaking()
+      setSpeakingMessageId(undefined)
+      return
+    }
+    setSpeakingMessageId(message.id)
+    speak(message.content, {
+      rate: preferences.speechRate,
+      voiceName: preferences.voiceName,
+      onEnd: () => setSpeakingMessageId((current) => (current === message.id ? undefined : current)),
+    })
+  }
+
+  const exportConversations = () => {
+    downloadFile(`mizanga-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`, createBackup(conversation.conversations), 'application/json')
+    notify('Sauvegarde téléchargée. Le contenu des fichiers joints n’y figure pas.', 'success')
+  }
+
+  const importConversations = async (file: File) => {
+    const imported = readBackup(await readTextFile(file).catch(() => ''))
+    if (!imported) {
+      notify('Ce fichier n’est pas une sauvegarde de Mizanga lisible.')
+      return
+    }
+    const { added, updated } = conversation.importConversations(imported)
+    const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? 's' : ''}`
+    notify(added + updated === 0
+      ? 'Aucune nouvelle conversation dans cette sauvegarde : votre historique est déjà à jour.'
+      : `Sauvegarde restaurée : ${plural(added, 'conversation ajoutée')}${updated ? `, ${plural(updated, 'mise')} à jour` : ''}.`, 'success')
   }
 
   const startNewConversation = () => {
@@ -333,6 +388,8 @@ export function App({ aiService = demoAiService }: AppProps) {
               setDraft('')
               notify('Toutes les conversations de cette session ont été supprimées.', 'success')
             }}
+            onExportConversations={exportConversations}
+            onImportConversations={(file) => void importConversations(file)}
           />
         )
       case 'evaluation':
@@ -355,6 +412,8 @@ export function App({ aiService = demoAiService }: AppProps) {
             onEditLastMessage={conversation.editLastUserMessage}
             onRate={rateMessage}
             onReport={openReport}
+            speakingMessageId={speakingMessageId}
+            onSpeak={preferences.readAloud && isSpeechSupported() ? toggleSpeech : undefined}
           />
         )
     }

@@ -1,14 +1,17 @@
-import { AudioLines, Database, Info, Languages, Monitor, Moon, SlidersHorizontal, Sun, UserRound, type LucideIcon } from 'lucide-react'
-import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
+import { AudioLines, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Upload, UserRound, type LucideIcon } from 'lucide-react'
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
+import { isSpeechSupported, listVoices, speak, speechRates, subscribeVoices } from '../app/speech'
+import { MAX_CUSTOM_INSTRUCTIONS_CHARS } from '../services/remoteAiService'
 import { isVoiceRecordingSupported } from '../app/voiceRecording'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
 import type { LinguisticPreferences, ResponseLanguage, ThemePreference, UserWritingMode } from '../domain/types'
 
-type SectionId = 'general' | 'langue' | 'donnees' | 'voix' | 'compte'
+type SectionId = 'general' | 'personnalisation' | 'langue' | 'donnees' | 'voix' | 'compte'
 
 const sections: Array<{ id: SectionId; label: string; description: string; icon: LucideIcon }> = [
   { id: 'general', label: 'Général', description: 'Apparence et langue de l’interface.', icon: SlidersHorizontal },
+  { id: 'personnalisation', label: 'Personnalisation', description: 'Ce que Mizanga doit savoir sur vous et la façon dont vous préférez qu’elle réponde.', icon: Sparkles },
   { id: 'langue', label: 'Langue et écriture', description: 'La langue de vos échanges avec Mizanga et votre façon d’écrire le mooré.', icon: Languages },
   { id: 'donnees', label: 'Conversations et données', description: 'Ce qui est conservé, où, et comment l’effacer.', icon: Database },
   { id: 'voix', label: 'Voix', description: 'Messages vocaux et lecture audio des réponses.', icon: AudioLines },
@@ -98,6 +101,103 @@ function SoonSwitch({ label }: { label: string }) {
   return <button type="button" role="switch" aria-checked="false" aria-label={`${label} — bientôt disponible`} className="switch" disabled />
 }
 
+const instructionExamples = [
+  'J’enseigne au primaire à Koudougou.',
+  'Réponds de façon courte, avec des exemples tirés de la vie au Burkina Faso.',
+  'Appelle-moi Awa et tutoie-moi.',
+]
+
+/** Instructions personnelles : brouillon local, enregistré seulement sur demande. */
+function CustomInstructions({ value, isDemonstration, onSave }: { value: string; isDemonstration: boolean; onSave: (value: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  const isDirty = draft.trim() !== value.trim()
+  return (
+    <div className="setting-group instructions-group">
+      <label className="setting-label" htmlFor="setting-custom-instructions">Instructions personnelles</label>
+      <p className="setting-description">
+        Votre métier, votre région, le ton ou la longueur de réponse que vous préférez… Mizanga en tient compte dans toutes les conversations.
+        {isDemonstration ? ' Elles seront utilisées dès qu’un moteur d’IA sera connecté.' : ' Elles sont envoyées avec chaque message, comme le reste de la conversation : n’y mettez pas d’informations sensibles.'}
+      </p>
+      <textarea
+        id="setting-custom-instructions"
+        className="instructions-input"
+        rows={6}
+        maxLength={MAX_CUSTOM_INSTRUCTIONS_CHARS}
+        value={draft}
+        placeholder={`Par exemple :\n${instructionExamples.map((example) => `• ${example}`).join('\n')}`}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="instructions-footer">
+        <span className="char-count" aria-live="polite">{draft.length} / {MAX_CUSTOM_INSTRUCTIONS_CHARS}</span>
+        <span className="confirm-actions">
+          {value && <button type="button" className="secondary-button" onClick={() => { setDraft(''); onSave('') }}>Effacer</button>}
+          <button type="button" className="primary-button" disabled={!isDirty} onClick={() => onSave(draft.trim())}>Enregistrer</button>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Voix de l’appareil, mises à jour quand le navigateur finit de les charger. */
+function useVoices() {
+  const [voices, setVoices] = useState(listVoices)
+  useEffect(() => subscribeVoices(() => setVoices(listVoices())), [])
+  return voices
+}
+
+function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPreferences; onChange: (changes: Partial<LinguisticPreferences>) => void }) {
+  const voices = useVoices()
+  const supported = isSpeechSupported()
+  const unavailable = supported ? undefined : 'Votre navigateur ne propose pas la lecture à voix haute.'
+  return (
+    <>
+      <div className="setting-group">
+        <SettingRow
+          label="Messages vocaux"
+          description="Touchez le micro de la zone de saisie pour parler à Mizanga (2 minutes au plus). La compréhension du mooré parlé n’est pas encore garantie : le français est mieux compris pour l’instant."
+        >
+          <span className="value-pill">{isVoiceRecordingSupported() ? 'Disponible' : 'Non pris en charge ici'}</span>
+        </SettingRow>
+        <SettingRow label="Lecture audio des réponses" htmlFor="setting-read-aloud" description={unavailable ?? 'Affiche le bouton « Écouter » sous chaque réponse. La lecture se fait sur votre appareil, sans envoi de données.'}>
+          {supported ? <Switch id="setting-read-aloud" checked={preferences.readAloud} onChange={(readAloud) => onChange({ readAloud })} /> : <span className="value-pill">Non pris en charge ici</span>}
+        </SettingRow>
+        <SettingRow label="Vitesse de lecture" htmlFor="setting-voice-speed">
+          <SelectControl
+            id="setting-voice-speed"
+            value={String(preferences.speechRate)}
+            disabled={!supported || !preferences.readAloud}
+            options={speechRates.map((rate) => ({ value: String(rate), label: rate === 1 ? 'Normale' : `× ${rate.toLocaleString('fr')}` }))}
+            onChange={(rate) => onChange({ speechRate: Number(rate) })}
+          />
+        </SettingRow>
+        <SettingRow label="Voix" htmlFor="setting-voice-variety" description="Les voix disponibles dépendent de votre appareil.">
+          <span className="confirm-actions">
+            <SelectControl
+              id="setting-voice-variety"
+              value={preferences.voiceName}
+              disabled={!supported || !preferences.readAloud || voices.length === 0}
+              options={[{ value: '', label: 'Automatique (français)' }, ...voices.map((voice) => ({ value: voice.name, label: `${voice.name} — ${voice.lang}` }))]}
+              onChange={(voiceName) => onChange({ voiceName })}
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!supported || !preferences.readAloud}
+              onClick={() => speak('Bonjour, je suis Mizanga. Voici ma voix.', { rate: preferences.speechRate, voiceName: preferences.voiceName })}
+            >
+              <Play size={14} aria-hidden="true" /> Essayer
+            </button>
+          </span>
+        </SettingRow>
+      </div>
+      <p className="settings-callout">
+        <Info size={16} aria-hidden="true" />
+        <span>Aucune voix mooré n’existe encore sur les téléphones et ordinateurs : une réponse en mooré serait lue avec une prononciation approximative. Une voix mooré fait partie des prochaines étapes.</span>
+      </p>
+    </>
+  )
+}
+
 interface SettingsViewProps {
   preferences: LinguisticPreferences
   engine: { label: string; isDemonstration: boolean }
@@ -107,12 +207,15 @@ interface SettingsViewProps {
   onNewConversation: () => void
   onOpenEvaluation: () => void
   onClearConversations: () => void
+  onExportConversations: () => void
+  onImportConversations: (file: File) => void
 }
 
-export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onOpenEvaluation, onClearConversations }: SettingsViewProps) {
+export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onOpenEvaluation, onClearConversations, onExportConversations, onImportConversations }: SettingsViewProps) {
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection)
   const [confirmingClear, setConfirmingClear] = useState(false)
-  const tabRefs = useRef<Record<SectionId, HTMLButtonElement | null>>({ general: null, langue: null, donnees: null, voix: null, compte: null })
+  const tabRefs = useRef<Record<SectionId, HTMLButtonElement | null>>({ general: null, personnalisation: null, langue: null, donnees: null, voix: null, compte: null })
   const current = sections.find((section) => section.id === activeSection) ?? sections[0]
 
   const selectSection = (id: SectionId, focus = false) => {
@@ -197,6 +300,10 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
             </div>
           )}
 
+          {activeSection === 'personnalisation' && (
+            <CustomInstructions value={preferences.customInstructions} isDemonstration={engine.isDemonstration} onSave={(customInstructions) => onChange({ customInstructions })} />
+          )}
+
           {activeSection === 'langue' && (
             <>
               <div className="setting-group">
@@ -250,6 +357,24 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 <SettingRow label="Historique des conversations" description="Recherche, favoris et suppression depuis le menu latéral.">
                   <span className="value-pill">{conversationCount === 0 ? 'Aucune' : `${conversationCount} conversation${conversationCount > 1 ? 's' : ''}`}</span>
                 </SettingRow>
+                <SettingRow label="Sauvegarder l’historique" description="Télécharge vos conversations dans un fichier, pour les garder ou les transférer sur un autre appareil. Le contenu des fichiers joints n’y figure pas.">
+                  <button type="button" className="secondary-button" disabled={conversationCount === 0} onClick={onExportConversations}><Download size={14} aria-hidden="true" /> Exporter</button>
+                </SettingRow>
+                <SettingRow label="Restaurer une sauvegarde" description="Ajoute les conversations d’un fichier de sauvegarde de Mizanga à votre historique, sans effacer les autres.">
+                  <button type="button" className="secondary-button" onClick={() => importInputRef.current?.click()}><Upload size={14} aria-hidden="true" /> Importer</button>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    hidden
+                    aria-label="Fichier de sauvegarde"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) onImportConversations(file)
+                    }}
+                  />
+                </SettingRow>
                 <SettingRow
                   label="Vos messages et fichiers"
                   description={engine.isDemonstration
@@ -278,25 +403,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
             </>
           )}
 
-          {activeSection === 'voix' && (
-            <div className="setting-group">
-              <SettingRow
-                label="Messages vocaux"
-                description="Touchez le micro de la zone de saisie pour parler à Mizanga (2 minutes au plus). La compréhension du mooré parlé n’est pas encore garantie : le français est mieux compris pour l’instant."
-              >
-                <span className="value-pill">{isVoiceRecordingSupported() ? 'Disponible' : 'Non pris en charge ici'}</span>
-              </SettingRow>
-              <SettingRow label="Lecture audio des réponses" description={<>Écouter les réponses à voix haute. <span className="soon-badge">Bientôt</span></>}>
-                <SoonSwitch label="Lecture audio des réponses" />
-              </SettingRow>
-              <SettingRow label="Vitesse de lecture" htmlFor="setting-voice-speed" description="Disponible avec la lecture audio.">
-                <SelectControl id="setting-voice-speed" value="normal" options={[{ value: 'normal', label: 'Normale' }]} disabled onChange={() => undefined} />
-              </SettingRow>
-              <SettingRow label="Langue et variété vocale" htmlFor="setting-voice-variety" description="Disponible avec la lecture audio.">
-                <SelectControl id="setting-voice-variety" value="default" options={[{ value: 'default', label: 'Par défaut' }]} disabled onChange={() => undefined} />
-              </SettingRow>
-            </div>
-          )}
+          {activeSection === 'voix' && <VoiceSettings preferences={preferences} onChange={onChange} />}
 
           {activeSection === 'compte' && (
             <div className="setting-group">

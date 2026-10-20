@@ -439,6 +439,7 @@ button.close-drawer { display: none; }
 }
 .message-actions button:hover { color: var(--foreground); background: var(--accent); }
 .message-actions button.is-positive { color: var(--primary); }
+.message-actions button.is-active { color: var(--primary); background: var(--accent); }
 .message-actions button.is-negative { color: var(--destructive); }
 .label-short { display: none; }
 
@@ -642,6 +643,27 @@ button.close-drawer { display: none; }
 .setting-description { margin: 3px 0 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
 .setting-description .soon-badge { margin-left: 4px; vertical-align: 1px; }
 .setting-control { display: flex; align-items: center; justify-content: flex-end; flex: 0 0 auto; }
+.setting-control .secondary-button > svg { margin-right: 2px; vertical-align: -2px; }
+
+.instructions-group { gap: 6px; padding: 16px 0; }
+.instructions-input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.instructions-input:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
+.instructions-input::placeholder { color: var(--muted-foreground); }
+.instructions-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.char-count { color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .select-control { position: relative; display: inline-flex; }
 .select-control::after {

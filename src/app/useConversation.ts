@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AiServiceError, type AiService } from '../domain/services'
-import { clearStoredConversations, loadConversations, saveConversations } from './conversationStorage'
+import { clearStoredConversations, loadConversations, mergeConversations, saveConversations } from './conversationStorage'
 import type { Attachment, ChatMessage, Conversation, LinguisticPreferences, MessageRating } from '../domain/types'
 
 function createId(prefix: string) {
@@ -208,6 +208,13 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     setConversations([])
   }
 
+  /** Restaure une sauvegarde ; renvoie le nombre de conversations ajoutées et mises à jour. */
+  const importConversations = (imported: Conversation[]) => {
+    const result = mergeConversations(conversations, imported)
+    setConversations(result.conversations)
+    return { added: result.added, updated: result.updated }
+  }
+
   const rename = (conversationId: string, title: string) => {
     const trimmed = title.trim().slice(0, 80)
     if (!trimmed) return
@@ -241,6 +248,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     startNew,
     remove,
     clearAll,
+    importConversations,
     rename,
     toggleFavorite,
     rate,

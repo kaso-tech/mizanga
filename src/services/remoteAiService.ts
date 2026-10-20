@@ -28,6 +28,8 @@ function errorFrom(body: { error?: string; retryAt?: string } | null, status?: n
 
 /** Plafonds alignés sur le serveur (server/chat-handler.mjs). */
 export const MAX_MESSAGE_CHARS = 32_000
+/** Longueur maximale des instructions personnelles (même limite côté serveur). */
+export const MAX_CUSTOM_INSTRUCTIONS_CHARS = 1500
 const MAX_HISTORY_MESSAGES = 40
 const MAX_HISTORY_CHARS = 60_000
 /** Contenu des fichiers renvoyé au moteur : ceux des échanges les plus récents, dans ce budget. */
@@ -95,7 +97,7 @@ export function createRemoteAiService({ label, endpoint = '/api/chat' }: { label
           body: JSON.stringify({
             messages: selectHistory(messages),
             webSearch,
-            preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode },
+            preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode, customInstructions: preferences.customInstructions },
           }),
           signal,
         })
