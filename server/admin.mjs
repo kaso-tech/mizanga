@@ -77,7 +77,9 @@ export function createAdminAuth({ password, now = Date.now } = {}) {
     `${ADMIN_COOKIE}=${value ?? ''}`,
     'Path=/api',
     'HttpOnly',
-    'SameSite=Strict',
+    // Preview est rendu dans une iframe cross-site : SameSite=None est requis dans ce contexte.
+    // Secure est ajouté quand le proxy signale l’origine HTTPS publique.
+    'SameSite=None',
     `Max-Age=${value ? SESSION_MS / 1000 : 0}`,
     ...(isHttps(req) ? ['Secure'] : []),
   ].join('; ')

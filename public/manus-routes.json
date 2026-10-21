@@ -1,1 +1,1 @@
-{"routes": [{"path": "/", "title": "Conversation"}, {"path": "/historique", "title": "Historique"}, {"path": "/favoris", "title": "Favoris"}, {"path": "/parametres", "title": "Paramètres"}, {"path": "/a-propos", "title": "À propos"}]}
+{"routes": [{"path": "/", "title": "Conversation"}, {"path": "/historique", "title": "Historique"}, {"path": "/favoris", "title": "Favoris"}, {"path": "/parametres", "title": "Paramètres"}, {"path": "/a-propos", "title": "À propos"}, {"path": "/admin", "title": "Administration"}, {"path": "/evaluation", "title": "Évaluation du mooré"}]}

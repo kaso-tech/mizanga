@@ -265,11 +265,12 @@ describe('API Mizanga', () => {
     const base = await startApi({ adminPassword })
     expect((await fetch(`${base}/api/admin/overview`)).status).toBe(401)
 
-    const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https' }, body: JSON.stringify({ password: adminPassword }) })
     expect(response.status).toBe(200)
     const setCookie = response.headers.get('set-cookie') ?? ''
     expect(setCookie).toContain('HttpOnly')
-    expect(setCookie).toContain('SameSite=Strict')
+    expect(setCookie).toContain('SameSite=None')
+    expect(setCookie).toContain('Secure')
     expect(setCookie).toContain('Path=/api')
     const cookie = setCookie.split(';')[0]
 
