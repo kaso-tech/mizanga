@@ -15,5 +15,5 @@
     "checkJs": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "server/**/*.mjs"]
+  "include": ["vite.config.ts", "vitest.config.ts", "server/**/*.mjs", "supabase/**/*.mjs"]
 }

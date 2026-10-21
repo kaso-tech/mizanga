@@ -104,6 +104,14 @@ Le dossier `server/knowledge/moore/` contient la référence que le relais trans
 - Le serveur relit les fichiers modifiés en quelques secondes ; la référence est limitée à 24 000 caractères par demande.
 - La console d’administration (`/admin`) indique ce que contient la référence, la taille envoyée et les problèmes à corriger.
 
+## Base de données (Supabase) — espace Business, en cours
+
+Le schéma est dans `supabase/migrations/` : profils, entreprises et membres (propriétaire ou employé), produits, ventes et lignes de vente (prix d’achat figé au moment de la vente), journal des mouvements de stock, dépenses, consommation de l’IA, formules et abonnements (mode test). Les montants sont des entiers dans la devise de l’entreprise (XOF par défaut).
+
+- **Sécurité :** chaque table a des règles RLS (un commerçant ne voit et ne modifie que les données de ses entreprises) et des droits SQL limités par colonne. La quantité en stock, les ventes et les mouvements ne s’écrivent qu’à travers des fonctions contrôlées ; la consommation IA et les abonnements, que par le serveur.
+- **Tests :** `supabase/tests/` applique les migrations à une vraie base PostgreSQL en mémoire (PGlite), avec une simulation de ce que fournit Supabase (rôles, `auth.uid()`, droits par défaut), et vérifie l’isolement entre commerçants. Ils tournent avec `pnpm test` et dans la CI.
+- **Pas encore branché :** l’application n’utilise pas encore la base ; la connexion (e-mail, puis Google) arrive avec le projet Supabase de développement.
+
 ## Routes
 
 `/` (conversation), `/parametres`, `/a-propos`, `/historique`, `/favoris` ; `/admin` (console d’administration, non liée depuis l’interface). L’application est une SPA : en production, toute adresse inconnue doit renvoyer `index.html`.

@@ -7,7 +7,7 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
-      include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.mjs'],
+      include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.mjs', 'supabase/**/*.test.mjs'],
       restoreMocks: true,
     },
   }),
