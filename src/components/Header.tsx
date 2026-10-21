@@ -1,26 +1,21 @@
 import { ChevronDown, PanelLeft, Settings, UserRound } from 'lucide-react'
 import { responseLanguageLabels } from '../data/content'
 import type { ResponseLanguage } from '../domain/types'
-import { Brand } from './Brand'
 
 interface HeaderProps {
   isMenuOpen: boolean
-  showBrand: boolean
   responseLanguage: ResponseLanguage
   onToggleSidebar: () => void
   onResponseLanguageChange: (language: ResponseLanguage) => void
   onOpenSettings: () => void
-  onGoHome: () => void
 }
 
 export function Header({
   isMenuOpen,
-  showBrand,
   responseLanguage,
   onToggleSidebar,
   onResponseLanguageChange,
   onOpenSettings,
-  onGoHome,
 }: HeaderProps) {
   return (
     <header className="topbar">
@@ -34,11 +29,6 @@ export function Header({
         >
           <PanelLeft size={20} />
         </button>
-        {showBrand && (
-          <button type="button" className="topbar-brand" onClick={onGoHome} aria-label="Accueil Mizanga">
-            <Brand />
-          </button>
-        )}
       </div>
 
       <div className="topbar-actions">

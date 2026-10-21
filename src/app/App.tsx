@@ -523,12 +523,10 @@ export function App({ aiService = demoAiService }: AppProps) {
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header
           isMenuOpen={isMobile ? drawerOpen : !sidebarCollapsed}
-          showBrand={isMobile || sidebarCollapsed}
           responseLanguage={preferences.responseLanguage}
           onToggleSidebar={toggleSidebar}
           onResponseLanguageChange={(responseLanguage) => updatePreferences({ responseLanguage })}
           onOpenSettings={() => navigate('settings')}
-          onGoHome={() => navigate('chat')}
         />
         <div className="content-scroll"><div className="content-frame"><Suspense fallback={<div className="page-loading" aria-busy="true" />}>{renderView()}</Suspense></div></div>
         {activeView === 'chat' && !isEmptyChat && (

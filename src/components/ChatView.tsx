@@ -1,19 +1,9 @@
-import { ArrowDown, Bookmark, Code2, FileText, Lightbulb, Mail, RotateCcw, Search, Sprout } from 'lucide-react'
+import { ArrowDown, Bookmark, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SavedPrompt } from '../app/savedPrompts'
-import { suggestions, type SuggestionIcon } from '../data/content'
 import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
 import { ChatMessage } from './ChatMessage'
-
-const suggestionIcons: Record<SuggestionIcon, typeof Mail> = {
-  mail: Mail,
-  summarize: FileText,
-  ideas: Lightbulb,
-  code: Code2,
-  advice: Sprout,
-  explain: Search,
-}
 
 interface ChatViewProps {
   messages: ChatMessageType[]
@@ -23,6 +13,7 @@ interface ChatViewProps {
   /** Zone de saisie affichée au centre de l’écran d’accueil. */
   composer: ReactNode
   copiedMessageId?: string
+  /** Insère une consigne enregistrée dans la zone de saisie. */
   onSuggestion: (prompt: string) => void
   onNewConversation: () => void
   onCopy: (message: ChatMessageType) => void
@@ -129,17 +120,6 @@ export function ChatView({
             ))}
           </div>
         )}
-        <div className="suggestion-grid" aria-label="Suggestions">
-          {suggestions.map(({ label, prompt, icon }) => {
-            const Icon = suggestionIcons[icon]
-            return (
-              <button type="button" key={label} className="suggestion-card" onClick={() => onSuggestion(prompt)}>
-                <Icon size={16} aria-hidden="true" />
-                <span>{label}</span>
-              </button>
-            )
-          })}
-        </div>
       </section>
     )
   }
