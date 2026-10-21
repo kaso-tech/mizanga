@@ -1,5 +1,6 @@
-import { generateGeminiTitle, streamGeminiReply, UpstreamError } from './gemini.mjs'
 import { createAdminAuth } from './admin.mjs'
+import { UpstreamError } from './ai/errors.mjs'
+import { createAiProvider } from './ai/provider.mjs'
 import { buildReferenceText, createReferenceLoader, MAX_REFERENCE_CHARS } from './moore-reference.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
@@ -121,13 +122,17 @@ const clientOf = (req) => req.socket.remoteAddress || 'inconnu'
  * Gestionnaire Node pour `/api/health` et `/api/chat`, partagé par le serveur de développement Vite
  * et le serveur de production. Réponse de `/api/chat` : NDJSON, une ligne `{"text": …}` par fragment,
  * ou `{"error": …}` si le moteur échoue en cours de route.
- * `liteModel` : modèle économe (plus rapide, quota gratuit plus large), proposé au choix et utilisé pour les titres.
+ * Le modèle est appelé uniquement à travers `provider` (server/ai/provider.mjs). À défaut, un fournisseur
+ * est créé à partir de `aiProvider` (défaut « gemini »), `apiKey`, `model`, `liteModel` (modèle économe,
+ * proposé au choix et utilisé pour les titres) et `apiBase`.
  * `referenceDir` : dossier de la référence du mooré (par défaut server/knowledge/moore).
  * `adminPassword` : mot de passe de la console d’administration (/admin) ; absent, la console est fermée.
- * @param {{ apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
+ * `version` : version déployée (server/build-info.mjs), annoncée par /api/health.
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, rateLimit?: { windowMs: number, maxRequests: number } }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteModel = 'gemini-flash-lite-latest', apiBase, referenceDir, adminPassword, rateLimit } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, rateLimit } = {}) {
+  const ai = provider ?? createAiProvider({ provider: aiProvider, apiKey, model, liteModel, apiBase })
   const limit = createRateLimiter(rateLimit)
   const loadReference = createReferenceLoader(referenceDir)
   const admin = createAdminAuth({ password: adminPassword })
@@ -165,7 +170,8 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
       const { reference } = loadReference()
       const sent = buildReferenceText(reference)
       return sendJson(res, 200, {
-        engine: { configured: Boolean(apiKey), model, liteModel },
+        version: version ?? null,
+        engine: { provider: ai.name, configured: ai.configured, model: ai.models.standard, liteModel: ai.models.lite },
         reference: {
           sheetChars: reference.sheet.length,
           examples: reference.examples.length,
@@ -188,7 +194,7 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
     if (path === '/api/health' && req.method === 'GET') {
       // Public : seulement ce dont l’interface a besoin. Les noms des modèles et l’état de la
       // référence du mooré sont réservés à la console d’administration.
-      return sendJson(res, 200, { engine: apiKey ? 'gemini' : 'demo', liteModel: Boolean(apiKey && liteModel) })
+      return sendJson(res, 200, { engine: ai.configured ? ai.name : 'demo', liteModel: Boolean(ai.configured && ai.models.lite), ...(version ? { version } : {}) })
     }
     if (path.startsWith('/api/admin/')) return handleAdmin(req, res, path)
     if (path !== '/api/chat' && path !== '/api/title') {
@@ -196,7 +202,7 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
       return sendJson(res, 404, { error: 'Introuvable.' })
     }
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Méthode non autorisée.' })
-    if (!apiKey) return sendJson(res, 503, { error: 'Aucun moteur d’IA n’est configuré sur ce serveur.' })
+    if (!ai.configured) return sendJson(res, 503, { error: 'Aucun moteur d’IA n’est configuré sur ce serveur.' })
 
     // Les administrateurs (outil d’évaluation) ne sont pas soumis à la limite par visiteur.
     const blockedUntil = admin.isAuthenticated(req) ? null : limit(clientOf(req))
@@ -206,8 +212,7 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
       try {
         const body = await readJson(req)
         if (typeof body?.text !== 'string' || !body.text.trim() || body.text.length > MAX_MESSAGE_CHARS) return sendJson(res, 400, { error: 'Requête invalide.' })
-        // Les titres passent par le modèle économe pour préserver le quota du modèle principal.
-        const title = await generateGeminiTitle({ apiKey, model: liteModel, apiBase, text: body.text })
+        const title = await ai.generateTitle({ text: body.text })
         return sendJson(res, 200, { title })
       } catch (error) {
         const { status = 502, message = 'Titre indisponible.', retryAt } = /** @type {{ status?: number, message?: string, retryAt?: Date }} */ (error)
@@ -231,7 +236,7 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
     let started = false
     try {
       const { modelTier, ...reply } = request
-      for await (const event of streamGeminiReply({ apiKey, model: modelTier === 'lite' ? liteModel : model, apiBase, ...reply, reference: loadReference().text, signal: controller.signal })) {
+      for await (const event of ai.streamReply({ ...reply, tier: modelTier, reference: loadReference().text, signal: controller.signal })) {
         if (!started) {
           res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
           started = true

@@ -1,5 +1,5 @@
 // Serveur de production : sert le site compilé (dist/) et l’API /api/*.
-// Usage : `pnpm build && pnpm start` (variables : PORT, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_PASSWORD).
+// Usage : `pnpm build && pnpm start` (variables : PORT, AI_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_PASSWORD).
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { brotliCompress, constants as zlibConstants, gzip } from 'node:zlib'
 import { MIN_ADMIN_PASSWORD_LENGTH } from './admin.mjs'
+import { readBuildInfo } from './build-info.mjs'
 import { createApiHandler } from './chat-handler.mjs'
 
 const distDir = resolve(fileURLToPath(new URL('../dist', import.meta.url)))
@@ -94,11 +95,13 @@ async function serveStatic(req, res) {
 }
 
 const api = createApiHandler({
+  aiProvider: process.env.AI_PROVIDER || undefined,
   apiKey: process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL || undefined,
   liteModel: process.env.GEMINI_LITE_MODEL || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,
   apiBase: process.env.GEMINI_API_BASE || undefined,
+  version: readBuildInfo(distDir) ?? undefined,
 })
 
 createServer((req, res) => {

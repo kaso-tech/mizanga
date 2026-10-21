@@ -285,7 +285,8 @@ describe('App', () => {
   it('ouvre la console après connexion et donne accès à l’évaluation', async () => {
     let authenticated = false
     const overview = {
-      engine: { configured: true, model: 'modele-standard', liteModel: 'modele-econome' },
+      version: { version: '0.1.0', commit: 'abc1234', builtAt: '2026-10-21T00:00:00.000Z' },
+      engine: { provider: 'gemini', configured: true, model: 'modele-standard', liteModel: 'modele-econome' },
       reference: { sheetChars: 0, examples: 0, entries: 0, counts: { draft: 0, review: 0, rejected: 0 }, problems: [], sentChars: 0, maxChars: 24000, omittedExamples: 0, omittedEntries: 0 },
     }
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {

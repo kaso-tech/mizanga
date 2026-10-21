@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApiHandler } from './chat-handler.mjs'
-import { buildSystemInstruction, nextMidnight, quotaResetTime } from './gemini.mjs'
+import { nextMidnight, quotaResetTime } from './ai/gemini.mjs'
+import { buildSystemInstruction } from './ai/system-instruction.mjs'
 
 /** @type {{ status: number, events: unknown[], body?: unknown }} */
 let upstreamReply = { status: 200, events: [] }
@@ -267,14 +268,19 @@ describe('API Mizanga', () => {
     expect(response.status).toBe(200)
     const setCookie = response.headers.get('set-cookie') ?? ''
     expect(setCookie).toContain('HttpOnly')
-    expect(setCookie).toContain('SameSite=None')
+    // En HTTPS (aperçu Manus dans un cadre) : SameSite=None, accepté par les navigateurs grâce à Secure.
+    expect(setCookie).toContain('SameSite=None; Secure')
+    // En HTTP (développement local) : SameSite=Lax, car SameSite=None sans Secure serait refusé.
+    const overHttp = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    expect(overHttp.headers.get('set-cookie')).toContain('SameSite=Lax')
+    expect(overHttp.headers.get('set-cookie')).not.toContain('Secure')
     expect(setCookie).toContain('Secure')
     expect(setCookie).toContain('Path=/api')
     const cookie = setCookie.split(';')[0]
 
     expect(await (await fetch(`${base}/api/admin/session`, { headers: { cookie } })).json()).toEqual({ configured: true, authenticated: true })
     const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
-    expect(overview.engine).toEqual({ configured: false, model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })
+    expect(overview.engine).toEqual({ provider: 'gemini', configured: false, model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })
 
     // Un cookie modifié est refusé.
     const forged = cookie.replace(/=(\d+)\./, (_match, expires) => `=${Number(expires) + 1000}.`)
@@ -306,5 +312,11 @@ describe('API Mizanga', () => {
     const asAdmin = await fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', cookie }, body: JSON.stringify(validBody) })
     expect(asAdmin.status).toBe(200)
     await asAdmin.text()
+
+    // Une requête déclenchée par un autre site, même avec le cookie, n’a pas les droits d’administrateur.
+    const crossSite = await fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'text/plain', cookie, 'Sec-Fetch-Site': 'cross-site' }, body: JSON.stringify(validBody) })
+    expect(crossSite.status).toBe(429)
+    expect((await fetch(`${base}/api/admin/overview`, { headers: { cookie, 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(401)
+    expect((await fetch(`${base}/api/admin/overview`, { headers: { cookie, 'Sec-Fetch-Site': 'same-origin' } })).status).toBe(200)
   })
 })

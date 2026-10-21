@@ -32,6 +32,7 @@ export function AboutView({ engineLabel, isDemonstration }: AboutViewProps) {
           <li>Les corrections proposées par les utilisateurs seront vérifiées avant d’être utilisées.</li>
         </ul>
       </section>
+      <p className="about-version">Version {__BUILD_INFO__.version} · {__BUILD_INFO__.commit} · {new Date(__BUILD_INFO__.builtAt).toLocaleDateString('fr', { dateStyle: 'medium' })}</p>
     </article>
   )
 }

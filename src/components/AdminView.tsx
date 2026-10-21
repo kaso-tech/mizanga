@@ -15,7 +15,8 @@ const sections: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
 ]
 
 interface Overview {
-  engine: { configured: boolean; model: string; liteModel: string }
+  version: { version: string; commit: string; builtAt: string } | null
+  engine: { provider: string; configured: boolean; model: string; liteModel: string }
   reference: {
     sheetChars: number
     examples: number
@@ -89,6 +90,14 @@ function Stat({ label, value }: { label: string; value: string }) {
 function EnginePanel({ overview }: { overview: Overview }) {
   return (
     <div className="setting-group">
+      <div className="setting-row">
+        <div className="setting-text"><p className="setting-label">Version déployée</p><p className="setting-description">Interface : {__BUILD_INFO__.commit}</p></div>
+        <code className="value-pill">{overview.version ? `${overview.version.version} · ${overview.version.commit}` : 'inconnue'}</code>
+      </div>
+      <div className="setting-row">
+        <div className="setting-text"><p className="setting-label">Fournisseur</p><p className="setting-description">AI_PROVIDER</p></div>
+        <code className="value-pill">{overview.engine.provider}</code>
+      </div>
       <div className="setting-row">
         <div className="setting-text"><p className="setting-label">Clé d’API Gemini</p><p className="setting-description">GEMINI_API_KEY</p></div>
         <span className="value-pill">{overview.engine.configured ? 'Configurée' : 'Absente'}</span>

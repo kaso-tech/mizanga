@@ -19,6 +19,19 @@ function readCookie(req, name) {
   return undefined
 }
 
+/**
+ * Le cookie est en SameSite=None (aperçu Manus dans un cadre) : un autre site pourrait donc déclencher
+ * des requêtes qui l’emportent. Le navigateur indique leur provenance dans Sec-Fetch-Site, qu’une page
+ * ne peut pas falsifier ; la session n’est reconnue que pour l’application elle-même (« same-origin »)
+ * ou une adresse saisie directement (« none »). Sans cet en-tête (client hors navigateur), pas de
+ * restriction supplémentaire : un tel client n’a pas le cookie de l’administrateur.
+ * @param {import('node:http').IncomingMessage} req
+ */
+const isSameSiteRequest = (req) => {
+  const site = req.headers['sec-fetch-site']
+  return site === undefined || site === 'same-origin' || site === 'none'
+}
+
 /** La requête est-elle arrivée en HTTPS (directement ou derrière le proxy de l’hébergeur) ? @param {import('node:http').IncomingMessage} req */
 const isHttps = (req) => String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https' || Boolean(/** @type {any} */ (req.socket).encrypted)
 
@@ -37,7 +50,7 @@ export function createAdminAuth({ password, now = Date.now } = {}) {
 
   /** @param {import('node:http').IncomingMessage} req */
   const isAuthenticated = (req) => {
-    if (!configured) return false
+    if (!configured || !isSameSiteRequest(req)) return false
     const token = readCookie(req, ADMIN_COOKIE)
     if (!token) return false
     const [expiresAt, signature] = token.split('.')
@@ -77,11 +90,11 @@ export function createAdminAuth({ password, now = Date.now } = {}) {
     `${ADMIN_COOKIE}=${value ?? ''}`,
     'Path=/api',
     'HttpOnly',
-    // Preview est rendu dans une iframe cross-site : SameSite=None est requis dans ce contexte.
-    // Secure est ajouté quand le proxy signale l’origine HTTPS publique.
-    'SameSite=None',
+    // L’aperçu Manus affiche l’application dans un cadre d’un autre site : SameSite=None y est requis,
+    // mais les navigateurs le refusent sans Secure, donc hors HTTPS. En HTTP (développement local),
+    // SameSite=Lax. Les requêtes venues d’un autre site restent refusées (isSameSiteRequest).
+    ...(isHttps(req) ? ['SameSite=None', 'Secure'] : ['SameSite=Lax']),
     `Max-Age=${value ? SESSION_MS / 1000 : 0}`,
-    ...(isHttps(req) ? ['Secure'] : []),
   ].join('; ')
 
   return { configured, isAuthenticated, login, cookieHeader }

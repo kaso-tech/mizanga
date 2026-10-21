@@ -78,12 +78,14 @@ Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemi
             ◀─ NDJSON ──                            ◀─ SSE ──
 ```
 
-- **Côté serveur** (`server/chat-handler.mjs`, `server/gemini.mjs`) : le relais ajoute les consignes de Mizanga (assistant généraliste, langue de réponse choisie, honnêteté sur le mooré), transmet l’historique tel quel à Gemini et renvoie la réponse fragment par fragment. Le même code tourne dans `pnpm dev` (extension Vite), `pnpm preview` et `pnpm start`.
+- **Service IA centralisé** (`server/ai/`) : toutes les demandes au modèle passent par le contrat `server/ai/provider.mjs` ; l’implémentation Gemini est dans `server/ai/gemini.mjs`, les consignes communes dans `server/ai/system-instruction.mjs`. Le fournisseur se choisit côté serveur (`AI_PROVIDER`, seule valeur actuelle : `gemini`) ; en ajouter un autre (Qwen…) ne touche pas au reste. Des instantanés (`server/preservation.test.mjs`) figent les requêtes envoyées au moteur pour garantir qu’une réorganisation ne change pas le comportement.
+- **Côté serveur** (`server/chat-handler.mjs`) : le relais ajoute les consignes de Mizanga (assistant généraliste, langue de réponse choisie, honnêteté sur le mooré), transmet l’historique tel quel à Gemini et renvoie la réponse fragment par fragment. Le même code tourne dans `pnpm dev` (extension Vite), `pnpm preview` et `pnpm start`.
 - **Garde-fous** : taille des demandes limitée, 20 demandes par minute et par origine de connexion observée par le serveur (sans faire confiance à l’en-tête falsifiable `X-Forwarded-For`), annulation propagée quand l’utilisateur clique sur « Arrêter », erreurs traduites en messages clairs (quota gratuit atteint, clé refusée…).
 - **Côté navigateur** : au démarrage, l’application interroge `/api/health` et choisit le moteur Gemini (`src/services/remoteAiService.ts`) ou la démonstration (`src/services/demoAiService.ts`).
 
 | Variable | Rôle |
 | --- | --- |
+| `AI_PROVIDER` | Fournisseur d’IA (défaut : `gemini`). Une valeur inconnue empêche le démarrage. |
 | `GEMINI_API_KEY` | Clé de l’API Gemini. Absente : mode démonstration. |
 | `GEMINI_MODEL` | Modèle standard (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
 | `GEMINI_LITE_MODEL` | Modèle économe, proposé au choix et utilisé pour les titres (défaut : `gemini-flash-lite-latest`). |
@@ -111,6 +113,8 @@ Le dossier `server/knowledge/moore/` contient la référence que le relais trans
 - **Développement :** environnement Manus, avec `pnpm dev` ; la clé se configure dans les secrets de l’environnement (`GEMINI_API_KEY`).
 - **Production Manus :** un conteneur Node, et non un site statique, car l’API doit rester côté serveur. Le `Dockerfile` active pnpm, installe le verrouillé, construit `dist/`, puis lance `server/index.mjs` avec `pnpm start`. La sonde `/api/health` est publique et ne révèle pas la clé.
 - **Variables :** `GEMINI_API_KEY` (et éventuellement `GEMINI_MODEL`) sont des secrets injectés à l’exécution ; `PORT` est fourni par l’hébergement. La clé ne doit jamais être placée dans un fichier versionné ou dans une variable `VITE_*`.
+
+La version déployée (numéro, commit, date de compilation) est écrite dans `dist/version.json`, annoncée par `/api/health` et affichée dans « À propos » et dans la console d’administration.
 
 Le serveur sert aussi les routes de l’application (`/parametres`…), compresse les fichiers texte (brotli ou gzip) et met en cache les fichiers de `dist/assets`. Les vues secondaires (paramètres, console d’administration, à propos…) et le rendu Markdown sont chargés à la demande : score Lighthouse mobile de 99 en performance.
 

@@ -144,9 +144,9 @@ const engineStorageKey = 'mizanga.engine.v1'
 type Health = { engine?: string; liteModel?: boolean }
 
 const serviceFor = (health: Health) => (
-  health.engine === 'gemini'
+  health.engine && health.engine !== 'demo'
     // Les noms techniques des modèles restent dans la console d’administration.
-    ? createRemoteAiService({ label: 'Gemini (Google)', offersLiteModel: health.liteModel === true })
+    ? createRemoteAiService({ label: health.engine === 'gemini' ? 'Gemini (Google)' : health.engine, offersLiteModel: health.liteModel === true })
     : demoAiService
 )
 

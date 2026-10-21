@@ -583,6 +583,7 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 .about-view { padding-top: 32px; line-height: 1.625; }
 .about-view > * + * { margin-top: 20px; }
 .about-band { width: 64px; height: 6px; border-radius: 999px; }
+.about-view .about-version { color: var(--muted-foreground); font-size: 12px; }
 .about-view .settings-section ul { margin: 0; padding-left: 20px; font-size: 14px; }
 .about-view .settings-section li + li { margin-top: 4px; }
 .about-view .settings-section h2 { margin-bottom: 8px; }
