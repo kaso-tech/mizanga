@@ -76,7 +76,7 @@ afterAll(() => {
   for (const server of servers) server.close()
 })
 
-describe('API Mizanga', () => {
+describe('API Gilli', () => {
   it('annonce le moteur disponible', async () => {
     const demo = await startApi({})
     expect(await (await fetch(`${demo}/api/health`)).json()).toEqual({ engine: 'demo', liteModel: false })
@@ -208,7 +208,7 @@ describe('API Mizanga', () => {
     expect(lastUpstreamRequest.body.systemInstruction.parts[0].text).toContain('Recherche web : utilise la recherche Google seulement quand')
   })
 
-  it('ajoute les instructions personnelles, bornées et après les règles de Mizanga', async () => {
+  it('ajoute les instructions personnelles, bornées et après les règles de Gilli', async () => {
     upstreamReply = { status: 200, events: [textEvent('ok')] }
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase })
     await (await post(base, { ...validBody, preferences: { ...validBody.preferences, customInstructions: `  Je suis enseignant à Koudougou.${'x'.repeat(2000)}` } })).text()

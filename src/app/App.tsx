@@ -91,7 +91,7 @@ function useIsOnline() {
   return isOnline
 }
 
-const preferencesStorageKey = 'mizanga.preferences.v1'
+const preferencesStorageKey = 'gilli.preferences.v1'
 
 /** Préférences conservées sur cet appareil uniquement ; une valeur illisible ou inconnue est ignorée. */
 function loadPreferences(): LinguisticPreferences {
@@ -189,7 +189,7 @@ export function App({ aiService = demoAiService }: AppProps) {
   const conversationTitle = conversation.activeConversation?.title
   useEffect(() => {
     const pageTitle = activeView === 'chat' ? conversationTitle : titleByView[activeView]
-    document.title = pageTitle ? `${pageTitle} — Mizanga` : 'Mizanga'
+    document.title = pageTitle ? `${pageTitle} — Gilli` : 'Gilli'
   }, [activeView, conversationTitle])
 
   useEffect(() => {
@@ -269,14 +269,14 @@ export function App({ aiService = demoAiService }: AppProps) {
   }
 
   const exportConversations = () => {
-    downloadFile(`mizanga-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`, createBackup(conversation.conversations), 'application/json')
+    downloadFile(`gilli-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`, createBackup(conversation.conversations), 'application/json')
     notify('Sauvegarde téléchargée. Le contenu des fichiers joints n’y figure pas.', 'success')
   }
 
   const importConversations = async (file: File) => {
     const imported = readBackup(await readTextFile(file).catch(() => ''))
     if (!imported) {
-      notify('Ce fichier n’est pas une sauvegarde de Mizanga lisible.')
+      notify('Ce fichier n’est pas une sauvegarde de Gilli lisible.')
       return
     }
     const { added, updated } = conversation.importConversations(imported)

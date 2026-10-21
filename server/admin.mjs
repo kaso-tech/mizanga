@@ -3,7 +3,7 @@
 // des utilisateurs : la vérification se fait ici, à chaque appel d’une adresse /api/admin/*.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
-export const ADMIN_COOKIE = 'mizanga_admin'
+export const ADMIN_COOKIE = 'gilli_admin'
 export const MIN_ADMIN_PASSWORD_LENGTH = 12
 const SESSION_MS = 8 * 60 * 60 * 1000
 const LOGIN_ATTEMPTS = { windowMs: 15 * 60 * 1000, maxAttempts: 5 }
@@ -41,7 +41,7 @@ const isHttps = (req) => String(req.headers['x-forwarded-proto'] ?? '').split(',
 export function createAdminAuth({ password, now = Date.now } = {}) {
   const configured = typeof password === 'string' && password.length >= MIN_ADMIN_PASSWORD_LENGTH
   // Clé de signature dérivée du mot de passe : en changer invalide toutes les sessions ouvertes.
-  const signingKey = configured ? createHmac('sha256', 'mizanga-admin-session').update(password).digest() : randomBytes(32)
+  const signingKey = configured ? createHmac('sha256', 'gilli-admin-session').update(password).digest() : randomBytes(32)
   const expectedDigest = configured ? sha256(password) : randomBytes(32)
   /** @type {Map<string, number[]>} */
   const attempts = new Map()

@@ -21,7 +21,7 @@ type ErrorBody = { error?: string; retryAt?: string; code?: string }
 
 function errorFrom(body: ErrorBody | null, status?: number) {
   const retryAt = body?.retryAt ? new Date(body.retryAt) : undefined
-  const message = body?.error ?? 'Le serveur de Mizanga est injoignable. Vérifiez votre connexion et réessayez.'
+  const message = body?.error ?? 'Le serveur de Gilli est injoignable. Vérifiez votre connexion et réessayez.'
   const code = body?.code === 'quota' ? 'quota' : undefined
   if (retryAt && !Number.isNaN(retryAt.getTime())) {
     return new AiServiceError(`${message} Elle sera réinitialisée ${formatResetTime(retryAt)}.`, retryAt, code)
@@ -73,7 +73,7 @@ export function selectHistory(messages: ChatMessage[]) {
 }
 
 /**
- * Moteur distant : le serveur Mizanga (/api/chat) relaie la demande vers le modèle configuré
+ * Moteur distant : le serveur Gilli (/api/chat) relaie la demande vers le modèle configuré
  * (Gemini). La clé d’API reste sur le serveur ; le navigateur ne reçoit que le texte.
  * Réponse attendue : NDJSON, une ligne `{"text": …}` par fragment ou `{"error": …}`.
  */
@@ -108,7 +108,7 @@ export function createRemoteAiService({ label, offersLiteModel = false, endpoint
       } catch (error) {
         if (signal.aborted) throw error
         // Réseau coupé ou serveur injoignable.
-        throw new AiServiceError(navigator.onLine ? 'Le serveur de Mizanga est injoignable. Réessayez dans un instant.' : 'Vous êtes hors connexion. Vérifiez votre réseau puis réessayez.')
+        throw new AiServiceError(navigator.onLine ? 'Le serveur de Gilli est injoignable. Réessayez dans un instant.' : 'Vous êtes hors connexion. Vérifiez votre réseau puis réessayez.')
       }
       if (!response.ok || !response.body) {
         throw errorFrom((await response.json().catch(() => null)) as ErrorBody | null, response.status)
@@ -139,7 +139,7 @@ export function createRemoteAiService({ label, offersLiteModel = false, endpoint
  * Choisit le moteur selon ce que le serveur annonce (/api/health). Sans serveur ou sans clé configurée
  * (site statique, test local), l’application reste en démonstration.
  */
-const engineStorageKey = 'mizanga.engine.v1'
+const engineStorageKey = 'gilli.engine.v1'
 
 type Health = { engine?: string; liteModel?: boolean }
 

@@ -223,7 +223,7 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
               type="button"
               className="secondary-button"
               disabled={!supported || !preferences.readAloud}
-              onClick={() => speak('Bonjour, je suis Mizanga. Voici ma voix.', { rate: preferences.speechRate, voiceName: preferences.voiceName })}
+              onClick={() => speak('Bonjour, je suis Gilli. Voici ma voix.', { rate: preferences.speechRate, voiceName: preferences.voiceName })}
             >
               <Play size={14} aria-hidden="true" /> Essayer
             </button>

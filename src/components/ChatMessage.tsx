@@ -37,7 +37,7 @@ const canShare = () => typeof navigator !== 'undefined' && typeof navigator.shar
 async function shareReply(message: ChatMessageType) {
   const sources = message.sources?.length ? `\n\nSources :\n${message.sources.map((source) => `- ${source.title} : ${source.url}`).join('\n')}` : ''
   try {
-    await navigator.share({ title: 'Réponse de Mizanga', text: `${message.content}${sources}` })
+    await navigator.share({ title: 'Réponse de Gilli', text: `${message.content}${sources}` })
   } catch {
     // Partage annulé par l’utilisateur : rien à signaler.
   }
@@ -184,7 +184,7 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
   const isCopied = copiedMessageId === message.id
 
   return (
-    <article className="message-row is-assistant fade-up" aria-label="Réponse de Mizanga">
+    <article className="message-row is-assistant fade-up" aria-label="Réponse de Gilli">
       <BrandMark />
       <div className="assistant-body">
         {message.isDemonstration && <span className="demo-badge">Démonstration — aucune IA réelle</span>}

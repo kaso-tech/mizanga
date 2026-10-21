@@ -65,7 +65,7 @@ function LoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
   return (
     <form className="admin-login settings-section" onSubmit={(event) => void submit(event)}>
       <h2><LockKeyhole size={18} aria-hidden="true" /> Connexion administrateur</h2>
-      <p className="evaluation-help">Réservé à l’équipe Mizanga.</p>
+      <p className="evaluation-help">Réservé à l’équipe Gilli.</p>
       <div className="field">
         <label className="field-label" htmlFor="admin-password">Mot de passe</label>
         <input id="admin-password" type="password" autoComplete="current-password" autoFocus value={password} onChange={(event) => setPassword(event.target.value)} />
@@ -180,7 +180,7 @@ export function AdminView({ aiService, preferences, onNotify }: AdminViewProps) 
       }
       setOverview(await readJson<Overview>(response))
     } catch {
-      setLoadError('Le serveur est injoignable. La console demande une connexion au serveur de Mizanga.')
+      setLoadError('Le serveur est injoignable. La console demande une connexion au serveur de Gilli.')
       setSession({ configured: false, authenticated: false })
     }
   }, [])

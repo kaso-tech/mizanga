@@ -8,9 +8,12 @@ import '@fontsource/noto-serif/600.css'
 import { App } from './app/App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { registerServiceWorker } from './app/installPrompt'
+import { migrateLegacyStorage } from './app/legacyStorage'
 import { detectAiService } from './services/remoteAiService'
 import './styles/global.css'
 
+// Avant toute lecture du stockage : reprise des données enregistrées sous l’ancien nom (Mizanga).
+migrateLegacyStorage()
 registerServiceWorker()
 
 // Le moteur (Gemini ou démonstration) est choisi une fois, selon ce que le serveur annonce.

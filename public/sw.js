@@ -1,6 +1,6 @@
-// Service worker de Mizanga : rend l’application installable et utilisable hors connexion
+// Service worker de Gilli : rend l’application installable et utilisable hors connexion
 // pour son interface. Les échanges avec le moteur d’IA (/api/*) ne sont jamais mis en cache.
-const CACHE = 'mizanga-v2'
+const CACHE = 'gilli-v2'
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.png', '/brand/mark.png', '/icons/icon-192.png']
 
 // Met en cache l’interface et les fichiers compilés qu’elle référence (script et feuille de style à empreinte),

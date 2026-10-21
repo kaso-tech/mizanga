@@ -31,7 +31,7 @@ const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, re
 })
 
 /**
- * Outil d’évaluation : des locuteurs importent leurs questions (CSV), Mizanga y répond une à une,
+ * Outil d’évaluation : des locuteurs importent leurs questions (CSV), Gilli y répond une à une,
  * chaque réponse est notée puis les résultats sont exportés. Rien n’est envoyé ailleurs qu’au moteur.
  */
 export function EvaluationView({ aiService, preferences, onNotify }: EvaluationViewProps) {
@@ -113,7 +113,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
           Une question par ligne. Colonne « langue_de_reponse » : {Object.keys(responseLanguageLabels).join(', ')}.
         </p>
         <div className="evaluation-actions">
-          <button type="button" className="secondary-button" onClick={() => downloadText(templateCsv(), 'mizanga-evaluation-modele.csv', 'text/csv;charset=utf-8')}>
+          <button type="button" className="secondary-button" onClick={() => downloadText(templateCsv(), 'gilli-evaluation-modele.csv', 'text/csv;charset=utf-8')}>
             <Download size={16} aria-hidden="true" /> Télécharger le modèle (CSV)
           </button>
           <button type="button" className="secondary-button" disabled={isRunning} onClick={() => fileInputRef.current?.click()}>
@@ -177,7 +177,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
                   <p className="evaluation-question"><span>Question {item.id}</span> {item.question}</p>
                   {item.expected && <p className="evaluation-expected"><span>Réponse attendue</span> {item.expected}</p>}
                   <div className="evaluation-answer" aria-busy={runningId === item.id || undefined}>
-                    <span>Réponse de Mizanga{item.responseLanguage ? ` — ${responseLanguageLabels[item.responseLanguage]}` : ''}</span>
+                    <span>Réponse de Gilli{item.responseLanguage ? ` — ${responseLanguageLabels[item.responseLanguage]}` : ''}</span>
                     {runningId === item.id ? <p className="evaluation-muted">Réponse en cours…</p>
                       : item.error ? <p className="message-error">{item.error}</p>
                         : item.answer !== undefined ? <p className="evaluation-text">{item.answer}</p>
@@ -216,7 +216,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
           <section className="settings-section">
             <h3>4. Exporter</h3>
             <div className="evaluation-actions">
-              <button type="button" className="primary-button" disabled={summary.answered === 0} onClick={() => downloadText(resultsCsv(items, aiService.label), `mizanga-evaluation-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>
+              <button type="button" className="primary-button" disabled={summary.answered === 0} onClick={() => downloadText(resultsCsv(items, aiService.label), `gilli-evaluation-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>
                 <Download size={16} aria-hidden="true" /> Exporter les résultats (CSV)
               </button>
               {confirmingClear ? (

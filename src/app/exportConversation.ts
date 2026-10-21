@@ -4,10 +4,10 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString('fr', { dateSty
 
 /** Conversation au format Markdown, lisible tel quel ou dans n’importe quel éditeur. */
 export function conversationToMarkdown(conversation: Conversation) {
-  const lines = [`# ${conversation.title || 'Conversation Mizanga'}`, '', `_Exportée depuis Mizanga le ${formatDate(new Date().toISOString())}._`, '']
+  const lines = [`# ${conversation.title || 'Conversation Gilli'}`, '', `_Exportée depuis Gilli le ${formatDate(new Date().toISOString())}._`, '']
   for (const message of conversation.messages) {
     if (message.role === 'assistant' && message.status === 'error') continue
-    lines.push(`## ${message.role === 'user' ? 'Vous' : 'Mizanga'} — ${formatDate(message.createdAt)}`, '')
+    lines.push(`## ${message.role === 'user' ? 'Vous' : 'Gilli'} — ${formatDate(message.createdAt)}`, '')
     for (const attachment of message.attachments ?? []) lines.push(`> Fichier joint : ${attachment.name}`)
     if (message.attachments?.length) lines.push('')
     if (message.content) lines.push(message.content, '')
@@ -28,7 +28,7 @@ export function exportFileName(conversation: Conversation) {
     .replace(/^-+|-+$/g, '')
     .toLowerCase()
     .slice(0, 60)
-  return `mizanga-${base || 'conversation'}.md`
+  return `gilli-${base || 'conversation'}.md`
 }
 
 /** Télécharge un fichier produit dans le navigateur. */

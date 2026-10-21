@@ -24,9 +24,9 @@ describe('conversationStorage', () => {
   })
 
   it('ignore les données illisibles ou incomplètes', () => {
-    localStorage.setItem('mizanga.conversations.v1', '{pas du json')
+    localStorage.setItem('gilli.conversations.v1', '{pas du json')
     expect(loadConversations()).toEqual([])
-    localStorage.setItem('mizanga.conversations.v1', JSON.stringify([{ id: 'x' }, { ...conversation, messages: [{ role: 'pirate' }] }, conversation]))
+    localStorage.setItem('gilli.conversations.v1', JSON.stringify([{ id: 'x' }, { ...conversation, messages: [{ role: 'pirate' }] }, conversation]))
     expect(loadConversations().map((item) => item.id)).toEqual(['c1'])
   })
 
@@ -42,7 +42,7 @@ describe('conversationStorage', () => {
       messages: [{ ...conversation.messages[0], attachments: [{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 2048, data: 'AAAA' }] }],
     }
     saveConversations([withFile])
-    expect(localStorage.getItem('mizanga.conversations.v1')).not.toContain('AAAA')
+    expect(localStorage.getItem('gilli.conversations.v1')).not.toContain('AAAA')
     expect(loadConversations()[0].messages[0].attachments).toEqual([{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 2048 }])
   })
 
@@ -55,7 +55,7 @@ describe('conversationStorage', () => {
     expect(restored.messages[0].attachments).toEqual([{ id: 'f1', name: 'photo.jpg', mimeType: 'image/jpeg', size: 10 }])
   })
 
-  it('refuse un fichier qui n’est pas une sauvegarde de Mizanga', () => {
+  it('refuse un fichier qui n’est pas une sauvegarde de Gilli', () => {
     expect(readBackup('pas du JSON')).toBeNull()
     expect(readBackup(JSON.stringify([conversation]))).toBeNull()
   })
@@ -79,5 +79,11 @@ describe('conversationStorage', () => {
 
     saveConversations([{ ...conversation, messages: [conversation.messages[0], { ...reply, versions, versionIndex: 5 }] }])
     expect(loadConversations()[0].messages[1].versions).toBeUndefined()
+  })
+
+  it('importe encore les sauvegardes exportées sous l’ancien nom (Mizanga)', () => {
+    const legacy = createBackup([conversation]).replace('"gilli-conversations"', '"mizanga-conversations"')
+    expect(legacy).toContain('mizanga-conversations')
+    expect(readBackup(legacy)?.[0].title).toBe('Bonjour ɛ')
   })
 })

@@ -1,6 +1,6 @@
 import type { Attachment, ChatMessage, Conversation, ReplyVersion } from '../domain/types'
 
-const storageKey = 'mizanga.conversations.v1'
+const storageKey = 'gilli.conversations.v1'
 
 const isString = (value: unknown): value is string => typeof value === 'string'
 
@@ -93,18 +93,20 @@ const withoutFileContents = (conversations: Conversation[]) => conversations.map
   )),
 }))
 
-const backupFormat = 'mizanga-conversations'
+const backupFormat = 'gilli-conversations'
+/** Sauvegardes exportées quand l’application s’appelait Mizanga : toujours importables. */
+const legacyBackupFormat = 'mizanga-conversations'
 
 /** Fichier de sauvegarde de l’historique (JSON), sans le contenu des fichiers joints. */
 export function createBackup(conversations: Conversation[], now = new Date()): string {
   return JSON.stringify({ format: backupFormat, version: 1, exportedAt: now.toISOString(), conversations: withoutFileContents(conversations) }, null, 2)
 }
 
-/** Lit un fichier de sauvegarde ; renvoie null s’il ne vient pas de Mizanga ou est illisible. */
+/** Lit un fichier de sauvegarde ; renvoie null s’il ne vient pas de Gilli ou est illisible. */
 export function readBackup(text: string): Conversation[] | null {
   try {
     const backup = JSON.parse(text) as { format?: unknown; conversations?: unknown } | null
-    if (backup?.format !== backupFormat || !Array.isArray(backup.conversations)) return null
+    if ((backup?.format !== backupFormat && backup?.format !== legacyBackupFormat) || !Array.isArray(backup.conversations)) return null
     return parseConversations(backup.conversations)
   } catch {
     return null

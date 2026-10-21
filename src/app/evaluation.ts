@@ -28,7 +28,7 @@ export function templateCsv() {
   return toCsv([
     [...headers],
     ['1', '[Votre question en mooré]', '[Réponse attendue — facultatif]', 'moore-standard'],
-    ['2', '[Une question en français à laquelle Mizanga doit répondre en mooré]', '', 'moore-standard'],
+    ['2', '[Une question en français à laquelle Gilli doit répondre en mooré]', '', 'moore-standard'],
     ['3', '[Une question en mooré écrite de façon informelle]', '', 'auto'],
   ])
 }
@@ -137,7 +137,7 @@ export function summarize(items: EvaluationItem[]) {
   }
 }
 
-const storageKey = 'mizanga.evaluation.v1'
+const storageKey = 'gilli.evaluation.v1'
 
 export function loadEvaluation(): EvaluationItem[] {
   try {

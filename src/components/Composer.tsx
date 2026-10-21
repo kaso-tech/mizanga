@@ -311,7 +311,7 @@ export function Composer({
         </div>
       </div>
       <p className="disclaimer">
-        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Mizanga peut se tromper. A Mizanga tõe tudgame.'}
+        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Gilli peut se tromper. A Gilli tõe tudgame.'}
       </p>
     </div>
   )

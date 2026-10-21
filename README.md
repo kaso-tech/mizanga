@@ -1,6 +1,6 @@
-# Mizanga
+# Gilli
 
-Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer, apprendre, s’organiser — dont la particularité est de **comprendre et de répondre en mooré**, une langue encore mal prise en charge par les autres assistants. D’autres langues du Burkina Faso (fulfulde, dioula/bambara) pourront suivre.
+Gilli est un **assistant IA généraliste** — rédiger, résumer, expliquer, apprendre, s’organiser — dont la particularité est de **comprendre et de répondre en mooré**, une langue encore mal prise en charge par les autres assistants. D’autres langues du Burkina Faso (fulfulde, dioula/bambara) pourront suivre.
 
 > **Moteur : Gemini (Google), offre gratuite.** Quand une clé `GEMINI_API_KEY` est configurée sur le serveur, les réponses sont produites par Gemini. Sans clé, l’application reste en **mode démonstration** et le dit explicitement. La maîtrise du mooré par Gemini n’a pas encore été évaluée par des locuteurs.
 
@@ -14,7 +14,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Recherche web automatique : le moteur cherche sur Google seulement quand la demande le justifie (actualité, faits récents ou à vérifier) ; la réponse cite alors ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
 - Messages vocaux (2 minutes au plus, convertis en WAV 16 kHz) et fichiers audio ; la compréhension du mooré parlé n’est pas encore garantie.
 - Conversations renommables, exportables en Markdown, imprimables ou enregistrables en PDF (mise en page dédiée), et réponses partageables (WhatsApp, SMS…) via le partage du téléphone.
-- **Instructions personnelles** (Paramètres › Personnalisation) : métier, région, ton ou longueur de réponse préférés, pris en compte dans toutes les conversations (1 500 caractères au plus, placés après les règles de Mizanga).
+- **Instructions personnelles** (Paramètres › Personnalisation) : métier, région, ton ou longueur de réponse préférés, pris en compte dans toutes les conversations (1 500 caractères au plus, placés après les règles de Gilli).
 - **Consignes enregistrées** : les demandes fréquentes, enregistrées depuis un message ou dans Paramètres › Personnalisation, proposées sur l’accueil et en tapant « / » au début d’un message.
 - **Lecture à voix haute** des réponses avec la synthèse vocale de l’appareil (vitesse et voix réglables, sans envoi de données) ; aucune voix mooré n’existe encore, l’interface le signale.
 - **Console d’administration** (`/admin`, réservée à l’équipe, protégée par mot de passe côté serveur et jamais liée depuis l’interface) : configuration du moteur, état de la référence du mooré, et outil d’évaluation du mooré (importer des questions préparées par des locuteurs en CSV, obtenir les réponses une à une, les noter, exporter les résultats pour Excel). L’ancienne adresse `/evaluation` y mène.
@@ -74,12 +74,12 @@ plan.md         Décisions produit et design
 ## Moteur d’IA
 
 ```text
-Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemini
+Navigateur ──/api/chat──▶ serveur Gilli (server/) ──▶ API Gemini
             ◀─ NDJSON ──                            ◀─ SSE ──
 ```
 
 - **Service IA centralisé** (`server/ai/`) : toutes les demandes au modèle passent par le contrat `server/ai/provider.mjs` ; l’implémentation Gemini est dans `server/ai/gemini.mjs`, les consignes communes dans `server/ai/system-instruction.mjs`. Le fournisseur se choisit côté serveur (`AI_PROVIDER`, seule valeur actuelle : `gemini`) ; en ajouter un autre (Qwen…) ne touche pas au reste. Des instantanés (`server/preservation.test.mjs`) figent les requêtes envoyées au moteur pour garantir qu’une réorganisation ne change pas le comportement.
-- **Côté serveur** (`server/chat-handler.mjs`) : le relais ajoute les consignes de Mizanga (assistant généraliste, langue de réponse choisie, honnêteté sur le mooré), transmet l’historique tel quel à Gemini et renvoie la réponse fragment par fragment. Le même code tourne dans `pnpm dev` (extension Vite), `pnpm preview` et `pnpm start`.
+- **Côté serveur** (`server/chat-handler.mjs`) : le relais ajoute les consignes de Gilli (assistant généraliste, langue de réponse choisie, honnêteté sur le mooré), transmet l’historique tel quel à Gemini et renvoie la réponse fragment par fragment. Le même code tourne dans `pnpm dev` (extension Vite), `pnpm preview` et `pnpm start`.
 - **Garde-fous** : taille des demandes limitée, 20 demandes par minute et par origine de connexion observée par le serveur (sans faire confiance à l’en-tête falsifiable `X-Forwarded-For`), annulation propagée quand l’utilisateur clique sur « Arrêter », erreurs traduites en messages clairs (quota gratuit atteint, clé refusée…).
 - **Côté navigateur** : au démarrage, l’application interroge `/api/health` et choisit le moteur Gemini (`src/services/remoteAiService.ts`) ou la démonstration (`src/services/demoAiService.ts`).
 
@@ -131,4 +131,4 @@ Le serveur sert aussi les routes de l’application (`/parametres`…), compress
 - **Honnêteté :** l’interface indique toujours ce qui est connecté, démontré ou à venir.
 - **Respect du texte :** aucune substitution automatique de caractères (par ex. è → ɛ).
 - **Qualité du mooré :** les textes en mooré sont rédigés et validés par des locuteurs ; les corrections des utilisateurs seront relues avant toute utilisation.
-- **Confidentialité :** Mizanga ne stocke aucune conversation sur un serveur : l’historique et les préférences restent dans le navigateur de l’utilisateur (désactivable) ; en mode Gemini, les messages transitent par Google pour produire les réponses. Seuls les derniers échanges (dans une limite de taille) sont envoyés au moteur.
+- **Confidentialité :** Gilli ne stocke aucune conversation sur un serveur : l’historique et les préférences restent dans le navigateur de l’utilisateur (désactivable) ; en mode Gemini, les messages transitent par Google pour produire les réponses. Seuls les derniers échanges (dans une limite de taille) sont envoyés au moteur.

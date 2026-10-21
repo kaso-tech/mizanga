@@ -248,7 +248,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
     } catch (error) {
       if (controller.signal.aborted) return
       const message = error instanceof UpstreamError ? error.message : 'Le moteur est momentanément indisponible. Réessayez plus tard.'
-      if (!(error instanceof UpstreamError)) console.error('[mizanga] Erreur du moteur :', error)
+      if (!(error instanceof UpstreamError)) console.error('[gilli] Erreur du moteur :', error)
       const retryAt = error instanceof UpstreamError ? error.retryAt : undefined
       if (started) {
         res.end(`${JSON.stringify(errorBody(message, retryAt, quotaCode(error)))}\n`)

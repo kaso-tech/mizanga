@@ -22,11 +22,11 @@ describe('exportConversation', () => {
     expect(markdown).toContain('Quel temps fera-t-il ?')
     expect(markdown).toContain('Il fera **chaud**.')
     expect(markdown).toContain('- [Météo](https://exemple.bf)')
-    expect(markdown.match(/## Mizanga/g)).toHaveLength(1)
+    expect(markdown.match(/## Gilli/g)).toHaveLength(1)
   })
 
   it('donne un nom de fichier sûr', () => {
-    expect(exportFileName(conversation)).toBe('mizanga-meteo-a-ouagadougou.md')
-    expect(exportFileName({ ...conversation, title: '???' })).toBe('mizanga-conversation.md')
+    expect(exportFileName(conversation)).toBe('gilli-meteo-a-ouagadougou.md')
+    expect(exportFileName({ ...conversation, title: '???' })).toBe('gilli-conversation.md')
   })
 })

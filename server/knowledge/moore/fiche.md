@@ -14,7 +14,7 @@
 ## Variante de référence
 
 <!--
-  Quelle variante du mooré Mizanga doit-elle utiliser par défaut (ex. parler de Ouagadougou) ?
+  Quelle variante du mooré Gilli doit-il utiliser par défaut (ex. parler de Ouagadougou) ?
   Quelles autres variantes doit-elle comprendre ? Comment réagir quand l’utilisateur écrit dans une autre variante ?
 -->
 
@@ -44,7 +44,7 @@
 ## Erreurs fréquentes à éviter
 
 <!--
-  Erreurs déjà observées dans les réponses de Mizanga ou d’autres assistants (mots inventés, calques du français,
+  Erreurs déjà observées dans les réponses de Gilli ou d’autres assistants (mots inventés, calques du français,
   mauvaises lettres…). Format conseillé : « Ne pas écrire … mais … (parce que …) ».
   L’outil d’évaluation de la console d’administration (/admin) et les signalements aident à les repérer.
 -->

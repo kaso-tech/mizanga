@@ -7,7 +7,7 @@ export interface SavedPrompt {
   prompt: string
 }
 
-const storageKey = 'mizanga.prompts.v1'
+const storageKey = 'gilli.prompts.v1'
 export const MAX_SAVED_PROMPTS = 30
 export const MAX_PROMPT_TITLE_CHARS = 60
 

@@ -16,7 +16,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[mizanga] Erreur de l’interface :', error, info.componentStack)
+    console.error('[gilli] Erreur de l’interface :', error, info.componentStack)
   }
 
   render() {
@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
       <main className="crash-screen" role="alert">
         <img src="/brand/mark.png" width={56} height={56} alt="" className="brand-mark" />
         <h1>Un problème est survenu</h1>
-        <p>Mizanga a rencontré une erreur inattendue. Vos conversations enregistrées sur cet appareil sont conservées.</p>
+        <p>Gilli a rencontré une erreur inattendue. Vos conversations enregistrées sur cet appareil sont conservées.</p>
         <div className="crash-actions">
           <button type="button" className="primary-button" onClick={() => window.location.reload()}>Recharger la page</button>
           <button type="button" className="secondary-button" onClick={() => { window.location.href = '/' }}>Revenir à l’accueil</button>

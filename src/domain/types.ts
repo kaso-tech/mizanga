@@ -22,7 +22,7 @@ export interface LinguisticPreferences {
   modelTier: ModelTier
   /** Taille du texte des conversations. */
   textSize: TextSize
-  /** Ce que Mizanga doit savoir sur l’utilisateur et sa façon de répondre ; transmis au moteur avec chaque demande. */
+  /** Ce que Gilli doit savoir sur l’utilisateur et sa façon de répondre ; transmis au moteur avec chaque demande. */
   customInstructions: string
   /** Affiche le bouton « Écouter » sous les réponses (synthèse vocale du navigateur). */
   readAloud: boolean

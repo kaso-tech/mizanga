@@ -1,6 +1,6 @@
 # Référence du mooré — guide pour les locuteurs et linguistes
 
-Ce dossier contient ce que Mizanga transmet au moteur d’IA (Gemini) avec **chaque demande**, pour l’aider à écrire un mooré correct. Le moteur n’est pas réentraîné : il lit ces informations à chaque fois et les suit en priorité sur ses propres connaissances.
+Ce dossier contient ce que Gilli transmet au moteur d’IA (Gemini) avec **chaque demande**, pour l’aider à écrire un mooré correct. Le moteur n’est pas réentraîné : il lit ces informations à chaque fois et les suit en priorité sur ses propres connaissances.
 
 Rien n’y est inventé : les fichiers sont livrés vides et ne doivent contenir que des textes rédigés et vérifiés par des locuteurs.
 

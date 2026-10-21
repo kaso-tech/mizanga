@@ -123,7 +123,7 @@ export function ChatView({
   return (
     <section className="conversation-view" aria-label="Conversation">
       <header className="print-header">
-        <p>Mizanga — conversation imprimée le {new Date().toLocaleDateString('fr', { dateStyle: 'long' })}</p>
+        <p>Gilli — conversation imprimée le {new Date().toLocaleDateString('fr', { dateStyle: 'long' })}</p>
         <h1>{title || 'Conversation'}</h1>
       </header>
       <div className="messages-list">

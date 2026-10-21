@@ -1,4 +1,4 @@
-# Plan d’implémentation — Mizanga
+# Plan d’implémentation — Gilli
 
 ## Moteur d’IA : Gemini via relais serveur (octobre 2026)
 
@@ -18,7 +18,7 @@ L’interface reprend le design du prototype Lovable (dépôt `kaso-tech/mizanga
 
 ## Repositionnement (octobre 2026)
 
-Mizanga est un **assistant IA généraliste**, au même titre que Claude, ChatGPT ou Perplexity : rédiger, résumer, expliquer, apprendre, s’organiser. Sa particularité est linguistique : il doit comprendre et répondre en **mooré**, langue encore mal prise en charge par les autres assistants, puis potentiellement dans d’autres langues du Burkina Faso. Le mooré est un atout du produit, pas son unique sujet.
+Gilli est un **assistant IA généraliste**, au même titre que Claude, ChatGPT ou Perplexity : rédiger, résumer, expliquer, apprendre, s’organiser. Sa particularité est linguistique : il doit comprendre et répondre en **mooré**, langue encore mal prise en charge par les autres assistants, puis potentiellement dans d’autres langues du Burkina Faso. Le mooré est un atout du produit, pas son unique sujet.
 
 Conséquences sur l’interface (elles remplacent la direction visuelle « Tissage conversationnel discret » décrite plus bas) :
 
@@ -26,12 +26,12 @@ Conséquences sur l’interface (elles remplacent la direction visuelle « Tissa
 - **Langue des réponses :** « Automatique » par défaut (même langue que l’utilisateur), modifiable depuis la zone de saisie et les paramètres.
 - **Conversation :** réponses sans bulle et rendues en Markdown complet, pastille de langue sous chaque réponse, actions en icônes (copier, régénérer, avis) ; « Proposer une correction » seulement sous les réponses en mooré.
 - **Navigation :** barre latérale repliable avec les conversations de la session et une recherche ; paramètres, historique, favoris et À propos dans le menu du compte.
-- **Style :** interface neutre (blancs et gris), Noto Sans embarquée pour un rendu identique de ɛ, ɩ, ʋ et des voyelles nasales, bleu Mizanga réservé aux accents. Les noms de langues s’écrivent en minuscules (« le mooré »).
+- **Style :** interface neutre (blancs et gris), Noto Sans embarquée pour un rendu identique de ɛ, ɩ, ʋ et des voyelles nasales, bleu Gilli réservé aux accents. Les noms de langues s’écrivent en minuscules (« le mooré »).
 - **Honnêteté :** inchangée. Aucune réponse, source ou phrase en mooré n’est inventée ; les textes en mooré seront fournis et validés par des locuteurs.
 
 ## Portée approuvée
 
-Mizanga est une interface web responsive et interactive qui rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité. Le moteur Gemini est désormais accessible exclusivement par un relais serveur sécurisé, sans promesse de maîtrise linguistique du mooré et sans persistance des conversations. La recherche, l’authentification, l’audio, la base de connaissances et l’administration restent explicitement indisponibles.
+Gilli est une interface web responsive et interactive qui rend concrètes la navigation, la conversation, les préférences linguistiques et les retours qualité. Le moteur Gemini est désormais accessible exclusivement par un relais serveur sécurisé, sans promesse de maîtrise linguistique du mooré et sans persistance des conversations. La recherche, l’authentification, l’audio, la base de connaissances et l’administration restent explicitement indisponibles.
 
 ## Choix d’implémentation
 
@@ -51,7 +51,7 @@ Mizanga est une interface web responsive et interactive qui rend concrètes la n
 
 - **Mouvement de design :** minimalisme conversationnel africain contemporain, inspiré par le rythme d'une trame, pas par l'imagerie touristique.
 - **Principes :** lisibilité avant décoration ; hiérarchie éditoriale calme ; une interaction par intention ; densité réduite sur mobile.
-- **Philosophie colorielle :** blanc bleuté pour le fond, bleu nuit pour le texte, bleu cobalt pour la structure et l'action. Le bleu cobalt est la couleur propriétaire de Mizanga.
+- **Philosophie colorielle :** blanc bleuté pour le fond, bleu nuit pour le texte, bleu cobalt pour la structure et l'action. Le bleu cobalt est la couleur propriétaire de Gilli.
 - **Discipline du noir :** le noir absolu (`--ink-inverse`) est réservé à **une seule action primaire par écran** — ici « Se connecter ». Il ne sert ni aux cartes décoratives ni aux blocs de bas de page : la carte « Prochaine étape » de la page À propos est une surface de marque, pas un bloc noir.
 - **Paradigme de mise en page :** une colonne de lecture centrée (780 px) bordée d'une navigation latérale sur grand écran ; le compositeur de message forme une base stable. Le filet de trame guide le regard entre identité, contexte et conversation.
 - **Éléments signatures :** anneau ouvert ponctué d'un point de diacritique (monogramme) ; filet signature en dégradé sous l'en-tête ; badges de statut francs (« Démonstration », « Bientôt disponible »).

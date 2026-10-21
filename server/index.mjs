@@ -111,13 +111,13 @@ createServer((req, res) => {
     return
   }
   serveStatic(req, res).catch((error) => {
-    console.error('[mizanga] Erreur de service des fichiers :', error)
+    console.error('[gilli] Erreur de service des fichiers :', error)
     if (!res.headersSent) res.writeHead(500)
     res.end()
   })
 }).listen(port, () => {
-  console.log(`[mizanga] http://localhost:${port} — moteur : ${process.env.GEMINI_API_KEY ? `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})` : 'démonstration (GEMINI_API_KEY absente)'}`)
+  console.log(`[gilli] http://localhost:${port} — moteur : ${process.env.GEMINI_API_KEY ? `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})` : 'démonstration (GEMINI_API_KEY absente)'}`)
   const adminPassword = process.env.ADMIN_PASSWORD ?? ''
-  if (!adminPassword) console.log('[mizanga] Console d’administration fermée (ADMIN_PASSWORD absent).')
-  else if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) console.warn(`[mizanga] ADMIN_PASSWORD trop court (${MIN_ADMIN_PASSWORD_LENGTH} caractères au moins) : console fermée.`)
+  if (!adminPassword) console.log('[gilli] Console d’administration fermée (ADMIN_PASSWORD absent).')
+  else if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) console.warn(`[gilli] ADMIN_PASSWORD trop court (${MIN_ADMIN_PASSWORD_LENGTH} caractères au moins) : console fermée.`)
 })

@@ -30,7 +30,7 @@ describe('savedPrompts', () => {
   it('enregistre et relit les consignes en ignorant les entrées invalides', () => {
     storeSavedPrompts([{ id: '1', title: 'T', prompt: 'P' }])
     expect(loadSavedPrompts()).toEqual([{ id: '1', title: 'T', prompt: 'P' }])
-    localStorage.setItem('mizanga.prompts.v1', JSON.stringify([{ id: 2 }, null, { id: '3', title: 'T', prompt: ' ' }]))
+    localStorage.setItem('gilli.prompts.v1', JSON.stringify([{ id: 2 }, null, { id: '3', title: 'T', prompt: ' ' }]))
     expect(loadSavedPrompts()).toEqual([])
   })
 })

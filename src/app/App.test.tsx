@@ -33,7 +33,7 @@ describe('App', () => {
   })
 
   it('ignore les préférences enregistrées invalides', async () => {
-    localStorage.setItem('mizanga.preferences.v1', JSON.stringify({ responseLanguage: 'toString', theme: 'dark' }))
+    localStorage.setItem('gilli.preferences.v1', JSON.stringify({ responseLanguage: 'toString', theme: 'dark' }))
     renderApp('/parametres#langue')
     expect(await screen.findByRole('combobox', { name: 'Langue des réponses' })).toHaveValue('auto')
     expect(document.documentElement.dataset.theme).toBe('dark')
@@ -117,7 +117,7 @@ describe('App', () => {
     await userEvent.type(field, 'Réponds brièvement.')
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
-    expect(JSON.parse(localStorage.getItem('mizanga.preferences.v1') ?? '{}').customInstructions).toBe('Réponds brièvement.')
+    expect(JSON.parse(localStorage.getItem('gilli.preferences.v1') ?? '{}').customInstructions).toBe('Réponds brièvement.')
 
     await userEvent.click(screen.getAllByRole('button', { name: /Nouvelle conversation/ })[0])
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
@@ -177,7 +177,7 @@ describe('App', () => {
   })
 
   it('ferme le menu des consignes avec Échap et garde le texte', async () => {
-    localStorage.setItem('mizanga.prompts.v1', JSON.stringify([{ id: 'p1', title: 'Courrier', prompt: 'Rédige un courrier' }]))
+    localStorage.setItem('gilli.prompts.v1', JSON.stringify([{ id: 'p1', title: 'Courrier', prompt: 'Rédige un courrier' }]))
     renderApp()
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), '/')
     expect(screen.getByRole('listbox')).toBeInTheDocument()
@@ -247,7 +247,7 @@ describe('App', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Réessayer avec le modèle économe/ }))
     expect(await screen.findByText('Réponse économe')).toBeInTheDocument()
     expect(tiers).toEqual(['standard', 'lite'])
-    expect(JSON.parse(localStorage.getItem('mizanga.preferences.v1') ?? '{}').modelTier).toBe('lite')
+    expect(JSON.parse(localStorage.getItem('gilli.preferences.v1') ?? '{}').modelTier).toBe('lite')
   })
 
   it('imprime une conversation depuis son menu', async () => {

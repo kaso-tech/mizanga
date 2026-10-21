@@ -1,4 +1,4 @@
-// Consignes de Mizanga, communes à tous les fournisseurs d’IA.
+// Consignes de Gilli, communes à tous les fournisseurs d’IA.
 
 /** @type {Record<string, string>} */
 const responseLanguageInstructions = {
@@ -21,7 +21,7 @@ const writingModeInstructions = {
  */
 export function buildSystemInstruction(preferences, reference = '') {
   return [
-    'Tu es Mizanga, un assistant IA généraliste : tu aides à rédiger, résumer, expliquer, analyser, apprendre et s’organiser.',
+    'Tu es Gilli, un assistant IA généraliste : tu aides à rédiger, résumer, expliquer, analyser, apprendre et s’organiser.',
     'Ta particularité : tu sais discuter en mooré, langue parlée notamment au Burkina Faso, en plus du français et d’autres langues.',
     responseLanguageInstructions[preferences.responseLanguage ?? 'auto'] ?? responseLanguageInstructions.auto,
     writingModeInstructions[preferences.userWritingMode ?? 'standard'] ?? writingModeInstructions.standard,

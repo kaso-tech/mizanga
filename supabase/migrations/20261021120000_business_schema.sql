@@ -1,8 +1,8 @@
--- Mizanga — espace Business : schéma, droits et règles RLS.
+-- Gilli — espace Business : schéma, droits et règles RLS.
 --
 -- Principes :
 -- * chaque donnée commerciale appartient à une entreprise (business_id) ; seuls ses membres y accèdent ;
--- * les règles RLS s’appliquent même si le serveur de Mizanga se trompait : le serveur interroge la base
+-- * les règles RLS s’appliquent même si le serveur de Gilli se trompait : le serveur interroge la base
 --   avec l’identité de l’utilisateur, pas avec la clé « service » ;
 -- * les droits SQL (GRANT) limitent en plus les colonnes modifiables : la quantité en stock, les ventes et
 --   les mouvements de stock ne s’écrivent qu’à travers des fonctions contrôlées (étapes 3 et 4) ;

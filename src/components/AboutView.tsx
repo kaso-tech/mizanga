@@ -9,7 +9,7 @@ export function AboutView({ engineLabel, isDemonstration }: AboutViewProps) {
       <div className="weave-band about-band" aria-hidden="true" />
       <h1>À propos du projet</h1>
       <p>
-        Mizanga est un assistant d’intelligence artificielle généraliste, comme ChatGPT, Claude ou Perplexity : il rédige,
+        Gilli est un assistant d’intelligence artificielle généraliste, comme ChatGPT, Claude ou Perplexity : il rédige,
         résume, explique, analyse et aide à accomplir toutes sortes de tâches. Sa particularité : il vise à discuter et
         à répondre correctement en mooré, une langue encore mal comprise par la plupart des IA.
       </p>
