@@ -79,7 +79,7 @@ Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemi
 ```
 
 - **Côté serveur** (`server/chat-handler.mjs`, `server/gemini.mjs`) : le relais ajoute les consignes de Mizanga (assistant généraliste, langue de réponse choisie, honnêteté sur le mooré), transmet l’historique tel quel à Gemini et renvoie la réponse fragment par fragment. Le même code tourne dans `pnpm dev` (extension Vite), `pnpm preview` et `pnpm start`.
-- **Garde-fous** : taille des demandes limitée, 20 demandes par minute et par visiteur, annulation propagée quand l’utilisateur clique sur « Arrêter », erreurs traduites en messages clairs (quota gratuit atteint, clé refusée…).
+- **Garde-fous** : taille des demandes limitée, 20 demandes par minute et par origine de connexion observée par le serveur (sans faire confiance à l’en-tête falsifiable `X-Forwarded-For`), annulation propagée quand l’utilisateur clique sur « Arrêter », erreurs traduites en messages clairs (quota gratuit atteint, clé refusée…).
 - **Côté navigateur** : au démarrage, l’application interroge `/api/health` et choisit le moteur Gemini (`src/services/remoteAiService.ts`) ou la démonstration (`src/services/demoAiService.ts`).
 
 | Variable | Rôle |

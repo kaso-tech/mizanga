@@ -110,8 +110,13 @@ const errorBody = (message, retryAt, code) => ({ error: message, ...(retryAt ? {
 /** @param {unknown} error */
 const quotaCode = (error) => (error instanceof UpstreamError && error.status === 429 ? /** @type {const} */ ('quota') : undefined)
 
-/** Adresse du visiteur (derrière le proxy de l’hébergeur, la première de X-Forwarded-For). @param {import('node:http').IncomingMessage} req */
-const clientOf = (req) => String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnu'
+/**
+ * Identifiant du visiteur pour les limites (demandes, essais de connexion) : l’adresse de la connexion.
+ * Ne pas utiliser X-Forwarded-For ici : un client public peut le forger. Un proxy de confiance
+ * devra appliquer sa propre limite ou transmettre une identité vérifiée.
+ * @param {import('node:http').IncomingMessage} req
+ */
+const clientOf = (req) => req.socket.remoteAddress || 'inconnu'
 
 /**
  * Gestionnaire Node pour `/api/health` et `/api/chat`, partagé par le serveur de développement Vite
