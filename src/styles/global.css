@@ -584,7 +584,7 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 .page-view h1 { margin: 0; font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1.2; }
 .page-intro { margin: 16px 0; color: var(--muted-foreground); font-size: 12px; }
 .settings-section { margin-top: 16px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
-.settings-section h2 { margin: 0 0 16px; font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.settings-section h2, .settings-section h3 { margin: 0 0 16px; font-family: var(--font-display); font-size: 18px; font-weight: 600; }
 .field-label { margin: 0; font-size: 14px; font-weight: 500; }
 .choice-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .choice {
@@ -915,6 +915,22 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Console d’administration */
+.admin-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.admin-header .secondary-button { display: inline-flex; align-items: center; gap: 6px; }
+.admin-login { display: grid; gap: 12px; max-width: 440px; }
+.admin-login h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.admin-login .evaluation-help { margin: 0; }
+.admin-login .primary-button { justify-self: start; display: inline-flex; align-items: center; gap: 8px; }
+.admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.admin-stat { display: grid; gap: 2px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+.admin-stat-value { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+.admin-stat-label { color: var(--muted-foreground); font-size: 13px; }
+.admin-meter { height: 10px; margin-bottom: 10px; overflow: hidden; border-radius: 999px; background: var(--muted); }
+.admin-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+.admin-problems { margin: 0; padding-left: 20px; color: var(--foreground); font-size: 14px; line-height: 1.55; }
+.admin-page code { font-size: .9em; }
 
 /* Impression et export PDF : la conversation seule, en clair, sans les commandes de l’interface. */
 .print-header { display: none; }

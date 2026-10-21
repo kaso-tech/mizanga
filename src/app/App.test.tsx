@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
@@ -234,7 +234,7 @@ describe('App', () => {
     const remote: AiService = {
       isDemonstration: false,
       label: 'Gemini',
-      models: { standard: 'flash', lite: 'flash-lite' },
+      offersLiteModel: true,
       async *generate({ preferences }) {
         tiers.push(preferences.modelTier)
         if (preferences.modelTier === 'standard') throw new AiServiceError('La limite d’utilisation gratuite du moteur est atteinte.', undefined, 'quota')
@@ -261,6 +261,57 @@ describe('App', () => {
       await waitFor(() => expect(print).toHaveBeenCalledTimes(1))
     } finally {
       print.mockRestore()
+    }
+  })
+
+  it('ne montre plus l’outil d’évaluation aux utilisateurs et redirige son ancienne adresse vers la console', async () => {
+    renderApp('/parametres#langue')
+    expect(await screen.findByRole('heading', { level: 2, name: 'Langue et écriture' })).toBeInTheDocument()
+    expect(screen.queryByText(/Évaluer la qualité du mooré/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Référence du mooré/)).not.toBeInTheDocument()
+    cleanup()
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ configured: false, authenticated: false })))
+    try {
+      renderApp('/evaluation')
+      expect(window.location.pathname).toBe('/admin')
+      expect(await screen.findByText(/La console est fermée/)).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'Évaluation' })).not.toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('ouvre la console après connexion et donne accès à l’évaluation', async () => {
+    let authenticated = false
+    const overview = {
+      engine: { configured: true, model: 'modele-standard', liteModel: 'modele-econome' },
+      reference: { sheetChars: 0, examples: 0, entries: 0, counts: { draft: 0, review: 0, rejected: 0 }, problems: [], sentChars: 0, maxChars: 24000, omittedExamples: 0, omittedEntries: 0 },
+    }
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/admin/login') {
+        const { password } = JSON.parse(String(init?.body)) as { password: string }
+        if (password !== 'bon-mot-de-passe') return Response.json({ error: 'Mot de passe incorrect.' }, { status: 401 })
+        authenticated = true
+        return Response.json({ authenticated: true })
+      }
+      if (url === '/api/admin/session') return Response.json({ configured: true, authenticated })
+      if (url === '/api/admin/overview') return authenticated ? Response.json(overview) : Response.json({}, { status: 401 })
+      return Response.json({}, { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      renderApp('/admin')
+      const password = await screen.findByLabelText('Mot de passe')
+      await userEvent.type(password, 'mauvais{Enter}')
+      expect(await screen.findByText('Mot de passe incorrect.')).toBeInTheDocument()
+      await userEvent.clear(password)
+      await userEvent.type(password, 'bon-mot-de-passe{Enter}')
+      expect(await screen.findByText('modele-standard')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('tab', { name: 'Évaluation' }))
+      expect(screen.getByRole('heading', { name: '1. Préparer les questions' })).toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 })

@@ -1,5 +1,5 @@
 // Serveur de production : sert le site compilé (dist/) et l’API /api/*.
-// Usage : `pnpm build && pnpm start` (variables : PORT, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL).
+// Usage : `pnpm build && pnpm start` (variables : PORT, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_PASSWORD).
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -7,6 +7,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { brotliCompress, constants as zlibConstants, gzip } from 'node:zlib'
+import { MIN_ADMIN_PASSWORD_LENGTH } from './admin.mjs'
 import { createApiHandler } from './chat-handler.mjs'
 
 const distDir = resolve(fileURLToPath(new URL('../dist', import.meta.url)))
@@ -78,6 +79,8 @@ async function serveStatic(req, res) {
     // Les fichiers de dist/assets portent une empreinte dans leur nom : ils peuvent être gardés en cache.
     'Cache-Control': isHashedAsset ? 'public, max-age=31536000, immutable' : 'no-cache',
     Vary: 'Accept-Encoding',
+    // La console d’administration ne doit pas apparaître dans les moteurs de recherche.
+    ...(/^\/admin(\/|$)/.test(pathname) ? { 'X-Robots-Tag': 'noindex, nofollow' } : {}),
   }
   if (encoding) {
     const body = await compressedFile(filePath, encoding)
@@ -94,6 +97,7 @@ const api = createApiHandler({
   apiKey: process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL || undefined,
   liteModel: process.env.GEMINI_LITE_MODEL || undefined,
+  adminPassword: process.env.ADMIN_PASSWORD || undefined,
   apiBase: process.env.GEMINI_API_BASE || undefined,
 })
 
@@ -110,4 +114,7 @@ createServer((req, res) => {
   })
 }).listen(port, () => {
   console.log(`[mizanga] http://localhost:${port} — moteur : ${process.env.GEMINI_API_KEY ? `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})` : 'démonstration (GEMINI_API_KEY absente)'}`)
+  const adminPassword = process.env.ADMIN_PASSWORD ?? ''
+  if (!adminPassword) console.log('[mizanga] Console d’administration fermée (ADMIN_PASSWORD absent).')
+  else if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) console.warn(`[mizanga] ADMIN_PASSWORD trop court (${MIN_ADMIN_PASSWORD_LENGTH} caractères au moins) : console fermée.`)
 })

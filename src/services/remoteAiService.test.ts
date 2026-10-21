@@ -54,11 +54,11 @@ describe('remoteAiService', () => {
   })
 
   it('choisit Gemini seulement si le serveur l’annonce', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', model: 'gemini-flash-latest' })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', liteModel: false })))
     const live = await detectAiService()
-    expect(live).toMatchObject({ isDemonstration: false, label: 'Gemini (gemini-flash-latest)' })
+    expect(live).toMatchObject({ isDemonstration: false, label: 'Gemini (Google)', offersLiteModel: false })
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'demo', model: null })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'demo', liteModel: false })))
     expect(await detectAiService()).toBe(demoAiService)
 
     // Site statique sans API : la route renvoie la page HTML.
@@ -123,9 +123,9 @@ describe('remoteAiService', () => {
   })
 
   it('annonce le modèle économe et l’utilise quand il est choisi', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', liteModel: true })))
     const live = await detectAiService()
-    expect(live.models).toEqual({ standard: 'gemini-flash-latest', lite: 'gemini-flash-lite-latest' })
+    expect(live.offersLiteModel).toBe(true)
 
     const fetchMock = vi.fn().mockResolvedValue(streamedResponse(['{"text":"ok"}\n']))
     vi.stubGlobal('fetch', fetchMock)

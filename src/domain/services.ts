@@ -33,19 +33,11 @@ export interface AiService {
   readonly isDemonstration: boolean
   /** Nom du moteur montré à l’utilisateur (transparence). */
   readonly label: string
-  /** Modèles proposés au choix (paramètres), quand le moteur en offre plusieurs. */
-  readonly models?: { standard: string; lite?: string }
-  /** Contenu de la référence du mooré validée par des locuteurs, transmise au moteur (comptes seulement). */
-  readonly mooreReference?: MooreReferenceSummary
+  /** Vrai si le moteur propose aussi un modèle économe (choix dans les paramètres). */
+  readonly offersLiteModel?: boolean
   generate(request: AiGenerationRequest, options: { signal: AbortSignal }): AsyncIterable<AiChunk>
   /** Facultatif : propose un titre court pour une conversation à partir de son premier message. */
   suggestTitle?(firstMessage: string): Promise<string | null>
-}
-
-export interface MooreReferenceSummary {
-  sheet: boolean
-  examples: number
-  entries: number
 }
 
 /** Erreur d’un service d’IA dont le message peut être montré tel quel à l’utilisateur. */

@@ -1,4 +1,4 @@
-import { AiServiceError, type AiChunk, type AiService, type MooreReferenceSummary, type SourceReference } from '../domain/services'
+import { AiServiceError, type AiChunk, type AiService, type SourceReference } from '../domain/services'
 import type { ChatMessage } from '../domain/types'
 import { demoAiService } from './demoAiService'
 
@@ -77,12 +77,11 @@ export function selectHistory(messages: ChatMessage[]) {
  * (Gemini). La clé d’API reste sur le serveur ; le navigateur ne reçoit que le texte.
  * Réponse attendue : NDJSON, une ligne `{"text": …}` par fragment ou `{"error": …}`.
  */
-export function createRemoteAiService({ label, models, mooreReference, endpoint = '/api/chat' }: { label: string; models?: AiService['models']; mooreReference?: MooreReferenceSummary; endpoint?: string }): AiService {
+export function createRemoteAiService({ label, offersLiteModel = false, endpoint = '/api/chat' }: { label: string; offersLiteModel?: boolean; endpoint?: string }): AiService {
   return {
     isDemonstration: false,
     label,
-    models,
-    mooreReference,
+    offersLiteModel,
     async suggestTitle(firstMessage) {
       const response = await fetch('/api/title', {
         method: 'POST',
@@ -102,7 +101,7 @@ export function createRemoteAiService({ label, models, mooreReference, endpoint 
           body: JSON.stringify({
             messages: selectHistory(messages),
             webSearch,
-            modelTier: models?.lite ? preferences.modelTier : 'standard',
+            modelTier: offersLiteModel ? preferences.modelTier : 'standard',
             preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode, customInstructions: preferences.customInstructions },
           }),
           signal,
@@ -143,15 +142,12 @@ export function createRemoteAiService({ label, models, mooreReference, endpoint 
  */
 const engineStorageKey = 'mizanga.engine.v1'
 
-type Health = { engine?: string; model?: string | null; liteModel?: string | null; mooreReference?: MooreReferenceSummary }
+type Health = { engine?: string; liteModel?: boolean }
 
 const serviceFor = (health: Health) => (
   health.engine === 'gemini'
-    ? createRemoteAiService({
-      label: health.model ? `Gemini (${health.model})` : 'Gemini',
-      models: health.model ? { standard: health.model, ...(health.liteModel ? { lite: health.liteModel } : {}) } : undefined,
-      mooreReference: health.mooreReference,
-    })
+    // Les noms techniques des modèles restent dans la console d’administration.
+    ? createRemoteAiService({ label: 'Gemini (Google)', offersLiteModel: health.liteModel === true })
     : demoAiService
 )
 
@@ -161,7 +157,7 @@ export async function detectAiService({ timeoutMs = 2500 } = {}): Promise<AiServ
     const health = (await response.json()) as Health
     if (!response.ok) return demoAiService
     try {
-      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, model: health.model ?? null, liteModel: health.liteModel ?? null }))
+      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, liteModel: health.liteModel === true }))
     } catch {
       // Stockage indisponible : la détection se refera au prochain lancement.
     }

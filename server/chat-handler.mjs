@@ -1,5 +1,6 @@
 import { generateGeminiTitle, streamGeminiReply, UpstreamError } from './gemini.mjs'
-import { createReferenceLoader } from './moore-reference.mjs'
+import { createAdminAuth } from './admin.mjs'
+import { buildReferenceText, createReferenceLoader, MAX_REFERENCE_CHARS } from './moore-reference.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
 // Fichiers joints compris (8 Mo au plus, encodés en base64, soit environ 11 Mo de texte).
@@ -109,32 +110,83 @@ const errorBody = (message, retryAt, code) => ({ error: message, ...(retryAt ? {
 /** @param {unknown} error */
 const quotaCode = (error) => (error instanceof UpstreamError && error.status === 429 ? /** @type {const} */ ('quota') : undefined)
 
+/** Adresse du visiteur (derrière le proxy de l’hébergeur, la première de X-Forwarded-For). @param {import('node:http').IncomingMessage} req */
+const clientOf = (req) => String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnu'
+
 /**
  * Gestionnaire Node pour `/api/health` et `/api/chat`, partagé par le serveur de développement Vite
  * et le serveur de production. Réponse de `/api/chat` : NDJSON, une ligne `{"text": …}` par fragment,
  * ou `{"error": …}` si le moteur échoue en cours de route.
  * `liteModel` : modèle économe (plus rapide, quota gratuit plus large), proposé au choix et utilisé pour les titres.
  * `referenceDir` : dossier de la référence du mooré (par défaut server/knowledge/moore).
- * @param {{ apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
+ * `adminPassword` : mot de passe de la console d’administration (/admin) ; absent, la console est fermée.
+ * @param {{ apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteModel = 'gemini-flash-lite-latest', apiBase, referenceDir, rateLimit } = {}) {
+export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteModel = 'gemini-flash-lite-latest', apiBase, referenceDir, adminPassword, rateLimit } = {}) {
   const limit = createRateLimiter(rateLimit)
   const loadReference = createReferenceLoader(referenceDir)
+  const admin = createAdminAuth({ password: adminPassword })
+
+  /**
+   * Console d’administration : session, connexion, déconnexion et vue d’ensemble (réservée).
+   * @param {import('node:http').IncomingMessage} req @param {import('node:http').ServerResponse} res @param {string} path
+   */
+  const handleAdmin = async (req, res, path) => {
+    if (path === '/api/admin/session' && req.method === 'GET') {
+      return sendJson(res, 200, { configured: admin.configured, authenticated: admin.isAuthenticated(req) })
+    }
+    if (path === '/api/admin/login' && req.method === 'POST') {
+      if (!admin.configured) return sendJson(res, 503, { error: 'La console n’est pas configurée : définissez le secret ADMIN_PASSWORD sur le serveur.' })
+      let body
+      try {
+        body = await readJson(req)
+      } catch {
+        return sendJson(res, 400, { error: 'Requête invalide.' })
+      }
+      const result = admin.login(clientOf(req), body?.password)
+      if (result.ok) {
+        res.setHeader('Set-Cookie', admin.cookieHeader(req, result.cookie))
+        return sendJson(res, 200, { authenticated: true })
+      }
+      if (result.blockedUntil) return sendJson(res, 429, errorBody('Trop d’essais incorrects.', result.blockedUntil))
+      return sendJson(res, 401, { error: 'Mot de passe incorrect.' })
+    }
+    if (path === '/api/admin/logout' && req.method === 'POST') {
+      res.setHeader('Set-Cookie', admin.cookieHeader(req, null))
+      return sendJson(res, 200, { authenticated: false })
+    }
+    if (!admin.isAuthenticated(req)) return sendJson(res, 401, { error: 'Connexion administrateur requise.' })
+    if (path === '/api/admin/overview' && req.method === 'GET') {
+      const { reference } = loadReference()
+      const sent = buildReferenceText(reference)
+      return sendJson(res, 200, {
+        engine: { configured: Boolean(apiKey), model, liteModel },
+        reference: {
+          sheetChars: reference.sheet.length,
+          examples: reference.examples.length,
+          entries: reference.entries.length,
+          counts: reference.counts,
+          problems: reference.problems,
+          sentChars: sent.text.length,
+          maxChars: MAX_REFERENCE_CHARS,
+          omittedExamples: sent.omittedExamples,
+          omittedEntries: sent.omittedEntries,
+        },
+      })
+    }
+    return sendJson(res, 404, { error: 'Introuvable.' })
+  }
 
   return async (req, res, next) => {
     const path = (req.url ?? '').split('?')[0]
 
     if (path === '/api/health' && req.method === 'GET') {
-      const { reference } = loadReference()
-      return sendJson(res, 200, {
-        engine: apiKey ? 'gemini' : 'demo',
-        model: apiKey ? model : null,
-        liteModel: apiKey ? liteModel : null,
-        // Ce que contient la référence du mooré (comptes seulement : son texte reste sur le serveur).
-        mooreReference: { sheet: reference.sheet !== '', examples: reference.examples.length, entries: reference.entries.length },
-      })
+      // Public : seulement ce dont l’interface a besoin. Les noms des modèles et l’état de la
+      // référence du mooré sont réservés à la console d’administration.
+      return sendJson(res, 200, { engine: apiKey ? 'gemini' : 'demo', liteModel: Boolean(apiKey && liteModel) })
     }
+    if (path.startsWith('/api/admin/')) return handleAdmin(req, res, path)
     if (path !== '/api/chat' && path !== '/api/title') {
       if (next) return next()
       return sendJson(res, 404, { error: 'Introuvable.' })
@@ -142,8 +194,8 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Méthode non autorisée.' })
     if (!apiKey) return sendJson(res, 503, { error: 'Aucun moteur d’IA n’est configuré sur ce serveur.' })
 
-    const client = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnu'
-    const blockedUntil = limit(client)
+    // Les administrateurs (outil d’évaluation) ne sont pas soumis à la limite par visiteur.
+    const blockedUntil = admin.isAuthenticated(req) ? null : limit(clientOf(req))
     if (blockedUntil) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blockedUntil))
 
     if (path === '/api/title') {

@@ -18,7 +18,8 @@ import { useConversation } from './useConversation'
 
 // Pages secondaires chargées à la demande : l’accueil s’affiche plus vite sur réseau mobile.
 const SettingsView = lazy(() => import('../components/SettingsView').then((module) => ({ default: module.SettingsView })))
-const EvaluationView = lazy(() => import('../components/EvaluationView').then((module) => ({ default: module.EvaluationView })))
+// Console d’administration : protégée par le serveur, jamais liée depuis l’interface des utilisateurs.
+const AdminView = lazy(() => import('../components/AdminView').then((module) => ({ default: module.AdminView })))
 const AboutView = lazy(() => import('../components/AboutView').then((module) => ({ default: module.AboutView })))
 const CollectionView = lazy(() => import('../components/CollectionView').then((module) => ({ default: module.CollectionView })))
 const FeedbackDialog = lazy(() => import('../components/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })))
@@ -29,8 +30,11 @@ const routeByView: Record<AppView, string> = {
   favorites: '/favoris',
   settings: '/parametres',
   about: '/a-propos',
-  evaluation: '/evaluation',
+  admin: '/admin',
 }
+
+/** Anciennes adresses conservées pour les liens existants. */
+const legacyRoutes: Record<string, AppView> = { '/evaluation': 'admin' }
 
 const titleByView: Record<AppView, string> = {
   chat: 'Conversation',
@@ -38,7 +42,7 @@ const titleByView: Record<AppView, string> = {
   favorites: 'Favoris',
   settings: 'Paramètres',
   about: 'À propos',
-  evaluation: 'Évaluation du mooré',
+  admin: 'Administration',
 }
 
 const themeColorByTheme: Record<'light' | 'dark', string> = {
@@ -49,7 +53,7 @@ const themeColorByTheme: Record<'light' | 'dark', string> = {
 function getViewFromPath(pathname: string): AppView {
   const normalizedPath = pathname.replace(/\/+$/, '') || '/'
   const entry = Object.entries(routeByView).find(([, path]) => path === normalizedPath)
-  return (entry?.[0] as AppView | undefined) ?? 'chat'
+  return (entry?.[0] as AppView | undefined) ?? legacyRoutes[normalizedPath] ?? 'chat'
 }
 
 /** Remplace une adresse inconnue ou non canonique (ex. « /parametres/ ») par celle de la vue affichée. */
@@ -447,7 +451,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         return (
           <SettingsView
             preferences={preferences}
-            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration, models: aiService.models, mooreReference: aiService.mooreReference }}
+            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration, offersLiteModel: aiService.offersLiteModel }}
             conversationCount={conversation.conversations.length}
             onChange={updatePreferences}
             onResetPreferences={() => {
@@ -455,7 +459,6 @@ export function App({ aiService = demoAiService }: AppProps) {
               notify('Préférences réinitialisées.', 'success')
             }}
             onNewConversation={startNewConversation}
-            onOpenEvaluation={() => navigate('evaluation')}
             onClearConversations={() => {
               conversation.clearAll()
               setDraft('')
@@ -468,8 +471,8 @@ export function App({ aiService = demoAiService }: AppProps) {
             onImportConversations={(file) => void importConversations(file)}
           />
         )
-      case 'evaluation':
-        return <EvaluationView aiService={aiService} preferences={preferences} onNotify={notify} />
+      case 'admin':
+        return <AdminView aiService={aiService} preferences={preferences} onNotify={notify} />
       case 'about':
         return <AboutView engineLabel={aiService.label} isDemonstration={aiService.isDemonstration} />
       default:
@@ -485,7 +488,7 @@ export function App({ aiService = demoAiService }: AppProps) {
             onNewConversation={startNewConversation}
             onCopy={copyMessage}
             onRegenerate={() => conversation.regenerate()}
-            onUseLiteModel={aiService.models?.lite && preferences.modelTier !== 'lite' ? switchToLiteModel : undefined}
+            onUseLiteModel={aiService.offersLiteModel && preferences.modelTier !== 'lite' ? switchToLiteModel : undefined}
             onEditLastMessage={conversation.editLastUserMessage}
             onRate={rateMessage}
             onReport={openReport}

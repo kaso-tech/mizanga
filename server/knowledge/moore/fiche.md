@@ -46,7 +46,7 @@
 <!--
   Erreurs déjà observées dans les réponses de Mizanga ou d’autres assistants (mots inventés, calques du français,
   mauvaises lettres…). Format conseillé : « Ne pas écrire … mais … (parce que …) ».
-  L’outil d’évaluation (/evaluation) et les signalements aident à les repérer.
+  L’outil d’évaluation de la console d’administration (/admin) et les signalements aident à les repérer.
 -->
 
 ## Registre et ton

@@ -105,12 +105,11 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
   const percent = (value: number) => (summary.rated ? `${Math.round((value / summary.rated) * 100)} %` : '—')
 
   return (
-    <div className="page-view evaluation-view">
-      <h1>Évaluation du mooré</h1>
+    <div className="evaluation-view">
       <p className="page-intro">Mesurez la qualité réelle des réponses de Mizanga avec des questions préparées et notées par des locuteurs du mooré.</p>
 
       <section className="settings-section">
-        <h2>1. Préparer les questions</h2>
+        <h3>1. Préparer les questions</h3>
         <p className="evaluation-help">
           Téléchargez le modèle, remplissez une question par ligne (colonne « question », et si possible « reponse_attendue »), enregistrez-le en CSV puis importez-le.
           La colonne « langue_de_reponse » accepte : {Object.keys(responseLanguageLabels).join(', ')}.
@@ -141,7 +140,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
       {items.length > 0 && (
         <>
           <section className="settings-section">
-            <h2>2. Obtenir les réponses</h2>
+            <h3>2. Obtenir les réponses</h3>
             {aiService.isDemonstration && <p className="settings-callout">Aucun moteur d’IA n’est connecté : les réponses obtenues seront des messages de démonstration, sans valeur pour l’évaluation.</p>}
             <div className="evaluation-run">
               <label className="evaluation-delay">
@@ -167,7 +166,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
           </section>
 
           <section className="settings-section">
-            <h2>3. Noter les réponses</h2>
+            <h3>3. Noter les réponses</h3>
             <div className="evaluation-summary" aria-label="Résumé">
               <span className="value-pill">{summary.rated} notée{summary.rated > 1 ? 's' : ''} sur {summary.total}</span>
               <span className="value-pill is-correct">Correctes : {summary.correct} ({percent(summary.correct)})</span>
@@ -217,7 +216,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
           </section>
 
           <section className="settings-section">
-            <h2>4. Exporter</h2>
+            <h3>4. Exporter</h3>
             <p className="evaluation-help">Le fichier CSV s’ouvre dans Excel ou LibreOffice. L’évaluation en cours est gardée sur cet appareil jusqu’à ce que vous l’effaciez.</p>
             <div className="evaluation-actions">
               <button type="button" className="primary-button" disabled={summary.answered === 0} onClick={() => downloadText(resultsCsv(items, aiService.label), `mizanga-evaluation-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>

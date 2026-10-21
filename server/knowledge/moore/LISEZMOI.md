@@ -43,7 +43,7 @@ Tout est envoyé à chaque demande : plus la référence est longue, plus chaque
 
 ## Mesurer l’effet
 
-Avant de remplir la référence, faites passer un jeu de questions avec l’outil d’évaluation (`/evaluation`) ; repassez-le après chaque série de modifications et comparez les résultats. C’est la seule façon de savoir si une règle ou un exemple améliore vraiment les réponses.
+Avant de remplir la référence, faites passer un jeu de questions avec l’outil d’évaluation de la console d’administration (`/admin`, onglet « Évaluation ») ; repassez-le après chaque série de modifications et comparez les résultats. C’est la seule façon de savoir si une règle ou un exemple améliore vraiment les réponses.
 
 ## Droits et confidentialité
 

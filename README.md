@@ -17,7 +17,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - **Instructions personnelles** (Paramètres › Personnalisation) : métier, région, ton ou longueur de réponse préférés, pris en compte dans toutes les conversations (1 500 caractères au plus, placés après les règles de Mizanga).
 - **Consignes enregistrées** : les demandes fréquentes, enregistrées depuis un message ou dans Paramètres › Personnalisation, proposées sur l’accueil et en tapant « / » au début d’un message.
 - **Lecture à voix haute** des réponses avec la synthèse vocale de l’appareil (vitesse et voix réglables, sans envoi de données) ; aucune voix mooré n’existe encore, l’interface le signale.
-- **Outil d’évaluation du mooré** (`/evaluation`, aussi dans Paramètres › Langue et écriture) : importer des questions préparées par des locuteurs (CSV), obtenir les réponses une à une en respectant le quota, les noter et exporter les résultats pour Excel.
+- **Console d’administration** (`/admin`, réservée à l’équipe, protégée par mot de passe côté serveur et jamais liée depuis l’interface) : configuration du moteur, état de la référence du mooré, et outil d’évaluation du mooré (importer des questions préparées par des locuteurs en CSV, obtenir les réponses une à une, les noter, exporter les résultats pour Excel). L’ancienne adresse `/evaluation` y mène.
 - Clavier des caractères du mooré (ɛ ɩ ʋ ã ẽ ĩ õ ũ Ɛ Ɩ Ʋ) inséré au curseur ; le texte saisi n’est jamais normalisé.
 - Historique avec recherche dans les titres et le contenu des messages, favoris et suppression, enregistré sur l’appareil (désactivable dans les paramètres, par exemple sur un appareil partagé).
 - Sauvegarde de l’historique dans un fichier JSON et restauration sur un autre appareil, sans doublons (Paramètres › Conversations et données).
@@ -87,6 +87,7 @@ Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemi
 | `GEMINI_API_KEY` | Clé de l’API Gemini. Absente : mode démonstration. |
 | `GEMINI_MODEL` | Modèle standard (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
 | `GEMINI_LITE_MODEL` | Modèle économe, proposé au choix et utilisé pour les titres (défaut : `gemini-flash-lite-latest`). |
+| `ADMIN_PASSWORD` | Mot de passe de la console d’administration (12 caractères au moins). Absent : console fermée. |
 | `PORT` | Port du serveur de production (défaut : 3000). |
 
 **Confidentialité :** avec l’offre gratuite de Gemini, Google peut utiliser les échanges pour améliorer ses services ; l’application le signale dans les paramètres. Passez à une offre payante avant d’accueillir des données sensibles.
@@ -99,11 +100,11 @@ Le dossier `server/knowledge/moore/` contient la référence que le relais trans
 
 - `pnpm moore:check` affiche ce qui sera transmis et signale les problèmes (statut inconnu, ligne validée sans relecteur, doublons, taille dépassée).
 - Le serveur relit les fichiers modifiés en quelques secondes ; la référence est limitée à 24 000 caractères par demande.
-- Paramètres › Langue et écriture indique ce que contient la référence (fiche, nombre d’exemples et de mots).
+- La console d’administration (`/admin`) indique ce que contient la référence, la taille envoyée et les problèmes à corriger.
 
 ## Routes
 
-`/` (conversation), `/parametres`, `/a-propos`, `/historique`, `/favoris`. L’application est une SPA : en production, toute adresse inconnue doit renvoyer `index.html`.
+`/` (conversation), `/parametres`, `/a-propos`, `/historique`, `/favoris` ; `/admin` (console d’administration, non liée depuis l’interface). L’application est une SPA : en production, toute adresse inconnue doit renvoyer `index.html`.
 
 ## Déploiement
 
@@ -111,7 +112,7 @@ Le dossier `server/knowledge/moore/` contient la référence que le relais trans
 - **Production Manus :** un conteneur Node, et non un site statique, car l’API doit rester côté serveur. Le `Dockerfile` active pnpm, installe le verrouillé, construit `dist/`, puis lance `server/index.mjs` avec `pnpm start`. La sonde `/api/health` est publique et ne révèle pas la clé.
 - **Variables :** `GEMINI_API_KEY` (et éventuellement `GEMINI_MODEL`) sont des secrets injectés à l’exécution ; `PORT` est fourni par l’hébergement. La clé ne doit jamais être placée dans un fichier versionné ou dans une variable `VITE_*`.
 
-Le serveur sert aussi les routes de l’application (`/parametres`…), compresse les fichiers texte (brotli ou gzip) et met en cache les fichiers de `dist/assets`. Les vues secondaires (paramètres, évaluation, à propos…) et le rendu Markdown sont chargés à la demande : score Lighthouse mobile de 99 en performance.
+Le serveur sert aussi les routes de l’application (`/parametres`…), compresse les fichiers texte (brotli ou gzip) et met en cache les fichiers de `dist/assets`. Les vues secondaires (paramètres, console d’administration, à propos…) et le rendu Markdown sont chargés à la demande : score Lighthouse mobile de 99 en performance.
 
 ## Principes du projet
 

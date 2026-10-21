@@ -47,6 +47,13 @@ async function startApi(config) {
 /** @param {unknown} body */
 const post = (/** @type {string} */ base, body) => fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
+const adminPassword = 'mot-de-passe-de-test'
+/** Connexion à la console ; renvoie le cookie de session. @param {string} base */
+async function adminLogin(base, password = adminPassword) {
+  const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
+  return (response.headers.get('set-cookie') ?? '').split(';')[0]
+}
+
 let geminiBase = ''
 const textEvent = (/** @type {string} */ text, thought = false) => ({ candidates: [{ content: { parts: [{ text, thought }] } }] })
 const validBody = {
@@ -71,9 +78,9 @@ afterAll(() => {
 describe('API Mizanga', () => {
   it('annonce le moteur disponible', async () => {
     const demo = await startApi({})
-    expect(await (await fetch(`${demo}/api/health`)).json()).toMatchObject({ engine: 'demo', model: null, liteModel: null })
+    expect(await (await fetch(`${demo}/api/health`)).json()).toEqual({ engine: 'demo', liteModel: false })
     const gemini = await startApi({ apiKey: 'cle', model: 'gemini-test' })
-    expect(await (await fetch(`${gemini}/api/health`)).json()).toMatchObject({ engine: 'gemini', model: 'gemini-test', liteModel: 'gemini-flash-lite-latest' })
+    expect(await (await fetch(`${gemini}/api/health`)).json()).toEqual({ engine: 'gemini', liteModel: true })
   })
 
   it('refuse /api/chat sans clé configurée', async () => {
@@ -228,8 +235,11 @@ describe('API Mizanga', () => {
       writeFileSync(join(referenceDir, 'fiche.md'), '## Orthographe\nRègle de test validée.')
       writeFileSync(join(referenceDir, 'lexique.csv'), 'statut;francais;moore;valide_par\nvalidé;eau;mot-test;AB\nbrouillon;pain;mot-brouillon;')
       upstreamReply = { status: 200, events: [textEvent('ok')] }
-      const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, referenceDir })
-      expect(/** @type {any} */ (await (await fetch(`${base}/api/health`)).json()).mooreReference).toEqual({ sheet: true, examples: 0, entries: 1 })
+      const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, referenceDir, adminPassword })
+      const cookie = await adminLogin(base)
+      const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
+      expect(overview.reference).toMatchObject({ examples: 0, entries: 1, counts: { draft: 1 }, problems: [] })
+      expect(overview.reference.sheetChars).toBeGreaterThan(0)
       await (await post(base, validBody)).text()
       const instruction = lastUpstreamRequest.body.systemInstruction.parts[0].text
       expect(instruction).toContain('Référence du mooré rédigée et validée par des locuteurs')
@@ -239,5 +249,60 @@ describe('API Mizanga', () => {
     } finally {
       rmSync(referenceDir, { recursive: true, force: true })
     }
+  })
+
+  it('ferme la console sans mot de passe configuré (ou trop court)', async () => {
+    for (const config of [{}, { adminPassword: 'court' }]) {
+      const base = await startApi(config)
+      expect(await (await fetch(`${base}/api/admin/session`)).json()).toEqual({ configured: false, authenticated: false })
+      const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'court' }) })
+      expect(login.status).toBe(503)
+    }
+  })
+
+  it('ouvre une session administrateur protégée et la ferme', async () => {
+    const base = await startApi({ adminPassword })
+    expect((await fetch(`${base}/api/admin/overview`)).status).toBe(401)
+
+    const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    expect(response.status).toBe(200)
+    const setCookie = response.headers.get('set-cookie') ?? ''
+    expect(setCookie).toContain('HttpOnly')
+    expect(setCookie).toContain('SameSite=Strict')
+    expect(setCookie).toContain('Path=/api')
+    const cookie = setCookie.split(';')[0]
+
+    expect(await (await fetch(`${base}/api/admin/session`, { headers: { cookie } })).json()).toEqual({ configured: true, authenticated: true })
+    const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
+    expect(overview.engine).toEqual({ configured: false, model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })
+
+    // Un cookie modifié est refusé.
+    const forged = cookie.replace(/=(\d+)\./, (_match, expires) => `=${Number(expires) + 1000}.`)
+    expect((await fetch(`${base}/api/admin/overview`, { headers: { cookie: forged } })).status).toBe(401)
+
+    const logout = await fetch(`${base}/api/admin/logout`, { method: 'POST', headers: { cookie } })
+    expect(logout.headers.get('set-cookie')).toContain('Max-Age=0')
+  })
+
+  it('refuse un mauvais mot de passe et bloque après plusieurs essais', async () => {
+    const base = await startApi({ adminPassword })
+    const attempt = () => fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'mauvais-mot-de-passe' }) })
+    for (let index = 0; index < 5; index++) expect((await attempt()).status).toBe(401)
+    const blocked = await attempt()
+    expect(blocked.status).toBe(429)
+    expect(/** @type {any} */ (await blocked.json()).retryAt).toBeTruthy()
+    // Même le bon mot de passe attend la fin du blocage.
+    expect(await adminLogin(base)).toBe('')
+  })
+
+  it('n’applique pas la limite par visiteur aux administrateurs connectés', async () => {
+    upstreamReply = { status: 200, events: [textEvent('ok')] }
+    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, adminPassword, rateLimit: { windowMs: 60_000, maxRequests: 1 } })
+    expect((await post(base, validBody)).status).toBe(200)
+    expect((await post(base, validBody)).status).toBe(429)
+    const cookie = await adminLogin(base)
+    const asAdmin = await fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', cookie }, body: JSON.stringify(validBody) })
+    expect(asAdmin.status).toBe(200)
+    await asAdmin.text()
   })
 })
