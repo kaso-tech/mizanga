@@ -518,9 +518,11 @@ export function App({ aiService = demoAiService }: AppProps) {
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header
           isMenuOpen={isMobile ? drawerOpen : !sidebarCollapsed}
-          responseLanguage={preferences.responseLanguage}
+          isDemonstration={aiService.isDemonstration}
+          offersLiteModel={Boolean(aiService.offersLiteModel)}
+          modelTier={preferences.modelTier}
           onToggleSidebar={toggleSidebar}
-          onResponseLanguageChange={(responseLanguage) => updatePreferences({ responseLanguage })}
+          onModelTierChange={(modelTier) => updatePreferences({ modelTier })}
           onOpenSettings={() => navigate('settings')}
         />
         <div className="content-scroll"><div className="content-frame"><Suspense fallback={<div className="page-loading" aria-busy="true" />}>{renderView()}</Suspense></div></div>

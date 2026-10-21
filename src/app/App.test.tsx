@@ -32,10 +32,10 @@ describe('App', () => {
     expect(window.location.pathname).toBe('/parametres')
   })
 
-  it('ignore les préférences enregistrées invalides', () => {
+  it('ignore les préférences enregistrées invalides', async () => {
     localStorage.setItem('mizanga.preferences.v1', JSON.stringify({ responseLanguage: 'toString', theme: 'dark' }))
-    renderApp()
-    expect(screen.getByRole('combobox', { name: 'Langue de réponse' })).toHaveValue('auto')
+    renderApp('/parametres#langue')
+    expect(await screen.findByRole('combobox', { name: 'Langue des réponses' })).toHaveValue('auto')
     expect(document.documentElement.dataset.theme).toBe('dark')
   })
 
@@ -313,5 +313,21 @@ describe('App', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+
+  it('choisit le modèle depuis l’en-tête quand le moteur en propose deux', async () => {
+    const tiers: string[] = []
+    const remote: AiService = { isDemonstration: false, label: 'Gemini', offersLiteModel: true, async *generate({ preferences }) { tiers.push(preferences.modelTier); yield { text: 'ok' } } }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={remote} />)
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Modèle' }), 'lite')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
+    await screen.findByText('ok')
+    expect(tiers).toEqual(['lite'])
+    cleanup()
+
+    renderApp()
+    expect(screen.queryByRole('combobox', { name: 'Modèle' })).not.toBeInTheDocument()
+    expect(screen.getByText('Démonstration', { selector: '.model-badge' })).toBeInTheDocument()
   })
 })

@@ -1,20 +1,29 @@
 import { ChevronDown, PanelLeft, Settings, UserRound } from 'lucide-react'
-import { responseLanguageLabels } from '../data/content'
-import type { ResponseLanguage } from '../domain/types'
+import type { ModelTier } from '../domain/types'
 
 interface HeaderProps {
   isMenuOpen: boolean
-  responseLanguage: ResponseLanguage
+  isDemonstration: boolean
+  /** Vrai si le moteur propose un modèle économe en plus du standard. */
+  offersLiteModel: boolean
+  modelTier: ModelTier
   onToggleSidebar: () => void
-  onResponseLanguageChange: (language: ResponseLanguage) => void
+  onModelTierChange: (modelTier: ModelTier) => void
   onOpenSettings: () => void
+}
+
+const modelLabels: Record<ModelTier, string> = {
+  standard: 'Standard',
+  lite: 'Économe',
 }
 
 export function Header({
   isMenuOpen,
-  responseLanguage,
+  isDemonstration,
+  offersLiteModel,
+  modelTier,
   onToggleSidebar,
-  onResponseLanguageChange,
+  onModelTierChange,
   onOpenSettings,
 }: HeaderProps) {
   return (
@@ -32,15 +41,19 @@ export function Header({
       </div>
 
       <div className="topbar-actions">
-        <label className="language-select">
-          <span className="visually-hidden">Langue de réponse</span>
-          <select value={responseLanguage} onChange={(event) => onResponseLanguageChange(event.target.value as ResponseLanguage)}>
-            {Object.entries(responseLanguageLabels).map(([language, label]) => (
-              <option key={language} value={language}>{label}</option>
-            ))}
-          </select>
-          <ChevronDown size={16} aria-hidden="true" />
-        </label>
+        {offersLiteModel ? (
+          <label className="model-select" title="Standard : plus approfondi. Économe : plus rapide, quota plus large.">
+            <span className="visually-hidden">Modèle</span>
+            <select value={modelTier} onChange={(event) => onModelTierChange(event.target.value as ModelTier)}>
+              {Object.entries(modelLabels).map(([tier, label]) => (
+                <option key={tier} value={tier}>{label}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} aria-hidden="true" />
+          </label>
+        ) : isDemonstration ? (
+          <span className="model-badge">Démonstration</span>
+        ) : null}
         <button className="icon-button" type="button" aria-label="Paramètres" title="Paramètres" onClick={onOpenSettings}>
           <Settings size={20} />
         </button>
