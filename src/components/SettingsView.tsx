@@ -1,4 +1,4 @@
-import { AudioLines, Bookmark, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, UserRound, type LucideIcon } from 'lucide-react'
+import { AudioLines, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, UserRound, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
 import { MAX_PROMPT_TITLE_CHARS, MAX_SAVED_PROMPTS, type SavedPrompt } from '../app/savedPrompts'
@@ -10,13 +10,13 @@ import type { LinguisticPreferences, ModelTier, ResponseLanguage, TextSize, Them
 
 type SectionId = 'general' | 'personnalisation' | 'langue' | 'donnees' | 'voix' | 'compte'
 
-const sections: Array<{ id: SectionId; label: string; description: string; icon: LucideIcon }> = [
-  { id: 'general', label: 'Général', description: 'Apparence et langue de l’interface.', icon: SlidersHorizontal },
-  { id: 'personnalisation', label: 'Personnalisation', description: 'Ce que Mizanga doit savoir sur vous, votre façon de répondre préférée et vos consignes réutilisables.', icon: Sparkles },
-  { id: 'langue', label: 'Langue et écriture', description: 'La langue de vos échanges avec Mizanga et votre façon d’écrire le mooré.', icon: Languages },
-  { id: 'donnees', label: 'Conversations et données', description: 'Ce qui est conservé, où, et comment l’effacer.', icon: Database },
-  { id: 'voix', label: 'Voix', description: 'Messages vocaux et lecture audio des réponses.', icon: AudioLines },
-  { id: 'compte', label: 'Compte', description: 'Connexion et synchronisation.', icon: UserRound },
+const sections: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
+  { id: 'general', label: 'Général', icon: SlidersHorizontal },
+  { id: 'personnalisation', label: 'Personnalisation', icon: Sparkles },
+  { id: 'langue', label: 'Langue et écriture', icon: Languages },
+  { id: 'donnees', label: 'Conversations et données', icon: Database },
+  { id: 'voix', label: 'Voix', icon: AudioLines },
+  { id: 'compte', label: 'Compte', icon: UserRound },
 ]
 
 function initialSection(): SectionId {
@@ -84,11 +84,12 @@ function Switch({ id, checked, onChange }: { id: string; checked: boolean; onCha
 /** Installation sur l’écran d’accueil, selon ce que permet le navigateur. */
 function InstallRow() {
   const state = useSyncExternalStore(subscribeInstallState, getInstallState)
+  // Seules les marches à suivre manuelles sont expliquées ; sinon le bouton ou l’état suffit.
   const descriptions = {
-    installed: 'Mizanga est installée sur cet appareil.',
-    available: 'Ajoutez Mizanga à l’écran d’accueil pour l’ouvrir comme une application, même avec une connexion fragile.',
-    ios: 'Sur iPhone ou iPad : touchez le bouton Partager de Safari, puis « Sur l’écran d’accueil ».',
-    unavailable: 'Depuis le menu de votre navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».',
+    installed: undefined,
+    available: undefined,
+    ios: 'Safari › Partager › « Sur l’écran d’accueil ».',
+    unavailable: 'Menu du navigateur › « Installer l’application ».',
   }
   return (
     <SettingRow label="Installer l’application" description={descriptions[state]}>
@@ -115,10 +116,7 @@ function CustomInstructions({ value, isDemonstration, onSave }: { value: string;
   return (
     <div className="setting-group instructions-group">
       <label className="setting-label" htmlFor="setting-custom-instructions">Instructions personnelles</label>
-      <p className="setting-description">
-        Votre métier, votre région, le ton ou la longueur de réponse que vous préférez… Mizanga en tient compte dans toutes les conversations.
-        {isDemonstration ? ' Elles seront utilisées dès qu’un moteur d’IA sera connecté.' : ' Elles sont envoyées avec chaque message, comme le reste de la conversation : n’y mettez pas d’informations sensibles.'}
-      </p>
+      {!isDemonstration && <p className="setting-description">Envoyées avec chaque message : pas d’informations sensibles.</p>}
       <textarea
         id="setting-custom-instructions"
         className="instructions-input"
@@ -152,9 +150,7 @@ function SavedPromptsSettings({ prompts, onAdd, onDelete }: { prompts: SavedProm
   return (
     <div className="setting-group instructions-group">
       <p className="setting-label">Consignes enregistrées</p>
-      <p className="setting-description">
-        Les demandes que vous faites souvent, prêtes à l’emploi : elles apparaissent sur l’accueil et en tapant « / » au début d’un message. Vous pouvez aussi enregistrer un de vos messages avec son bouton <Bookmark size={12} aria-label="signet" />.
-      </p>
+      <p className="setting-description">Proposées sur l’accueil et avec « / » dans la zone de saisie.</p>
       <div className="prompt-form">
         <label className="visually-hidden" htmlFor="new-prompt-title">Titre de la consigne</label>
         <input id="new-prompt-title" className="instructions-input" value={title} maxLength={MAX_PROMPT_TITLE_CHARS} placeholder="Titre (facultatif), par ex. « Résumé en 5 points »" onChange={(event) => setTitle(event.target.value)} />
@@ -198,11 +194,11 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
       <div className="setting-group">
         <SettingRow
           label="Messages vocaux"
-          description="Touchez le micro de la zone de saisie pour parler à Mizanga (2 minutes au plus). La compréhension du mooré parlé n’est pas encore garantie : le français est mieux compris pour l’instant."
+          description="Le mooré parlé n’est pas encore bien compris."
         >
           <span className="value-pill">{isVoiceRecordingSupported() ? 'Disponible' : 'Non pris en charge ici'}</span>
         </SettingRow>
-        <SettingRow label="Lecture audio des réponses" htmlFor="setting-read-aloud" description={unavailable ?? 'Affiche le bouton « Écouter » sous chaque réponse. La lecture se fait sur votre appareil, sans envoi de données.'}>
+        <SettingRow label="Lecture audio des réponses" htmlFor="setting-read-aloud" description={unavailable}>
           {supported ? <Switch id="setting-read-aloud" checked={preferences.readAloud} onChange={(readAloud) => onChange({ readAloud })} /> : <span className="value-pill">Non pris en charge ici</span>}
         </SettingRow>
         <SettingRow label="Vitesse de lecture" htmlFor="setting-voice-speed">
@@ -214,7 +210,7 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
             onChange={(rate) => onChange({ speechRate: Number(rate) })}
           />
         </SettingRow>
-        <SettingRow label="Voix" htmlFor="setting-voice-variety" description="Les voix disponibles dépendent de votre appareil.">
+        <SettingRow label="Voix" htmlFor="setting-voice-variety">
           <span className="confirm-actions">
             <SelectControl
               id="setting-voice-variety"
@@ -236,7 +232,7 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
       </div>
       <p className="settings-callout">
         <Info size={16} aria-hidden="true" />
-        <span>Aucune voix mooré n’existe encore sur les téléphones et ordinateurs : une réponse en mooré serait lue avec une prononciation approximative. Une voix mooré fait partie des prochaines étapes.</span>
+        <span>Aucune voix mooré n’est encore disponible.</span>
       </p>
     </>
   )
@@ -248,7 +244,6 @@ interface SettingsViewProps {
   conversationCount: number
   onChange: (changes: Partial<LinguisticPreferences>) => void
   onResetPreferences: () => void
-  onNewConversation: () => void
   onClearConversations: () => void
   onExportConversations: () => void
   onImportConversations: (file: File) => void
@@ -257,7 +252,7 @@ interface SettingsViewProps {
   onDeletePrompt: (id: string) => void
 }
 
-export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onNewConversation, onClearConversations, onExportConversations, onImportConversations, savedPrompts, onAddPrompt, onDeletePrompt }: SettingsViewProps) {
+export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onClearConversations, onExportConversations, onImportConversations, savedPrompts, onAddPrompt, onDeletePrompt }: SettingsViewProps) {
   const importInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection)
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -285,7 +280,6 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
     <div className="settings-page">
       <header className="settings-header">
         <h1>Paramètres</h1>
-        <p>Personnalisez Mizanga. Vos préférences sont enregistrées sur cet appareil uniquement.</p>
       </header>
 
       <div className="settings-layout">
@@ -313,12 +307,11 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
         <section className="settings-panel" role="tabpanel" id={`panel-${current.id}`} aria-labelledby={`tab-${current.id}`}>
           <div className="panel-heading">
             <h2>{current.label}</h2>
-            <p>{current.description}</p>
           </div>
 
           {activeSection === 'general' && (
             <div className="setting-group">
-              <SettingRow label="Thème" description="« Système » suit le réglage clair ou sombre de votre appareil.">
+              <SettingRow label="Thème">
                 <SegmentedControl<ThemePreference>
                   name="theme"
                   label="Thème"
@@ -331,7 +324,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   onChange={(theme) => onChange({ theme })}
                 />
               </SettingRow>
-              <SettingRow label="Taille du texte" htmlFor="setting-text-size" description="Agrandit ou réduit les messages des conversations.">
+              <SettingRow label="Taille du texte" htmlFor="setting-text-size">
                 <SelectControl<TextSize>
                   id="setting-text-size"
                   value={preferences.textSize}
@@ -349,7 +342,6 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 <SettingRow
                   label="Modèle de réponses"
                   htmlFor="setting-model-tier"
-                  description="Le modèle standard rédige des réponses plus approfondies. Le modèle économe est plus rapide et dispose d’un quota gratuit distinct et plus large : utile pour les demandes simples ou quand la limite du modèle standard est atteinte."
                 >
                   <SelectControl<ModelTier>
                     id="setting-model-tier"
@@ -362,11 +354,11 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   />
                 </SettingRow>
               ) : (
-                <SettingRow label="Moteur de réponses" description={engine.isDemonstration ? 'Aucun moteur d’IA n’est connecté : les réponses sont des messages de démonstration.' : 'Le modèle qui rédige les réponses de Mizanga.'}>
+                <SettingRow label="Moteur de réponses">
                   <span className="value-pill">{engine.label}</span>
                 </SettingRow>
               )}
-              <SettingRow label="Langue de l’interface" htmlFor="setting-interface-language" description="Le mooré sera proposé comme langue d’interface dans une prochaine version.">
+              <SettingRow label="Langue de l’interface" htmlFor="setting-interface-language">
                 <SelectControl
                   id="setting-interface-language"
                   value="fr"
@@ -387,7 +379,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
           {activeSection === 'langue' && (
             <>
               <div className="setting-group">
-                <SettingRow label="Langue des réponses" htmlFor="setting-response-language" description="« Automatique » répond dans la langue de votre message. Aussi modifiable depuis l’en-tête.">
+                <SettingRow label="Langue des réponses" htmlFor="setting-response-language">
                   <SelectControl<ResponseLanguage>
                     id="setting-response-language"
                     value={preferences.responseLanguage}
@@ -395,7 +387,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                     onChange={(responseLanguage) => onChange({ responseLanguage })}
                   />
                 </SettingRow>
-                <SettingRow label="Ma façon d’écrire le mooré" htmlFor="setting-writing-mode" description="Aide le moteur à comprendre une écriture standardisée ou informelle.">
+                <SettingRow label="Ma façon d’écrire le mooré" htmlFor="setting-writing-mode">
                   <SelectControl<UserWritingMode>
                     id="setting-writing-mode"
                     value={preferences.userWritingMode}
@@ -407,35 +399,26 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   />
                 </SettingRow>
               </div>
-              <p className="settings-callout">
-                <Info size={16} aria-hidden="true" />
-                <span>Votre texte original est toujours conservé. Aucune substitution automatique de caractères (par ex. è → ɛ) n’est appliquée.</span>
-              </p>
             </>
           )}
 
           {activeSection === 'donnees' && (
             <>
               <div className="setting-group">
-                <SettingRow label="Nouvelle conversation" description="Repartir d’une conversation vide. Les précédentes restent dans le menu.">
-                  <button type="button" className="secondary-button" onClick={onNewConversation}>Démarrer</button>
-                </SettingRow>
                 <SettingRow
                   label="Enregistrer les conversations sur cet appareil"
                   htmlFor="setting-save-conversations"
-                  description={preferences.saveConversations
-                    ? 'Vos conversations sont gardées dans ce navigateur, même après fermeture. Désactivez-le sur un appareil partagé : l’historique enregistré sera effacé.'
-                    : 'Les conversations restent en mémoire et disparaissent à la fermeture ou au rechargement de la page.'}
+                  description={preferences.saveConversations ? 'À désactiver sur un appareil partagé.' : 'L’historique disparaît à la fermeture de la page.'}
                 >
                   <Switch id="setting-save-conversations" checked={preferences.saveConversations} onChange={(saveConversations) => onChange({ saveConversations })} />
                 </SettingRow>
-                <SettingRow label="Historique des conversations" description="Recherche, favoris et suppression depuis le menu latéral.">
+                <SettingRow label="Historique des conversations">
                   <span className="value-pill">{conversationCount === 0 ? 'Aucune' : `${conversationCount} conversation${conversationCount > 1 ? 's' : ''}`}</span>
                 </SettingRow>
-                <SettingRow label="Sauvegarder l’historique" description="Télécharge vos conversations dans un fichier, pour les garder ou les transférer sur un autre appareil. Le contenu des fichiers joints n’y figure pas.">
+                <SettingRow label="Sauvegarder l’historique" description="Sans le contenu des fichiers joints.">
                   <button type="button" className="secondary-button" disabled={conversationCount === 0} onClick={onExportConversations}><Download size={14} aria-hidden="true" /> Exporter</button>
                 </SettingRow>
-                <SettingRow label="Restaurer une sauvegarde" description="Ajoute les conversations d’un fichier de sauvegarde de Mizanga à votre historique, sans effacer les autres.">
+                <SettingRow label="Restaurer une sauvegarde">
                   <button type="button" className="secondary-button" onClick={() => importInputRef.current?.click()}><Upload size={14} aria-hidden="true" /> Importer</button>
                   <input
                     ref={importInputRef}
@@ -452,19 +435,17 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 </SettingRow>
                 <SettingRow
                   label="Vos messages et fichiers"
-                  description={engine.isDemonstration
-                    ? 'Aucun message ne quitte votre navigateur : aucun moteur d’IA n’est connecté.'
-                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses, y compris les messages vocaux ; le moteur peut aussi lancer une recherche Google quand la demande le justifie ; les fichiers joints ne sont pas conservés sur l’appareil. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations ou documents sensibles.'}
+                  description={engine.isDemonstration ? undefined : 'Google peut les utiliser pour améliorer ses services : évitez les informations sensibles.'}
                 >
                   <span className="value-pill">{engine.isDemonstration ? 'Restent sur l’appareil' : 'Envoyés à Google'}</span>
                 </SettingRow>
-                <SettingRow label="Préférences" description="Enregistrées sur cet appareil uniquement.">
+                <SettingRow label="Préférences">
                   <button type="button" className="secondary-button" onClick={onResetPreferences}>Réinitialiser</button>
                 </SettingRow>
               </div>
 
               <div className="danger-zone">
-                <SettingRow label="Supprimer toutes les conversations" description="Efface définitivement l’historique, favoris compris, y compris sur cet appareil.">
+                <SettingRow label="Supprimer toutes les conversations" description="Action définitive.">
                   {confirmingClear ? (
                     <span className="confirm-actions">
                       <button type="button" className="secondary-button" onClick={() => setConfirmingClear(false)}>Annuler</button>
@@ -486,11 +467,11 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 <span className="account-avatar" aria-hidden="true"><UserRound size={20} /></span>
                 <div className="setting-text">
                   <p className="setting-label">Invité</p>
-                  <p className="setting-description">Non connecté. Les comptes permettront de retrouver votre historique sur tous vos appareils.</p>
+                  <p className="setting-description">Non connecté</p>
                 </div>
                 <button type="button" className="secondary-button" disabled>Se connecter</button>
               </div>
-              <SettingRow label="Synchronisation" description={<>Historique et préférences sur tous vos appareils. <span className="soon-badge">Bientôt</span></>}>
+              <SettingRow label="Synchronisation" description={<span className="soon-badge">Bientôt</span>}>
                 <SoonSwitch label="Synchronisation" />
               </SettingRow>
             </div>

@@ -106,13 +106,11 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
 
   return (
     <div className="evaluation-view">
-      <p className="page-intro">Mesurez la qualité réelle des réponses de Mizanga avec des questions préparées et notées par des locuteurs du mooré.</p>
 
       <section className="settings-section">
         <h3>1. Préparer les questions</h3>
         <p className="evaluation-help">
-          Téléchargez le modèle, remplissez une question par ligne (colonne « question », et si possible « reponse_attendue »), enregistrez-le en CSV puis importez-le.
-          La colonne « langue_de_reponse » accepte : {Object.keys(responseLanguageLabels).join(', ')}.
+          Une question par ligne. Colonne « langue_de_reponse » : {Object.keys(responseLanguageLabels).join(', ')}.
         </p>
         <div className="evaluation-actions">
           <button type="button" className="secondary-button" onClick={() => downloadText(templateCsv(), 'mizanga-evaluation-modele.csv', 'text/csv;charset=utf-8')}>
@@ -162,7 +160,7 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
               )}
               <span className="value-pill" role="status">{summary.answered} / {summary.total} réponses · moteur : {aiService.label}</span>
             </div>
-            <p className="evaluation-help">La pause évite d’atteindre la limite gratuite du moteur. Si elle est atteinte, l’évaluation se met en pause et l’heure de reprise est indiquée.</p>
+            <p className="evaluation-help">La pause évite d’atteindre la limite gratuite.</p>
           </section>
 
           <section className="settings-section">
@@ -217,7 +215,6 @@ export function EvaluationView({ aiService, preferences, onNotify }: EvaluationV
 
           <section className="settings-section">
             <h3>4. Exporter</h3>
-            <p className="evaluation-help">Le fichier CSV s’ouvre dans Excel ou LibreOffice. L’évaluation en cours est gardée sur cet appareil jusqu’à ce que vous l’effaciez.</p>
             <div className="evaluation-actions">
               <button type="button" className="primary-button" disabled={summary.answered === 0} onClick={() => downloadText(resultsCsv(items, aiService.label), `mizanga-evaluation-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')}>
                 <Download size={16} aria-hidden="true" /> Exporter les résultats (CSV)

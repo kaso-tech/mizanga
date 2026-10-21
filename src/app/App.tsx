@@ -455,7 +455,6 @@ export function App({ aiService = demoAiService }: AppProps) {
               setPreferences(defaultPreferences)
               notify('Préférences réinitialisées.', 'success')
             }}
-            onNewConversation={startNewConversation}
             onClearConversations={() => {
               conversation.clearAll()
               setDraft('')

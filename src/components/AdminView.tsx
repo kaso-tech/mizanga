@@ -7,11 +7,11 @@ import { EvaluationView } from './EvaluationView'
 
 type SectionId = 'apercu' | 'reference' | 'evaluation' | 'signalements'
 
-const sections: Array<{ id: SectionId; label: string; description: string; icon: LucideIcon }> = [
-  { id: 'apercu', label: 'Moteur', description: 'Configuration du moteur d’IA sur le serveur.', icon: Cpu },
-  { id: 'reference', label: 'Référence du mooré', description: 'Règles, exemples et lexique validés, transmis au moteur avec chaque demande.', icon: BookOpenCheck },
-  { id: 'evaluation', label: 'Évaluation', description: 'Mesurer la qualité du mooré avec des questions préparées et notées par des locuteurs.', icon: ClipboardCheck },
-  { id: 'signalements', label: 'Signalements', description: 'Relecture des erreurs en mooré signalées par les utilisateurs.', icon: Flag },
+const sections: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
+  { id: 'apercu', label: 'Moteur', icon: Cpu },
+  { id: 'reference', label: 'Référence du mooré', icon: BookOpenCheck },
+  { id: 'evaluation', label: 'Évaluation', icon: ClipboardCheck },
+  { id: 'signalements', label: 'Signalements', icon: Flag },
 ]
 
 interface Overview {
@@ -64,7 +64,7 @@ function LoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
   return (
     <form className="admin-login settings-section" onSubmit={(event) => void submit(event)}>
       <h2><LockKeyhole size={18} aria-hidden="true" /> Connexion administrateur</h2>
-      <p className="evaluation-help">Réservé à l’équipe Mizanga. Le mot de passe est celui défini dans le secret ADMIN_PASSWORD du serveur.</p>
+      <p className="evaluation-help">Réservé à l’équipe Mizanga.</p>
       <div className="field">
         <label className="field-label" htmlFor="admin-password">Mot de passe</label>
         <input id="admin-password" type="password" autoComplete="current-password" autoFocus value={password} onChange={(event) => setPassword(event.target.value)} />
@@ -90,15 +90,15 @@ function EnginePanel({ overview }: { overview: Overview }) {
   return (
     <div className="setting-group">
       <div className="setting-row">
-        <div className="setting-text"><p className="setting-label">Clé d’API Gemini</p><p className="setting-description">Secret GEMINI_API_KEY du serveur. Absente : l’application reste en démonstration.</p></div>
+        <div className="setting-text"><p className="setting-label">Clé d’API Gemini</p><p className="setting-description">GEMINI_API_KEY</p></div>
         <span className="value-pill">{overview.engine.configured ? 'Configurée' : 'Absente'}</span>
       </div>
       <div className="setting-row">
-        <div className="setting-text"><p className="setting-label">Modèle standard</p><p className="setting-description">Variable GEMINI_MODEL.</p></div>
+        <div className="setting-text"><p className="setting-label">Modèle standard</p><p className="setting-description">GEMINI_MODEL</p></div>
         <code className="value-pill">{overview.engine.model}</code>
       </div>
       <div className="setting-row">
-        <div className="setting-text"><p className="setting-label">Modèle économe</p><p className="setting-description">Variable GEMINI_LITE_MODEL ; utilisé aussi pour les titres des conversations.</p></div>
+        <div className="setting-text"><p className="setting-label">Modèle économe</p><p className="setting-description">GEMINI_LITE_MODEL (aussi pour les titres)</p></div>
         <code className="value-pill">{overview.engine.liteModel}</code>
       </div>
     </div>
@@ -192,10 +192,7 @@ export function AdminView({ aiService, preferences, onNotify }: AdminViewProps) 
   return (
     <div className="settings-page admin-page">
       <header className="settings-header admin-header">
-        <div>
-          <h1>Console d’administration</h1>
-          <p>Outils de l’équipe Mizanga. Invisible des utilisateurs et protégée par le serveur.</p>
-        </div>
+        <h1>Console d’administration</h1>
         {session?.authenticated && (
           <button type="button" className="secondary-button" onClick={() => void logout()}><LogOut size={14} aria-hidden="true" /> Se déconnecter</button>
         )}
@@ -224,7 +221,6 @@ export function AdminView({ aiService, preferences, onNotify }: AdminViewProps) 
           <section className="settings-panel" role="tabpanel" id={`admin-panel-${current.id}`} aria-labelledby={`admin-tab-${current.id}`}>
             <div className="panel-heading">
               <h2>{current.label}</h2>
-              <p>{current.description}</p>
             </div>
             {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && <div className="page-loading" aria-busy="true" />}
             {overview && activeSection === 'apercu' && <EnginePanel overview={overview} />}

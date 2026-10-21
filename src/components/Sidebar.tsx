@@ -90,7 +90,7 @@ export function Sidebar({
 
         <nav className="conversation-list" aria-label="Conversations de cette session">
           <p className="nav-label">{savesConversations ? 'Conversations' : 'Cette session'}</p>
-          <p className="nav-note">{savesConversations ? 'Enregistré sur cet appareil uniquement.' : 'Non enregistré : l’historique disparaît à la fermeture de la page.'}</p>
+          {!savesConversations && <p className="nav-note">Non enregistré : disparaît à la fermeture.</p>}
           {visibleConversations.length === 0 ? (
             <p className="conversation-empty">{emptyMessage}</p>
           ) : (

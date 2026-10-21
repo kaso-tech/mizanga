@@ -74,10 +74,9 @@ export function FeedbackDialog({ message, initialPassage = '', onClose, onSubmit
 
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <section ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="report-title" aria-describedby="report-description" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="report-title" onMouseDown={(event) => event.stopPropagation()}>
         <button className="icon-button dialog-close" type="button" aria-label="Fermer" onClick={onClose}><X size={18} /></button>
         <h2 id="report-title">Signaler une erreur en mooré</h2>
-        <p id="report-description" className="dialog-description">Les corrections seront vérifiées par des relecteurs avant toute utilisation.</p>
         <form onSubmit={submit}>
           <div className="field">
             <p className="field-label">Réponse concernée</p>
@@ -106,7 +105,7 @@ export function FeedbackDialog({ message, initialPassage = '', onClose, onSubmit
             <textarea rows={2} value={explanation} onChange={(event) => setExplanation(event.target.value)} />
           </label>
           <button type="submit" className="primary-button is-block" disabled={!isValid}>Préparer le signalement</button>
-          <p className="dialog-footnote">Enregistrement des signalements : bientôt disponible.</p>
+          <p className="dialog-footnote">Pas encore envoyé : enregistrement bientôt disponible.</p>
         </form>
       </section>
     </div>

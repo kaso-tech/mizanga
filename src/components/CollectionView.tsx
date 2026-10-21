@@ -17,9 +17,9 @@ export function CollectionView({ kind, conversations, savesConversations, onSele
   return (
     <div className="page-view collection-view">
       <h1>{isHistory ? 'Historique' : 'Favoris'}</h1>
-      <p className="page-intro">{savesConversations ? 'Enregistré sur cet appareil uniquement.' : 'Non enregistré : l’historique de cette session disparaît à la fermeture de la page.'}</p>
+      {!savesConversations && <p className="page-intro">Non enregistré : disparaît à la fermeture.</p>}
       {items.length === 0 ? (
-        <p className="conversation-empty">{isHistory ? 'Aucune conversation pour l’instant.' : 'Aucun favori. Ajoutez-en avec l’étoile, dans le menu.'}</p>
+        <p className="conversation-empty">{isHistory ? 'Aucune conversation pour l’instant.' : 'Aucun favori.'}</p>
       ) : (
         <ul className="collection-list">
           {items.map((conversation) => (
