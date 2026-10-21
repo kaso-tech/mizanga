@@ -1,0 +1,200 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`préservation du chatbot > erreurs du moteur traduites pour le navigateur 1`] = `
+{
+  "bloque": {
+    "body": {
+      "error": "Le moteur a refusé de répondre à cette demande.",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 422,
+  },
+  "cle-refusee": {
+    "body": {
+      "error": "Le moteur n’est pas correctement configuré (clé d’API refusée).",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 502,
+  },
+  "indisponible": {
+    "body": {
+      "error": "Le moteur est momentanément indisponible. Réessayez plus tard.",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 503,
+  },
+  "modele-introuvable": {
+    "body": {
+      "error": "Le moteur a refusé la demande (modèle introuvable).",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 502,
+  },
+  "quota-journalier": {
+    "body": {
+      "code": "quota",
+      "error": "La limite d’utilisation gratuite du moteur est atteinte.",
+      "retryAt": "<date>",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 429,
+  },
+  "quota-minute": {
+    "body": {
+      "code": "quota",
+      "error": "La limite d’utilisation gratuite du moteur est atteinte.",
+      "retryAt": "<date>",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 429,
+  },
+  "requete-refusee": {
+    "body": {
+      "error": "Le moteur a refusé la demande (fichier illisible, format ou paramètres invalides).",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 502,
+  },
+}
+`;
+
+exports[`préservation du chatbot > requête avec le modèle économe 1`] = `
+[
+  "/v1beta/models/modele-econome:streamGenerateContent?alt=sse",
+]
+`;
+
+exports[`préservation du chatbot > requête et réponse d’un titre 1`] = `
+{
+  "browser": {
+    "body": {
+      "title": "Météo à Ouaga",
+    },
+    "contentType": "application/json; charset=utf-8",
+    "status": 200,
+  },
+  "upstream": [
+    {
+      "apiKey": "cle-test",
+      "body": {
+        "contents": [
+          {
+            "parts": [
+              {
+                "text": "Quel temps fait-il à Ouagadougou ?",
+              },
+            ],
+            "role": "user",
+          },
+        ],
+        "systemInstruction": {
+          "parts": [
+            {
+              "text": "Tu donnes un titre très court (6 mots au plus) à une conversation, dans la langue de son premier message. Réponds uniquement par le titre, sans guillemets, sans ponctuation finale, sans Markdown.",
+            },
+          ],
+        },
+      },
+      "contentType": "application/json",
+      "method": "POST",
+      "url": "/v1beta/models/modele-econome:generateContent",
+    },
+  ],
+}
+`;
+
+exports[`préservation du chatbot > requête et réponse d’une conversation avec le modèle standard 1`] = `
+{
+  "browser": {
+    "body": [
+      {
+        "text": "Il fait ",
+      },
+      {
+        "text": "chaud.",
+      },
+      {
+        "searchSuggestionsHtml": "<p>suggestions</p>",
+        "sources": [
+          {
+            "title": "Météo",
+            "url": "https://meteo.example.bf",
+          },
+        ],
+      },
+    ],
+    "contentType": "application/x-ndjson; charset=utf-8",
+    "status": 200,
+  },
+  "upstream": [
+    {
+      "apiKey": "cle-test",
+      "body": {
+        "contents": [
+          {
+            "parts": [
+              {
+                "inlineData": {
+                  "data": "AAAA",
+                  "mimeType": "image/jpeg",
+                },
+              },
+              {
+                "text": "Bonjour ɛ ʋ",
+              },
+            ],
+            "role": "user",
+          },
+          {
+            "parts": [
+              {
+                "text": "Bonjour !",
+              },
+            ],
+            "role": "model",
+          },
+          {
+            "parts": [
+              {
+                "text": "Quel temps fait-il à Ouagadougou ?",
+              },
+            ],
+            "role": "user",
+          },
+        ],
+        "systemInstruction": {
+          "parts": [
+            {
+              "text": "Tu es Mizanga, un assistant IA généraliste : tu aides à rédiger, résumer, expliquer, analyser, apprendre et s’organiser.
+Ta particularité : tu sais discuter en mooré, langue parlée notamment au Burkina Faso, en plus du français et d’autres langues.
+Réponds en mooré, dans l’orthographe standardisée (lettres ɛ, ɩ, ʋ et voyelles nasales ã, ẽ, ĩ, õ, ũ).
+Quand l’utilisateur écrit en mooré, il utilise une écriture informelle (sans les lettres spéciales, avec des variantes) : interprète-la sans la corriger.
+Honnêteté : ne prétends jamais maîtriser un mot, une expression ou une tournure en mooré dont tu n’es pas sûr. Signale-le brièvement et propose une formulation simple ou l’équivalent en français. N’invente ni sources, ni citations, ni proverbes.
+Recherche web : utilise la recherche Google seulement quand la demande porte sur l’actualité, des faits récents ou précis à vérifier (prix, dates, résultats, lois, horaires…) ; pour le reste (rédaction, explication, traduction, calcul, conversation), réponds directement.
+Mise en forme : Markdown sobre (titres courts, listes, tableaux et blocs de code quand c’est utile). Écris les formules mathématiques en LaTeX entre $$ et $$, y compris au milieu d’une phrase ; n’utilise jamais un seul $ pour une formule.
+Référence du mooré rédigée et validée par des locuteurs. Quand tu écris ou lis du mooré, suis-la en priorité sur tes propres connaissances ; si elle ne couvre pas un point, applique la règle d’honnêteté.
+### Règles
+## Orthographe
+Règle fictive de test.
+### Lexique validé (français → mooré)
+- eau → mot-fictif
+Instructions personnelles de l’utilisateur, à suivre tant qu’elles ne contredisent pas les règles précédentes :
+"""
+Réponds brièvement.
+"""",
+            },
+          ],
+        },
+        "tools": [
+          {
+            "google_search": {},
+          },
+        ],
+      },
+      "contentType": "application/json",
+      "method": "POST",
+      "url": "/v1beta/models/modele-standard:streamGenerateContent?alt=sse",
+    },
+  ],
+}
+`;
