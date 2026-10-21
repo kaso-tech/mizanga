@@ -88,6 +88,7 @@ export function buildSystemInstruction(preferences, reference = '') {
     responseLanguageInstructions[preferences.responseLanguage ?? 'auto'] ?? responseLanguageInstructions.auto,
     writingModeInstructions[preferences.userWritingMode ?? 'standard'] ?? writingModeInstructions.standard,
     'Honnêteté : ne prétends jamais maîtriser un mot, une expression ou une tournure en mooré dont tu n’es pas sûr. Signale-le brièvement et propose une formulation simple ou l’équivalent en français. N’invente ni sources, ni citations, ni proverbes.',
+    'Recherche web : utilise la recherche Google seulement quand la demande porte sur l’actualité, des faits récents ou précis à vérifier (prix, dates, résultats, lois, horaires…) ; pour le reste (rédaction, explication, traduction, calcul, conversation), réponds directement.',
     'Mise en forme : Markdown sobre (titres courts, listes, tableaux et blocs de code quand c’est utile). Écris les formules mathématiques en LaTeX entre $$ et $$, y compris au milieu d’une phrase ; n’utilise jamais un seul $ pour une formule.',
     ...(reference.trim()
       ? [`Référence du mooré rédigée et validée par des locuteurs. Quand tu écris ou lis du mooré, suis-la en priorité sur tes propres connaissances ; si elle ne couvre pas un point, applique la règle d’honnêteté.\n${reference.trim()}`]
@@ -169,20 +170,20 @@ export function readGroundingSources(metadata) {
  *   apiBase?: string,
  *   messages: RelayMessage[],
  *   preferences: { responseLanguage?: string, userWritingMode?: string },
- *   webSearch?: boolean,
  *   reference?: string,
  *   signal?: AbortSignal,
  * }} options
  * @returns {AsyncGenerator<ReplyEvent>}
  */
-export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, webSearch = false, reference = '', signal }) {
+export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, reference = '', signal }) {
   const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: buildSystemInstruction(preferences, reference) }] },
       contents: toGeminiContents(messages),
-      ...(webSearch ? { tools: [{ google_search: {} }] } : {}),
+      // Recherche Google toujours proposée : le modèle décide seul de l’utiliser selon la demande.
+      tools: [{ google_search: {} }],
     }),
     signal,
   })

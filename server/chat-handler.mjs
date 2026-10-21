@@ -63,7 +63,6 @@ export function validateChatRequest(body) {
   if (last.role !== 'user' || (!last.content.trim() && !last.attachments?.length)) return null
   const preferences = body.preferences ?? {}
   return {
-    webSearch: body.webSearch === true,
     modelTier: body.modelTier === 'lite' ? /** @type {const} */ ('lite') : /** @type {const} */ ('standard'),
     messages: messages.map(({ role, content, attachments }) => ({
       role,

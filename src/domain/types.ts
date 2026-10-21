@@ -62,6 +62,7 @@ export interface ChatMessage {
   isDemonstration?: boolean
   attachments?: Attachment[]
   /** Message de l’utilisateur envoyé avec la recherche web activée. */
+  /** Ancienne option « Recherche web » (conversations enregistrées avant la recherche automatique). */
   webSearch?: boolean
   /** Réponse : sources web consultées et suggestions de recherche Google associées. */
   sources?: Array<{ title: string; url: string }>

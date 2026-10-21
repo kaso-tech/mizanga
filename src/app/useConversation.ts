@@ -87,8 +87,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     let hasReply = false
     let completed = false
     try {
-      const webSearch = history.findLast((message) => message.role === 'user')?.webSearch === true
-      for await (const chunk of aiService.generate({ messages: history, preferences: { ...preferencesRef.current, ...overrides }, webSearch }, { signal: controller.signal })) {
+      for await (const chunk of aiService.generate({ messages: history, preferences: { ...preferencesRef.current, ...overrides } }, { signal: controller.signal })) {
         if (controller.signal.aborted) break
         if (chunk.sources || chunk.searchSuggestionsHtml) {
           updateMessage(conversationId, replyId, (message) => ({ ...message, sources: chunk.sources, searchSuggestionsHtml: chunk.searchSuggestionsHtml }))
@@ -144,7 +143,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     }
   }
 
-  const send = (content: string, attachments: Attachment[] = [], { webSearch = false }: { webSearch?: boolean } = {}) => {
+  const send = (content: string, attachments: Attachment[] = []) => {
     const now = new Date().toISOString()
     const userMessage: ChatMessage = {
       id: createId('user'),
@@ -152,7 +151,6 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
       content,
       createdAt: now,
       ...(attachments.length > 0 ? { attachments } : {}),
-      ...(webSearch ? { webSearch: true } : {}),
     }
     const existing = conversationsRef.current.find((conversation) => conversation.id === activeId)
     const conversationId = existing?.id ?? createId('conversation')

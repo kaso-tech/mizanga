@@ -1,4 +1,4 @@
-import { ArrowUp, Bookmark, Check, Clock, FileText, Globe, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Bookmark, Check, Clock, FileText, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { acceptAttribute, formatSize, isAudio, isImage } from '../app/attachments'
 import { filterSavedPrompts, type SavedPrompt } from '../app/savedPrompts'
@@ -19,8 +19,6 @@ interface ComposerProps {
   focusToken: number
   attachments: Attachment[]
   isPreparingFiles: boolean
-  webSearch: boolean
-  onToggleWebSearch: () => void
   onAddFiles: (files: File[]) => void
   onRemoveAttachment: (id: string) => void
   onValueChange: (value: string) => void
@@ -42,8 +40,6 @@ export function Composer({
   focusToken,
   attachments,
   isPreparingFiles,
-  webSearch,
-  onToggleWebSearch,
   onAddFiles,
   onRemoveAttachment,
   onValueChange,
@@ -286,16 +282,6 @@ export function Composer({
           </button>
           <button
             type="button"
-            className={`composer-pill ${webSearch ? 'is-active' : ''}`}
-            aria-pressed={webSearch}
-            title={webSearch ? 'Recherche web activée : la réponse citera ses sources' : 'Activer la recherche web'}
-            onClick={onToggleWebSearch}
-          >
-            <Globe size={16} aria-hidden="true" />
-            <span className="composer-pill-label">Recherche web</span>
-          </button>
-          <button
-            type="button"
             className={`composer-tool ${isRecording ? 'is-recording' : ''}`}
             disabled={!canRecord || recording.state === 'processing'}
             aria-pressed={isRecording}
@@ -325,7 +311,7 @@ export function Composer({
         </div>
       </div>
       <p className="disclaimer">
-        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Mizanga peut se tromper, y compris en mooré. Vérifiez les informations importantes.'}
+        {isDemonstration ? 'Version de démonstration — le moteur d’IA n’est pas encore connecté.' : 'Mizanga peut se tromper. A Mizanga tõe tudgame.'}
       </p>
     </div>
   )

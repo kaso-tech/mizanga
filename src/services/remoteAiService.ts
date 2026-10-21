@@ -92,7 +92,7 @@ export function createRemoteAiService({ label, offersLiteModel = false, endpoint
       const { title } = (await response.json()) as { title?: string | null }
       return typeof title === 'string' && title.trim() ? title.trim().slice(0, 60) : null
     },
-    async *generate({ messages, preferences, webSearch = false }, { signal }): AsyncGenerator<AiChunk> {
+    async *generate({ messages, preferences }, { signal }): AsyncGenerator<AiChunk> {
       let response: Response
       try {
         response = await fetch(endpoint, {
@@ -100,7 +100,6 @@ export function createRemoteAiService({ label, offersLiteModel = false, endpoint
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: selectHistory(messages),
-            webSearch,
             modelTier: offersLiteModel ? preferences.modelTier : 'standard',
             preferences: { responseLanguage: preferences.responseLanguage, userWritingMode: preferences.userWritingMode, customInstructions: preferences.customInstructions },
           }),

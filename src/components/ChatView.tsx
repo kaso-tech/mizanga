@@ -9,7 +9,6 @@ interface ChatViewProps {
   messages: ChatMessageType[]
   isGenerating: boolean
   isDemonstration: boolean
-  responseLanguageLabel: string
   /** Zone de saisie affichée au centre de l’écran d’accueil. */
   composer: ReactNode
   copiedMessageId?: string
@@ -37,7 +36,6 @@ export function ChatView({
   messages,
   isGenerating,
   isDemonstration,
-  responseLanguageLabel,
   composer,
   copiedMessageId,
   onSuggestion,
@@ -106,10 +104,8 @@ export function ChatView({
         <div className="welcome-head fade-up">
           <div className="weave-band welcome-band" aria-hidden="true" />
           <h1 id="welcome-title">Comment puis-je vous aider&#8239;?</h1>
-          <p>Un assistant pour écrire, analyser, apprendre et résoudre vos tâches — qui vous répond aussi en mooré.</p>
         </div>
         <div className="welcome-composer">{composer}</div>
-        <p className="response-language-note">Réponses en : <strong>{responseLanguageLabel}</strong></p>
         {savedPrompts.length > 0 && (
           <div className="saved-prompt-row" aria-label="Vos consignes">
             {savedPrompts.slice(0, 6).map((item) => (

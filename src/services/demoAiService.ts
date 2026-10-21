@@ -17,7 +17,7 @@ function abortableDelay(ms: number, signal: AbortSignal) {
 }
 
 /** Réponse de démonstration : elle cite la demande telle quelle et n’en produit aucune interprétation. */
-function buildReply({ messages, preferences, webSearch }: AiGenerationRequest) {
+function buildReply({ messages, preferences }: AiGenerationRequest) {
   const lastUser = [...messages].reverse().find((message) => message.role === 'user')
   const lastUserMessage = lastUser?.content ?? ''
   const files = lastUser?.attachments?.map((attachment) => `- ${attachment.name}`).join('\n')
@@ -26,7 +26,6 @@ function buildReply({ messages, preferences, webSearch }: AiGenerationRequest) {
     'Votre message a été reçu tel quel, sans modification :',
     lastUserMessage ? lastUserMessage.split(/\r?\n/).map((line) => `> ${line}`).join('\n') : '> (aucun texte)',
     ...(files ? ['Fichiers joints reçus, mais non lus en démonstration :', files] : []),
-    ...(webSearch ? ['Recherche web demandée : elle n’est pas effectuée en démonstration, aucune source n’est donc affichée.'] : []),
     'Préférences transmises au futur moteur :',
     `- Écriture de l’utilisateur : ${userWritingModeLabels[preferences.userWritingMode]}\n- Réponse souhaitée : ${responseLanguageLabels[preferences.responseLanguage]}`,
   ].join('\n\n')

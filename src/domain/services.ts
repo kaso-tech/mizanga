@@ -10,8 +10,6 @@ export interface AiGenerationRequest {
   /** Historique complet de la conversation, dernier message utilisateur inclus. Le texte n’est jamais normalisé. */
   messages: ChatMessage[]
   preferences: LinguisticPreferences
-  /** Autoriser le moteur à chercher sur le Web (réponse accompagnée de ses sources). */
-  webSearch?: boolean
 }
 
 /** Fragment de réponse. `language` (BCP 47) n’est fourni que si le service le connaît réellement. */

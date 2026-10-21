@@ -11,7 +11,7 @@ Mizanga est un **assistant IA généraliste** — rédiger, résumer, expliquer,
 - Raccourcis : Échap arrête la génération, Ctrl/Cmd + Maj + O ouvre une nouvelle conversation.
 - Langue des réponses : automatique (même langue que l’utilisateur), mooré standardisé ou informel, français, anglais.
 - Fichiers joints : photos (réduites avant l’envoi pour économiser les données), PDF et fichiers texte, par bouton, glisser-déposer ou collage ; 4 fichiers et 8 Mo au plus par message. Leur contenu n’est pas conservé dans l’historique.
-- Recherche web à la demande : la réponse cite ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
+- Recherche web automatique : le moteur cherche sur Google seulement quand la demande le justifie (actualité, faits récents ou à vérifier) ; la réponse cite alors ses sources, accompagnées des suggestions de recherche Google exigées par les conditions de Google.
 - Messages vocaux (2 minutes au plus, convertis en WAV 16 kHz) et fichiers audio ; la compréhension du mooré parlé n’est pas encore garantie.
 - Conversations renommables, exportables en Markdown, imprimables ou enregistrables en PDF (mise en page dédiée), et réponses partageables (WhatsApp, SMS…) via le partage du téléphone.
 - **Instructions personnelles** (Paramètres › Personnalisation) : métier, région, ton ou longueur de réponse préférés, pris en compte dans toutes les conversations (1 500 caractères au plus, placés après les règles de Mizanga).

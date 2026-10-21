@@ -454,7 +454,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                   label="Vos messages et fichiers"
                   description={engine.isDemonstration
                     ? 'Aucun message ne quitte votre navigateur : aucun moteur d’IA n’est connecté.'
-                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses, y compris les messages vocaux et, si vous l’activez, la recherche web ; les fichiers joints ne sont pas conservés sur l’appareil. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations ou documents sensibles.'}
+                    : 'Ils sont transmis au serveur de Mizanga puis à Google (Gemini) pour produire les réponses, y compris les messages vocaux ; le moteur peut aussi lancer une recherche Google quand la demande le justifie ; les fichiers joints ne sont pas conservés sur l’appareil. Avec l’offre gratuite de Gemini, Google peut utiliser ces échanges pour améliorer ses services : évitez d’y saisir des informations ou documents sensibles.'}
                 >
                   <span className="value-pill">{engine.isDemonstration ? 'Restent sur l’appareil' : 'Envoyés à Google'}</span>
                 </SettingRow>

@@ -147,7 +147,6 @@ export function App({ aiService = demoAiService }: AppProps) {
   const [draft, setDraft] = useState('')
   const [draftAttachments, setDraftAttachments] = useState<Attachment[]>([])
   const [isPreparingFiles, setIsPreparingFiles] = useState(false)
-  const [webSearch, setWebSearch] = useState(false)
   const [focusToken, setFocusToken] = useState(0)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
@@ -324,7 +323,7 @@ export function App({ aiService = demoAiService }: AppProps) {
       notify(`Message trop long (${content.length.toLocaleString('fr')} caractères). La limite est de ${MAX_MESSAGE_CHARS.toLocaleString('fr')} : découpez-le en plusieurs messages.`)
       return
     }
-    conversation.send(content, draftAttachments, { webSearch })
+    conversation.send(content, draftAttachments)
     setDraft('')
     setDraftAttachments([])
   }
@@ -429,8 +428,6 @@ export function App({ aiService = demoAiService }: AppProps) {
       focusToken={focusToken}
       attachments={draftAttachments}
       isPreparingFiles={isPreparingFiles}
-      webSearch={webSearch}
-      onToggleWebSearch={() => setWebSearch((enabled) => !enabled)}
       onAddFiles={(files) => void addFiles(files)}
       onRemoveAttachment={(id) => setDraftAttachments((current) => current.filter((attachment) => attachment.id !== id))}
       onValueChange={setDraft}
@@ -481,7 +478,6 @@ export function App({ aiService = demoAiService }: AppProps) {
             messages={conversation.messages}
             isGenerating={conversation.isGenerating}
             isDemonstration={aiService.isDemonstration}
-            responseLanguageLabel={responseLanguageLabels[preferences.responseLanguage]}
             composer={composer}
             copiedMessageId={copiedMessageId}
             onSuggestion={(prompt) => { setDraft(prompt); setFocusToken((token) => token + 1) }}
