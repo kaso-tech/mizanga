@@ -44,8 +44,8 @@ async function startApi(config) {
   return `http://127.0.0.1:${address.port}`
 }
 
-/** @param {unknown} body */
-const post = (/** @type {string} */ base, body) => fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+/** @param {unknown} body @param {Record<string, string>} [extraHeaders] */
+const post = (/** @type {string} */ base, body, extraHeaders = {}) => fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: JSON.stringify(body) })
 
 let geminiBase = ''
 const textEvent = (/** @type {string} */ text, thought = false) => ({ candidates: [{ content: { parts: [{ text, thought }] } }] })
@@ -136,11 +136,12 @@ describe('API Mizanga', () => {
     expect(quotaResetTime({}, null)).toBeUndefined()
   })
 
-  it('limite le nombre de demandes par visiteur', async () => {
+  it('limite les demandes sans faire confiance à X-Forwarded-For', async () => {
     upstreamReply = { status: 200, events: [textEvent('ok')] }
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, rateLimit: { windowMs: 60_000, maxRequests: 1 } })
-    expect((await post(base, validBody)).status).toBe(200)
-    const blocked = await post(base, validBody)
+    expect((await post(base, validBody, { 'X-Forwarded-For': '198.51.100.1' })).status).toBe(200)
+    // Changer un en-tête contrôlé par le client ne doit pas contourner le garde-fou.
+    const blocked = await post(base, validBody, { 'X-Forwarded-For': '203.0.113.99' })
     expect(blocked.status).toBe(429)
     const { retryAt } = /** @type {{ retryAt: string }} */ (await blocked.json())
     expect(new Date(retryAt).getTime()).toBeGreaterThan(Date.now() + 50_000)

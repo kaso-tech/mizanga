@@ -142,7 +142,9 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Méthode non autorisée.' })
     if (!apiKey) return sendJson(res, 503, { error: 'Aucun moteur d’IA n’est configuré sur ce serveur.' })
 
-    const client = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'inconnu'
+    // Ne pas utiliser X-Forwarded-For ici : un client public peut le forger. Un proxy de
+    // confiance devra appliquer sa propre limite ou transmettre une identité vérifiée.
+    const client = req.socket.remoteAddress || 'inconnu'
     const blockedUntil = limit(client)
     if (blockedUntil) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blockedUntil))
 
