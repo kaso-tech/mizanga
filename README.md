@@ -93,6 +93,14 @@ Navigateur ──/api/chat──▶ serveur Mizanga (server/) ──▶ API Gemi
 
 Pour changer de fournisseur, il suffit d’un autre `AiService` (contrat dans `src/domain/services.ts`) ou d’un autre relais côté serveur.
 
+## Référence du mooré
+
+Le dossier `server/knowledge/moore/` contient la référence que le relais transmet au moteur avec chaque demande : une fiche de règles (`fiche.md`), des exemples de réponses (`exemples.csv`) et un lexique (`lexique.csv`). Les fichiers sont livrés **vides** : ils doivent être rédigés et validés par des locuteurs, et seules les lignes au statut `validé` sont envoyées. Le guide pour les linguistes est dans `server/knowledge/moore/LISEZMOI.md`.
+
+- `pnpm moore:check` affiche ce qui sera transmis et signale les problèmes (statut inconnu, ligne validée sans relecteur, doublons, taille dépassée).
+- Le serveur relit les fichiers modifiés en quelques secondes ; la référence est limitée à 24 000 caractères par demande.
+- Paramètres › Langue et écriture indique ce que contient la référence (fiche, nombre d’exemples et de mots).
+
 ## Routes
 
 `/` (conversation), `/parametres`, `/a-propos`, `/historique`, `/favoris`. L’application est une SPA : en production, toute adresse inconnue doit renvoyer `index.html`.

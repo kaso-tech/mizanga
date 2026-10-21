@@ -1,4 +1,5 @@
 import { generateGeminiTitle, streamGeminiReply, UpstreamError } from './gemini.mjs'
+import { createReferenceLoader } from './moore-reference.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
 // Fichiers joints compris (8 Mo au plus, encodés en base64, soit environ 11 Mo de texte).
@@ -113,17 +114,26 @@ const quotaCode = (error) => (error instanceof UpstreamError && error.status ===
  * et le serveur de production. Réponse de `/api/chat` : NDJSON, une ligne `{"text": …}` par fragment,
  * ou `{"error": …}` si le moteur échoue en cours de route.
  * `liteModel` : modèle économe (plus rapide, quota gratuit plus large), proposé au choix et utilisé pour les titres.
- * @param {{ apiKey?: string, model?: string, liteModel?: string, apiBase?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
+ * `referenceDir` : dossier de la référence du mooré (par défaut server/knowledge/moore).
+ * @param {{ apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, rateLimit?: { windowMs: number, maxRequests: number } }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteModel = 'gemini-flash-lite-latest', apiBase, rateLimit } = {}) {
+export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteModel = 'gemini-flash-lite-latest', apiBase, referenceDir, rateLimit } = {}) {
   const limit = createRateLimiter(rateLimit)
+  const loadReference = createReferenceLoader(referenceDir)
 
   return async (req, res, next) => {
     const path = (req.url ?? '').split('?')[0]
 
     if (path === '/api/health' && req.method === 'GET') {
-      return sendJson(res, 200, { engine: apiKey ? 'gemini' : 'demo', model: apiKey ? model : null, liteModel: apiKey ? liteModel : null })
+      const { reference } = loadReference()
+      return sendJson(res, 200, {
+        engine: apiKey ? 'gemini' : 'demo',
+        model: apiKey ? model : null,
+        liteModel: apiKey ? liteModel : null,
+        // Ce que contient la référence du mooré (comptes seulement : son texte reste sur le serveur).
+        mooreReference: { sheet: reference.sheet !== '', examples: reference.examples.length, entries: reference.entries.length },
+      })
     }
     if (path !== '/api/chat' && path !== '/api/title') {
       if (next) return next()
@@ -165,7 +175,7 @@ export function createApiHandler({ apiKey, model = 'gemini-flash-latest', liteMo
     let started = false
     try {
       const { modelTier, ...reply } = request
-      for await (const event of streamGeminiReply({ apiKey, model: modelTier === 'lite' ? liteModel : model, apiBase, ...reply, signal: controller.signal })) {
+      for await (const event of streamGeminiReply({ apiKey, model: modelTier === 'lite' ? liteModel : model, apiBase, ...reply, reference: loadReference().text, signal: controller.signal })) {
         if (!started) {
           res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
           started = true

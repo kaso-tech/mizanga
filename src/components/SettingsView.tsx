@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, 
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
 import { MAX_PROMPT_TITLE_CHARS, MAX_SAVED_PROMPTS, type SavedPrompt } from '../app/savedPrompts'
 import { isSpeechSupported, listVoices, speak, speechRates, subscribeVoices } from '../app/speech'
+import type { MooreReferenceSummary } from '../domain/services'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS } from '../services/remoteAiService'
 import { isVoiceRecordingSupported } from '../app/voiceRecording'
 import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
@@ -182,6 +183,26 @@ function SavedPromptsSettings({ prompts, onAdd, onDelete }: { prompts: SavedProm
   )
 }
 
+/** Ce que contient la référence du mooré transmise au moteur (fichiers du serveur, validés par des locuteurs). */
+function MooreReferenceRow({ summary }: { summary: MooreReferenceSummary }) {
+  const isEmpty = !summary.sheet && summary.examples === 0 && summary.entries === 0
+  const parts = [
+    summary.sheet && 'fiche de règles',
+    summary.examples > 0 && `${summary.examples} exemple${summary.examples > 1 ? 's' : ''}`,
+    summary.entries > 0 && `${summary.entries} mot${summary.entries > 1 ? 's' : ''}`,
+  ].filter(Boolean)
+  return (
+    <SettingRow
+      label="Référence du mooré"
+      description={isEmpty
+        ? 'Règles, exemples et lexique rédigés et validés par des locuteurs, transmis au moteur avec chaque demande. Elle n’est pas encore remplie.'
+        : 'Règles, exemples et lexique rédigés et validés par des locuteurs, transmis au moteur avec chaque demande pour améliorer son mooré.'}
+    >
+      <span className="value-pill">{isEmpty ? 'À remplir' : parts.join(', ')}</span>
+    </SettingRow>
+  )
+}
+
 /** Voix de l’appareil, mises à jour quand le navigateur finit de les charger. */
 function useVoices() {
   const [voices, setVoices] = useState(listVoices)
@@ -244,7 +265,7 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
 
 interface SettingsViewProps {
   preferences: LinguisticPreferences
-  engine: { label: string; isDemonstration: boolean; models?: { standard: string; lite?: string } }
+  engine: { label: string; isDemonstration: boolean; models?: { standard: string; lite?: string }; mooreReference?: MooreReferenceSummary }
   conversationCount: number
   onChange: (changes: Partial<LinguisticPreferences>) => void
   onResetPreferences: () => void
@@ -409,6 +430,7 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
                 </SettingRow>
               </div>
               <div className="setting-group">
+                {engine.mooreReference && <MooreReferenceRow summary={engine.mooreReference} />}
                 <SettingRow label="Évaluer la qualité du mooré" description="Outil pour les locuteurs : importer des questions, obtenir les réponses de Mizanga, les noter et exporter les résultats.">
                   <button type="button" className="secondary-button" onClick={onOpenEvaluation}>Ouvrir l’outil</button>
                 </SettingRow>

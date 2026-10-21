@@ -1,4 +1,4 @@
-import { AiServiceError, type AiChunk, type AiService, type SourceReference } from '../domain/services'
+import { AiServiceError, type AiChunk, type AiService, type MooreReferenceSummary, type SourceReference } from '../domain/services'
 import type { ChatMessage } from '../domain/types'
 import { demoAiService } from './demoAiService'
 
@@ -77,11 +77,12 @@ export function selectHistory(messages: ChatMessage[]) {
  * (Gemini). La clé d’API reste sur le serveur ; le navigateur ne reçoit que le texte.
  * Réponse attendue : NDJSON, une ligne `{"text": …}` par fragment ou `{"error": …}`.
  */
-export function createRemoteAiService({ label, models, endpoint = '/api/chat' }: { label: string; models?: AiService['models']; endpoint?: string }): AiService {
+export function createRemoteAiService({ label, models, mooreReference, endpoint = '/api/chat' }: { label: string; models?: AiService['models']; mooreReference?: MooreReferenceSummary; endpoint?: string }): AiService {
   return {
     isDemonstration: false,
     label,
     models,
+    mooreReference,
     async suggestTitle(firstMessage) {
       const response = await fetch('/api/title', {
         method: 'POST',
@@ -142,13 +143,14 @@ export function createRemoteAiService({ label, models, endpoint = '/api/chat' }:
  */
 const engineStorageKey = 'mizanga.engine.v1'
 
-type Health = { engine?: string; model?: string | null; liteModel?: string | null }
+type Health = { engine?: string; model?: string | null; liteModel?: string | null; mooreReference?: MooreReferenceSummary }
 
 const serviceFor = (health: Health) => (
   health.engine === 'gemini'
     ? createRemoteAiService({
       label: health.model ? `Gemini (${health.model})` : 'Gemini',
       models: health.model ? { standard: health.model, ...(health.liteModel ? { lite: health.liteModel } : {}) } : undefined,
+      mooreReference: health.mooreReference,
     })
     : demoAiService
 )

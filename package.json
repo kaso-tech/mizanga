@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "start": "node server/index.mjs",
+    "moore:check": "node server/moore-reference-check.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -b",
     "test": "vitest run",

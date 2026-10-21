@@ -79,8 +79,9 @@ const writingModeInstructions = {
 
 /**
  * @param {{ responseLanguage?: string, userWritingMode?: string, customInstructions?: string }} preferences
+ * @param {string} [reference] Référence du mooré validée par des locuteurs (server/knowledge/moore).
  */
-export function buildSystemInstruction(preferences) {
+export function buildSystemInstruction(preferences, reference = '') {
   return [
     'Tu es Mizanga, un assistant IA généraliste : tu aides à rédiger, résumer, expliquer, analyser, apprendre et s’organiser.',
     'Ta particularité : tu sais discuter en mooré, langue parlée notamment au Burkina Faso, en plus du français et d’autres langues.',
@@ -88,6 +89,9 @@ export function buildSystemInstruction(preferences) {
     writingModeInstructions[preferences.userWritingMode ?? 'standard'] ?? writingModeInstructions.standard,
     'Honnêteté : ne prétends jamais maîtriser un mot, une expression ou une tournure en mooré dont tu n’es pas sûr. Signale-le brièvement et propose une formulation simple ou l’équivalent en français. N’invente ni sources, ni citations, ni proverbes.',
     'Mise en forme : Markdown sobre (titres courts, listes, tableaux et blocs de code quand c’est utile). Écris les formules mathématiques en LaTeX entre $$ et $$, y compris au milieu d’une phrase ; n’utilise jamais un seul $ pour une formule.',
+    ...(reference.trim()
+      ? [`Référence du mooré rédigée et validée par des locuteurs. Quand tu écris ou lis du mooré, suis-la en priorité sur tes propres connaissances ; si elle ne couvre pas un point, applique la règle d’honnêteté.\n${reference.trim()}`]
+      : []),
     // Les instructions personnelles viennent de l’utilisateur : elles ajustent le ton et le contenu
     // mais ne remplacent pas les règles ci-dessus.
     ...(preferences.customInstructions?.trim()
@@ -166,16 +170,17 @@ export function readGroundingSources(metadata) {
  *   messages: RelayMessage[],
  *   preferences: { responseLanguage?: string, userWritingMode?: string },
  *   webSearch?: boolean,
+ *   reference?: string,
  *   signal?: AbortSignal,
  * }} options
  * @returns {AsyncGenerator<ReplyEvent>}
  */
-export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, webSearch = false, signal }) {
+export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, webSearch = false, reference = '', signal }) {
   const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildSystemInstruction(preferences) }] },
+      systemInstruction: { parts: [{ text: buildSystemInstruction(preferences, reference) }] },
       contents: toGeminiContents(messages),
       ...(webSearch ? { tools: [{ google_search: {} }] } : {}),
     }),

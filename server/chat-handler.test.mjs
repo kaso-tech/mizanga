@@ -1,5 +1,8 @@
 // @vitest-environment node
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApiHandler } from './chat-handler.mjs'
 import { buildSystemInstruction, nextMidnight, quotaResetTime } from './gemini.mjs'
@@ -68,9 +71,9 @@ afterAll(() => {
 describe('API Mizanga', () => {
   it('annonce le moteur disponible', async () => {
     const demo = await startApi({})
-    expect(await (await fetch(`${demo}/api/health`)).json()).toEqual({ engine: 'demo', model: null, liteModel: null })
+    expect(await (await fetch(`${demo}/api/health`)).json()).toMatchObject({ engine: 'demo', model: null, liteModel: null })
     const gemini = await startApi({ apiKey: 'cle', model: 'gemini-test' })
-    expect(await (await fetch(`${gemini}/api/health`)).json()).toEqual({ engine: 'gemini', model: 'gemini-test', liteModel: 'gemini-flash-lite-latest' })
+    expect(await (await fetch(`${gemini}/api/health`)).json()).toMatchObject({ engine: 'gemini', model: 'gemini-test', liteModel: 'gemini-flash-lite-latest' })
   })
 
   it('refuse /api/chat sans clé configurée', async () => {
@@ -217,5 +220,24 @@ describe('API Mizanga', () => {
     expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-lite-test:streamGenerateContent?alt=sse')
     await (await post(base, { ...validBody, modelTier: 'inconnu' })).text()
     expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-test:streamGenerateContent?alt=sse')
+  })
+
+  it('transmet la référence du mooré validée et annonce son contenu', async () => {
+    const referenceDir = mkdtempSync(join(tmpdir(), 'moore-api-'))
+    try {
+      writeFileSync(join(referenceDir, 'fiche.md'), '## Orthographe\nRègle de test validée.')
+      writeFileSync(join(referenceDir, 'lexique.csv'), 'statut;francais;moore;valide_par\nvalidé;eau;mot-test;AB\nbrouillon;pain;mot-brouillon;')
+      upstreamReply = { status: 200, events: [textEvent('ok')] }
+      const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, referenceDir })
+      expect(/** @type {any} */ (await (await fetch(`${base}/api/health`)).json()).mooreReference).toEqual({ sheet: true, examples: 0, entries: 1 })
+      await (await post(base, validBody)).text()
+      const instruction = lastUpstreamRequest.body.systemInstruction.parts[0].text
+      expect(instruction).toContain('Référence du mooré rédigée et validée par des locuteurs')
+      expect(instruction).toContain('Règle de test validée.')
+      expect(instruction).toContain('- eau → mot-test')
+      expect(instruction).not.toContain('mot-brouillon')
+    } finally {
+      rmSync(referenceDir, { recursive: true, force: true })
+    }
   })
 })

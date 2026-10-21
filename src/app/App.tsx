@@ -447,7 +447,7 @@ export function App({ aiService = demoAiService }: AppProps) {
         return (
           <SettingsView
             preferences={preferences}
-            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration, models: aiService.models }}
+            engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration, models: aiService.models, mooreReference: aiService.mooreReference }}
             conversationCount={conversation.conversations.length}
             onChange={updatePreferences}
             onResetPreferences={() => {
