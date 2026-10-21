@@ -62,7 +62,7 @@ server/         Relais vers Gemini (/api/chat, /api/health) et serveur de produc
 src/
   app/          App (routes, préférences, notifications) et hook useConversation
   components/   Barre latérale, en-tête, conversation, zone de saisie, paramètres…
-  data/         Libellés, suggestions et caractères du mooré
+  data/         Libellés et caractères du mooré
   domain/       Types et contrats des services (IA, recherche, stockage, voix, administration)
   services/     Adaptateurs de démonstration et de relais du moteur d’IA
   styles/       Feuille de style unique et jetons de design

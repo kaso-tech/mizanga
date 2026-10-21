@@ -22,7 +22,7 @@ Mizanga est un **assistant IA généraliste**, au même titre que Claude, ChatGP
 
 Conséquences sur l’interface (elles remplacent la direction visuelle « Tissage conversationnel discret » décrite plus bas) :
 
-- **Accueil :** salutation simple, zone de saisie au centre, suggestions de tâches variées dont une seule porte sur le mooré. Sur téléphone, les six suggestions restent accessibles (grille de deux colonnes, libellés sur deux lignes) : aucune n'est masquée arbitrairement.
+- **Accueil :** salutation simple et zone de saisie au centre, sans requêtes prédéfinies ; seules les consignes enregistrées par l’utilisateur y sont proposées. Le logo figure dans le menu latéral, pas dans l’en-tête.
 - **Langue des réponses :** « Automatique » par défaut (même langue que l’utilisateur), modifiable depuis la zone de saisie et les paramètres.
 - **Conversation :** réponses sans bulle et rendues en Markdown complet, pastille de langue sous chaque réponse, actions en icônes (copier, régénérer, avis) ; « Proposer une correction » seulement sous les réponses en mooré.
 - **Navigation :** barre latérale repliable avec les conversations de la session et une recherche ; paramètres, historique, favoris et À propos dans le menu du compte.
@@ -73,7 +73,7 @@ Les trois niveaux d'encre secondaires (`--ink-soft`, `--ink-muted`, `--ink-faint
 ### Conversation (`/`)
 
 - En-tête compact : navigation, marque, statut de réponse, accès paramètres et état « Se connecter » non actif.
-- Écran d’accueil quand la conversation est vide : texte de bienvenue demandé, cinq suggestions cliquables et rappel transparent que l’IA n’est pas encore connectée.
+- Écran d’accueil quand la conversation est vide : texte de bienvenue demandé, consignes enregistrées de l’utilisateur et rappel transparent que l’IA n’est pas encore connectée.
 - Composer auto-redimensionnable : entrée envoie sur ordinateur, Maj+Entrée insère une ligne ; microphone désactivé avec « Bientôt disponible » ; action d’ajout de texte visible mais sans faux service.
 - Après un envoi, le texte est ajouté localement puis une réponse système non-linguistique signale avec clarté que le moteur IA n’est pas connecté. Il ne s’agit jamais d’une traduction ou d’une réponse Mooré factice.
 - Actions de réponse opérationnelles en local : copie, avis positif/négatif et formulaire de signalement ; la soumission confirme seulement que le stockage n’est pas encore activé.
@@ -98,7 +98,7 @@ src/
   app/              # routage local de vues et composition de l’application
   components/       # header, navigation, chat, composer, panneaux et primitives UI
   domain/           # types Conversation, préférences, contrats AiService/ResearchService
-  data/             # suggestions et contenus de démonstration transparents
+  data/             # libellés et contenus de démonstration transparents
   styles/           # tokens, thèmes, responsive et animations
   main.tsx          # point d’entrée
 public/
