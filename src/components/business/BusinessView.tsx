@@ -1,12 +1,17 @@
 import { AlertTriangle, History, PackagePlus, Pencil, Plus, Search, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { AccountView } from '../../app/accountView'
+import { periodFor, type PeriodPreset } from '../../app/businessPeriods'
 import { formatAmount, formatQuantity, stockLevel, stockValue } from '../../app/businessFormat'
 import type { AuthClient } from '../../services/authService'
 import { createBusinessApi, type Business, type Product } from '../../services/businessApi'
+import { ExpensesPanel } from './ExpensesPanel'
 import { HistoryDialog } from './HistoryDialog'
 import { MovementDialog } from './MovementDialog'
+import { PeriodPicker } from './PeriodPicker'
 import { ProductDialog } from './ProductDialog'
+import { ResultsPanel } from './ResultsPanel'
+import { SalesPanel } from './SalesPanel'
 
 /** Pays de la zone UEMOA (franc CFA, XOF) proposés à la création ; d’autres pays suivront. */
 const countries: Array<{ code: string; name: string }> = [
@@ -18,6 +23,15 @@ const countries: Array<{ code: string; name: string }> = [
   { code: 'NE', name: 'Niger' },
   { code: 'SN', name: 'Sénégal' },
   { code: 'TG', name: 'Togo' },
+]
+
+type Tab = 'products' | 'sales' | 'expenses' | 'results'
+
+const tabs: Array<{ id: Tab; label: string }> = [
+  { id: 'products', label: 'Produits' },
+  { id: 'sales', label: 'Ventes' },
+  { id: 'expenses', label: 'Dépenses' },
+  { id: 'results', label: 'Résultats' },
 ]
 
 type DialogState =
@@ -71,7 +85,7 @@ function BusinessSetup({ onCreate }: { onCreate: (input: { name: string; country
   )
 }
 
-/** Espace Business : produits et stocks du commerce de l’utilisateur. */
+/** Espace Business : produits et stocks, ventes, dépenses et résultats du commerce de l’utilisateur. */
 export function BusinessView({ account, client, onSignIn, onNotify }: BusinessViewProps) {
   const api = useMemo(() => (client ? createBusinessApi(() => client.accessToken()) : null), [client])
   const [business, setBusiness] = useState<Business | null | undefined>(undefined)
@@ -80,6 +94,8 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
   const [query, setQuery] = useState('')
   const [onlyLow, setOnlyLow] = useState(false)
   const [dialog, setDialog] = useState<DialogState>(null)
+  const [tab, setTab] = useState<Tab>('products')
+  const [preset, setPreset] = useState<PeriodPreset>('today')
 
   const loadProducts = useCallback(async (businessId: string) => {
     if (!api) return
@@ -148,7 +164,22 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
         }} />
       )}
 
-      {business && products && (
+      {business && products && api && (
+        <div className="segmented business-tabs" role="tablist" aria-label="Sections de l’espace Business">
+          {tabs.map((item) => (
+            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={tab === item.id ? 'is-selected' : ''} onClick={() => setTab(item.id)}>{item.label}</button>
+          ))}
+        </div>
+      )}
+      {business && products && api && tab !== 'products' && (() => {
+        const period = periodFor(preset, business.timezone)
+        const picker = <PeriodPicker preset={preset} period={period} onChange={setPreset} />
+        if (tab === 'sales') return <SalesPanel api={api} business={business} products={products} period={period} picker={picker} onNotify={onNotify} onStockChanged={() => loadProducts(business.id)} />
+        if (tab === 'expenses') return <ExpensesPanel api={api} business={business} period={period} picker={picker} onNotify={onNotify} />
+        return <ResultsPanel api={api} business={business} period={period} picker={picker} />
+      })()}
+
+      {business && products && tab === 'products' && (
         <>
           <div className="admin-stats business-stats">
             <div className="admin-stat"><span className="admin-stat-value">{products.length}</span><span className="admin-stat-label">Produits</span></div>

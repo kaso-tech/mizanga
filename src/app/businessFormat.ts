@@ -39,3 +39,8 @@ export function stockLevel(product: { quantity: number; alertThreshold: number }
 export const stockValue = (products: Array<{ quantity: number; purchasePrice: number }>) => (
   products.reduce((total, product) => total + Math.round(product.quantity * product.purchasePrice), 0)
 )
+
+/** Taux de marge brute (marge / chiffre d’affaires), à une décimale ; rien à afficher sans ventes. */
+export const marginRate = (grossMargin: number, revenue: number) => (
+  revenue > 0 ? `${(Math.round((grossMargin / revenue) * 1000) / 10).toLocaleString('fr')}\u00a0%` : null
+)

@@ -56,4 +56,20 @@ describe('accès aux données Business par l’API REST de Supabase', () => {
     const store = createSupabaseBusinessStore({ supabaseUrl: 'https://projet.supabase.co', publishableKey: 'k' }, { fetchImpl: async () => { throw new TypeError('fetch failed') } })
     await expect(store.listProducts(session, 'b1', { includeArchived: true })).rejects.toMatchObject({ status: 503 })
   })
+
+  it('appelle les fonctions de vente, de dépense et de calcul de la base', async () => {
+    const sale = fakeRest(200, { id: 's1', sold_at: '2026-10-22T09:00:00Z', status: 'completed', total_amount: 34000, total_cost: 30000, customer_name: null, note: null })
+    await sale.store.recordSale(session, 'b1', { items: [{ product_id: 'p1', quantity: 2 }], customerName: null, note: null })
+    expect(sale.calls[0].url).toBe('https://projet.supabase.co/rest/v1/rpc/record_sale')
+    expect(JSON.parse(String(sale.calls[0].init.body))).toEqual({ p_business_id: 'b1', p_items: [{ product_id: 'p1', quantity: 2 }], p_customer_name: null, p_note: null })
+
+    const summary = fakeRest(200, [{ revenue: 34000, cost_of_goods_sold: 30000, gross_margin: 4000, expenses: 2500, estimated_result: 1500, sales_count: 1, cancelled_sales_count: 0 }])
+    const result = await summary.store.summary(session, 'b1', { start: '2026-10-01', end: '2026-10-31' })
+    expect(result.summary).toEqual({ revenue: 34000, costOfGoodsSold: 30000, grossMargin: 4000, expenses: 2500, estimatedResult: 1500, salesCount: 1, cancelledSalesCount: 0 })
+    expect(summary.calls.map((call) => call.url)).toEqual(['https://projet.supabase.co/rest/v1/rpc/business_summary', 'https://projet.supabase.co/rest/v1/rpc/business_product_sales'])
+
+    const removal = fakeRest(200, [])
+    await expect(removal.store.deleteExpense(session, 'b1', 'e1')).rejects.toMatchObject({ status: 403 })
+    expect(removal.calls[0].init.method).toBe('DELETE')
+  })
 })

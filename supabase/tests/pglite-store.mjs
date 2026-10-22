@@ -1,7 +1,7 @@
 // Accès aux données Business pour les tests : mêmes requêtes que l’API REST de Supabase, exécutées sur
 // PGlite avec l’identité de l’utilisateur (rôle authenticated), donc avec les règles RLS et les fonctions
 // contrôlées réelles.
-import { MOVEMENT_COLUMNS, PRODUCT_COLUMNS, toBusiness, toBusinessError, toMovement, toProduct } from '../../server/business/supabase-store.mjs'
+import { MOVEMENT_COLUMNS, PRODUCT_COLUMNS, toBusiness, toBusinessError, toExpense, toMovement, toProduct, toProductSales, toSale, toSummary } from '../../server/business/supabase-store.mjs'
 import { BusinessError } from '../../server/business/validate.mjs'
 import { asUser } from './database.mjs'
 
@@ -52,6 +52,31 @@ export function createPgliteBusinessStore(db) {
     async recordMovement({ userId }, businessId, productId, input) {
       const [row] = await query(userId, `select ${movementColumns} from public.record_stock_movement($1, $2, $3, $4, $5, $6)`, [businessId, productId, input.kind, input.quantity, input.unitCost, input.note])
       return toMovement(row)
+    },
+    async listSales({ userId }, businessId, period) {
+      return (await query(userId, 'select public.list_sales($1, $2, $3) as result', [businessId, period.start, period.end]))[0].result
+    },
+    async recordSale({ userId }, businessId, input) {
+      return toSale((await query(userId, 'select * from public.record_sale($1, $2::jsonb, $3, $4)', [businessId, JSON.stringify(input.items), input.customerName, input.note]))[0])
+    },
+    async cancelSale({ userId }, businessId, saleId, reason) {
+      return toSale((await query(userId, 'select * from public.cancel_sale($1, $2, $3)', [businessId, saleId, reason]))[0])
+    },
+    async listExpenses({ userId }, businessId, period) {
+      return (await query(userId, 'select public.list_expenses($1, $2, $3) as result', [businessId, period.start, period.end]))[0].result
+    },
+    async recordExpense({ userId }, businessId, input) {
+      return toExpense((await query(userId, 'select * from public.record_expense($1, $2, $3, $4, $5)', [businessId, input.amount, input.category, input.description, input.spentOn]))[0])
+    },
+    async deleteExpense({ userId }, businessId, expenseId) {
+      const rows = await query(userId, 'delete from public.expenses where id = $1 and business_id = $2 returning id', [expenseId, businessId])
+      if (!rows.length) throw new BusinessError(403, 'Seul le propriétaire peut supprimer une dépense.')
+    },
+    async summary({ userId }, businessId, period) {
+      const params = [businessId, period.start, period.end]
+      const [summaryRow] = await query(userId, 'select * from public.business_summary($1, $2, $3)', params)
+      const productRows = await query(userId, 'select * from public.business_product_sales($1, $2, $3)', params)
+      return { summary: toSummary(summaryRow), products: productRows.map(toProductSales) }
     },
   }
 }

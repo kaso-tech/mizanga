@@ -97,3 +97,54 @@ export function validateMovementInput(body) {
     note: text(body?.note, 'La note', { max: 500 }) || null,
   }
 }
+
+/** Jour du calendrier au format AAAA-MM-JJ (date réelle). @param {unknown} value @param {string} label */
+function day(value, label) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw invalid(`${label} est invalide (format AAAA-MM-JJ).`)
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw invalid(`${label} n’existe pas.`)
+  return value
+}
+
+/** Période de jours locaux, bornes incluses, 366 jours au plus. @param {URLSearchParams} params */
+export function validatePeriod(params) {
+  const start = day(params.get('from'), 'La date de début')
+  const end = day(params.get('to'), 'La date de fin')
+  const days = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000
+  if (days < 0 || days > 366) throw invalid('Période invalide (366 jours au plus).')
+  return { start, end }
+}
+
+/** @param {any} body */
+export function validateSaleInput(body) {
+  const items = body?.items
+  if (!Array.isArray(items) || items.length === 0) throw invalid('Ajoutez au moins un produit à la vente.')
+  if (items.length > 100) throw invalid('Une vente compte 100 lignes au plus.')
+  return {
+    items: items.map((item) => {
+      if (!isUuid(item?.productId)) throw invalid('Produit invalide.')
+      return {
+        product_id: /** @type {string} */ (item.productId),
+        quantity: /** @type {number} */ (quantity(item.quantity, 'La quantité', { allowZero: false }) ?? (() => { throw invalid('La quantité est obligatoire.') })()),
+        ...(item.unitPrice === undefined || item.unitPrice === null ? {} : { unit_price: amount(item.unitPrice, 'Le prix unitaire') }),
+      }
+    }),
+    customerName: text(body?.customerName, 'Le nom du client', { max: 120 }) || null,
+    note: text(body?.note, 'La note', { max: 500 }) || null,
+  }
+}
+
+/** @param {any} body */
+export function validateExpenseInput(body) {
+  const value = amount(body?.amount, 'Le montant')
+  if (!value) throw invalid('Le montant doit être positif.')
+  return {
+    amount: value,
+    category: /** @type {string} */ (text(body?.category, 'La catégorie', { min: 1, max: 40, required: true })),
+    description: text(body?.description, 'La description', { max: 500 }) || null,
+    spentOn: body?.spentOn === undefined || body?.spentOn === null ? null : day(body.spentOn, 'La date'),
+  }
+}
+
+/** @param {any} body */
+export const validateCancelInput = (body) => ({ reason: text(body?.reason, 'Le motif', { max: 500 }) || null })

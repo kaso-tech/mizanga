@@ -51,6 +51,74 @@ export interface MovementInput {
   note?: string | null
 }
 
+export interface SaleItem {
+  productId: string
+  productName: string
+  unit: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export interface Sale {
+  id: string
+  soldAt: string
+  status: 'completed' | 'cancelled'
+  totalAmount: number
+  totalCost: number
+  customerName: string | null
+  note: string | null
+  items?: SaleItem[]
+}
+
+export interface SaleInput {
+  items: Array<{ productId: string; quantity: number; unitPrice?: number }>
+  customerName?: string | null
+  note?: string | null
+}
+
+export interface Expense {
+  id: string
+  amount: number
+  category: string
+  description: string | null
+  spentAt: string
+  createdBy: string
+}
+
+export interface ExpenseInput {
+  amount: number
+  category: string
+  description?: string | null
+  spentOn?: string | null
+}
+
+export interface Summary {
+  revenue: number
+  costOfGoodsSold: number
+  grossMargin: number
+  expenses: number
+  estimatedResult: number
+  salesCount: number
+  cancelledSalesCount: number
+}
+
+export interface ProductSales {
+  productId: string
+  productName: string
+  unit: string
+  quantity: number
+  revenue: number
+  cost: number
+  grossMargin: number
+}
+
+/** Période de jours du calendrier local du commerce, bornes incluses (AAAA-MM-JJ). */
+export interface Period {
+  start: string
+  end: string
+}
+
 /** Erreur dont le message peut être montré tel quel à l’utilisateur. */
 export class BusinessApiError extends Error {
   constructor(readonly userMessage: string, readonly status: number) {
@@ -93,5 +161,12 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     recordMovement: async (businessId: string, productId: string, input: MovementInput) => (
       (await request<{ movement: StockMovement }>('POST', `/${businessId}/products/${productId}/movements`, input)).movement
     ),
+    listSales: async (businessId: string, period: Period) => (await request<{ sales: Sale[] }>('GET', `/${businessId}/sales?from=${period.start}&to=${period.end}`)).sales,
+    recordSale: async (businessId: string, input: SaleInput) => (await request<{ sale: Sale }>('POST', `/${businessId}/sales`, input)).sale,
+    cancelSale: async (businessId: string, saleId: string, reason?: string) => (await request<{ sale: Sale }>('POST', `/${businessId}/sales/${saleId}/cancel`, { reason: reason ?? null })).sale,
+    listExpenses: async (businessId: string, period: Period) => (await request<{ expenses: Expense[] }>('GET', `/${businessId}/expenses?from=${period.start}&to=${period.end}`)).expenses,
+    recordExpense: async (businessId: string, input: ExpenseInput) => (await request<{ expense: Expense }>('POST', `/${businessId}/expenses`, input)).expense,
+    deleteExpense: async (businessId: string, expenseId: string) => { await request<{ deleted: boolean }>('DELETE', `/${businessId}/expenses/${expenseId}`) },
+    summary: async (businessId: string, period: Period) => request<{ summary: Summary; products: ProductSales[] }>('GET', `/${businessId}/summary?from=${period.start}&to=${period.end}`),
   }
 }

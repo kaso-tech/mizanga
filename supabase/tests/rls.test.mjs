@@ -132,21 +132,22 @@ describe('ventes, dépenses, IA et abonnements', () => {
     })
   })
 
-  it('isole les dépenses ; un employé ajoute mais ne supprime pas', async () => {
+  it('isole les dépenses ; un employé ajoute (par la fonction contrôlée) mais ne supprime pas', async () => {
     await asUser(db, bob, async () => {
       expect(await count('select * from public.expenses')).toBe(0)
-      expect(await errorOf(db.query('insert into public.expenses (business_id, amount) values ($1, 100)', [aliceShop]))).toMatch(/row-level security/)
+      expect(await errorOf(db.query("select public.record_expense($1, 100, 'transport')", [aliceShop]))).toBe('Accès refusé à cette entreprise.')
       expect((await db.query('update public.expenses set amount = 1 where business_id = $1', [aliceShop])).affectedRows).toBe(0)
     })
     await asUser(db, carla, async () => {
-      const inserted = await db.query("insert into public.expenses (business_id, amount, category) values ($1, 500, 'emballages') returning created_by", [aliceShop])
+      const inserted = await db.query("select created_by from public.record_expense($1, 500, 'emballages')", [aliceShop])
       expect(inserted.rows[0]).toEqual({ created_by: carla })
-      expect(await errorOf(db.query('insert into public.expenses (business_id, amount, created_by) values ($1, 1, $2)', [aliceShop, alice]))).toMatch(/permission denied/)
+      // L’ajout direct n’est plus permis : il passe par record_expense (date locale, contrôles).
+      expect(await errorOf(db.query("insert into public.expenses (business_id, amount, category) values ($1, 1, 'x')", [aliceShop]))).toMatch(/permission denied/)
       expect((await db.query('delete from public.expenses where business_id = $1', [aliceShop])).affectedRows).toBe(0)
       expect(await count('select * from public.expenses')).toBe(2)
     })
     await asUser(db, alice, async () => {
-      expect(await errorOf(db.query('insert into public.expenses (business_id, amount) values ($1, 0)', [aliceShop]))).toMatch(/check constraint/)
+      expect(await errorOf(db.query("select public.record_expense($1, 0, 'transport')", [aliceShop]))).toBe('Le montant doit être positif.')
     })
   })
 

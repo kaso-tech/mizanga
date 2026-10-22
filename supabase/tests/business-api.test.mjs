@@ -102,4 +102,39 @@ describe('espace Business : produits et stocks', () => {
     expect((await call('jeton-alice', 'GET', '/api/business/pas-un-uuid/products')).status).toBe(404)
     expect((await call('jeton-alice', 'DELETE', `/api/business/${shop}/products`)).status).toBe(404)
   })
+
+  it('enregistre ventes et dépenses et calcule le résultat estimé de la période', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const sold = await call('jeton-alice', 'POST', `/api/business/${shop}/sales`, { items: [{ productId: rice, quantity: 2 }, { productId: rice, quantity: 1 }] })
+    expect(sold).toEqual({ status: 422, body: { error: 'Un même produit apparaît deux fois : regroupez les quantités.' } })
+    const sale = await call('jeton-alice', 'POST', `/api/business/${shop}/sales`, { items: [{ productId: rice, quantity: 2, unitPrice: 17000 }], customerName: 'Mariam' })
+    expect(sale.status).toBe(201)
+    expect(sale.body.sale).toMatchObject({ status: 'completed', totalAmount: 34000, totalCost: 30000, customerName: 'Mariam' })
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products`)).body.products[0].quantity).toBe(12)
+
+    expect((await call('jeton-alice', 'POST', `/api/business/${shop}/expenses`, { amount: 2500, category: 'Transport', spentOn: today })).status).toBe(201)
+    expect((await call('jeton-alice', 'POST', `/api/business/${shop}/expenses`, { amount: 0, category: 'Transport' })).body).toEqual({ error: 'Le montant doit être positif.' })
+
+    const result = await call('jeton-alice', 'GET', `/api/business/${shop}/summary?from=${today}&to=${today}`)
+    expect(result.body.summary).toEqual({ revenue: 34000, costOfGoodsSold: 30000, grossMargin: 4000, expenses: 2500, estimatedResult: 1500, salesCount: 1, cancelledSalesCount: 0 })
+    expect(result.body.products).toEqual([{ productId: rice, productName: 'Riz 25 kg', unit: 'sac', quantity: 2, revenue: 34000, cost: 30000, grossMargin: 4000 }])
+
+    const sales = await call('jeton-alice', 'GET', `/api/business/${shop}/sales?from=${today}&to=${today}`)
+    expect(sales.body.sales[0].items).toEqual([{ productId: rice, productName: 'Riz 25 kg', unit: 'sac', quantity: 2, unitPrice: 17000, lineTotal: 34000 }])
+
+    const cancelled = await call('jeton-alice', 'POST', `/api/business/${shop}/sales/${sale.body.sale.id}/cancel`, { reason: 'Erreur' })
+    expect(cancelled.body.sale.status).toBe('cancelled')
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/summary?from=${today}&to=${today}`)).body.summary).toMatchObject({ revenue: 0, estimatedResult: -2500, cancelledSalesCount: 1 })
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products`)).body.products[0].quantity).toBe(14)
+
+    const expenses = await call('jeton-alice', 'GET', `/api/business/${shop}/expenses?from=${today}&to=${today}`)
+    expect(expenses.body.expenses).toHaveLength(1)
+    expect((await call('jeton-bob', 'DELETE', `/api/business/${shop}/expenses/${expenses.body.expenses[0].id}`)).status).toBe(403)
+    expect((await call('jeton-alice', 'DELETE', `/api/business/${shop}/expenses/${expenses.body.expenses[0].id}`)).body).toEqual({ deleted: true })
+
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/summary?from=${today}`)).status).toBe(422)
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/summary?from=2026-02-30&to=2026-03-01`)).body).toEqual({ error: 'La date de début n’existe pas.' })
+    expect((await call('jeton-bob', 'GET', `/api/business/${shop}/summary?from=${today}&to=${today}`)).status).toBe(403)
+    expect((await call('jeton-bob', 'POST', `/api/business/${shop}/sales`, { items: [{ productId: rice, quantity: 1 }] })).status).toBe(403)
+  })
 })

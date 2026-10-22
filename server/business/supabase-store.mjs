@@ -16,7 +16,63 @@ import { BusinessError } from './validate.mjs'
  * @property {(session: BusinessSession, businessId: string, productId: string, changes: Record<string, unknown>) => Promise<Product>} updateProduct
  * @property {(session: BusinessSession, businessId: string, productId: string) => Promise<StockMovement[]>} listMovements
  * @property {(session: BusinessSession, businessId: string, productId: string, input: ReturnType<typeof import('./validate.mjs').validateMovementInput>) => Promise<StockMovement>} recordMovement
+ * @property {(session: BusinessSession, businessId: string, period: Period) => Promise<unknown[]>} listSales
+ * @property {(session: BusinessSession, businessId: string, input: ReturnType<typeof import('./validate.mjs').validateSaleInput>) => Promise<Sale>} recordSale
+ * @property {(session: BusinessSession, businessId: string, saleId: string, reason: string | null) => Promise<Sale>} cancelSale
+ * @property {(session: BusinessSession, businessId: string, period: Period) => Promise<unknown[]>} listExpenses
+ * @property {(session: BusinessSession, businessId: string, input: ReturnType<typeof import('./validate.mjs').validateExpenseInput>) => Promise<Expense>} recordExpense
+ * @property {(session: BusinessSession, businessId: string, expenseId: string) => Promise<void>} deleteExpense
+ * @property {(session: BusinessSession, businessId: string, period: Period) => Promise<{ summary: Summary, products: ProductSales[] }>} summary
+ *
+ * @typedef {{ start: string, end: string }} Period
+ * @typedef {{ id: string, soldAt: string, status: string, totalAmount: number, totalCost: number, customerName: string | null, note: string | null }} Sale
+ * @typedef {{ id: string, amount: number, category: string, description: string | null, spentAt: string, createdBy: string }} Expense
+ * @typedef {{ revenue: number, costOfGoodsSold: number, grossMargin: number, expenses: number, estimatedResult: number, salesCount: number, cancelledSalesCount: number }} Summary
+ * @typedef {{ productId: string, productName: string, unit: string, quantity: number, revenue: number, cost: number, grossMargin: number }} ProductSales
  */
+
+/** @param {any} row @returns {Sale} */
+export const toSale = (row) => ({
+  id: row.id,
+  soldAt: new Date(row.sold_at).toISOString(),
+  status: row.status,
+  totalAmount: Number(row.total_amount),
+  totalCost: Number(row.total_cost),
+  customerName: row.customer_name ?? null,
+  note: row.note ?? null,
+})
+
+/** @param {any} row @returns {Expense} */
+export const toExpense = (row) => ({
+  id: row.id,
+  amount: Number(row.amount),
+  category: row.category,
+  description: row.description ?? null,
+  spentAt: new Date(row.spent_at).toISOString(),
+  createdBy: row.created_by,
+})
+
+/** @param {any} row @returns {Summary} */
+export const toSummary = (row) => ({
+  revenue: Number(row.revenue),
+  costOfGoodsSold: Number(row.cost_of_goods_sold),
+  grossMargin: Number(row.gross_margin),
+  expenses: Number(row.expenses),
+  estimatedResult: Number(row.estimated_result),
+  salesCount: Number(row.sales_count),
+  cancelledSalesCount: Number(row.cancelled_sales_count),
+})
+
+/** @param {any} row @returns {ProductSales} */
+export const toProductSales = (row) => ({
+  productId: row.product_id,
+  productName: row.product_name,
+  unit: row.unit,
+  quantity: Number(row.quantity),
+  revenue: Number(row.revenue),
+  cost: Number(row.cost),
+  grossMargin: Number(row.gross_margin),
+})
 
 export const PRODUCT_COLUMNS = 'id,name,unit,sku,quantity,purchase_price,sale_price,alert_threshold,archived,updated_at'
 export const MOVEMENT_COLUMNS = 'id,kind,quantity_delta,unit_cost,note,created_at,created_by'
@@ -148,6 +204,34 @@ export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { f
         p_note: input.note,
       })
       return toMovement(row)
+    },
+    async listSales(session, businessId, period) {
+      return request(session, 'POST', 'rpc/list_sales', { p_business_id: businessId, p_start: period.start, p_end: period.end })
+    },
+    async recordSale(session, businessId, input) {
+      return toSale(await request(session, 'POST', 'rpc/record_sale', { p_business_id: businessId, p_items: input.items, p_customer_name: input.customerName, p_note: input.note }))
+    },
+    async cancelSale(session, businessId, saleId, reason) {
+      return toSale(await request(session, 'POST', 'rpc/cancel_sale', { p_business_id: businessId, p_sale_id: saleId, p_reason: reason }))
+    },
+    async listExpenses(session, businessId, period) {
+      return request(session, 'POST', 'rpc/list_expenses', { p_business_id: businessId, p_start: period.start, p_end: period.end })
+    },
+    async recordExpense(session, businessId, input) {
+      return toExpense(await request(session, 'POST', 'rpc/record_expense', { p_business_id: businessId, p_amount: input.amount, p_category: input.category, p_description: input.description, p_spent_on: input.spentOn }))
+    },
+    async deleteExpense(session, businessId, expenseId) {
+      // La règle RLS réserve la suppression au propriétaire : rien de supprimé signifie refus (ou absence).
+      const rows = await request(session, 'DELETE', `expenses?select=id&id=eq.${id(expenseId)}&business_id=eq.${id(businessId)}`, undefined, true)
+      if (!rows?.length) throw new BusinessError(403, 'Seul le propriétaire peut supprimer une dépense.')
+    },
+    async summary(session, businessId, period) {
+      const params = { p_business_id: businessId, p_start: period.start, p_end: period.end }
+      const [summaryRows, productRows] = await Promise.all([
+        request(session, 'POST', 'rpc/business_summary', params),
+        request(session, 'POST', 'rpc/business_product_sales', params),
+      ])
+      return { summary: toSummary(summaryRows[0]), products: productRows.map(toProductSales) }
     },
   }
 }
