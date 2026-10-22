@@ -27,8 +27,13 @@ interface ComposerProps {
   onNotify: (message: string) => void
   /** Consignes proposées quand le message commence par « / ». */
   savedPrompts?: SavedPrompt[]
-  /** Fichiers joints et messages vocaux ; désactivés quand le destinataire ne les lit pas (assistant Business). */
+  /** Fichiers joints ; désactivés quand le destinataire ne les lit pas. */
   allowAttachments?: boolean
+  /** Messages vocaux (par défaut, comme les fichiers joints). */
+  allowVoice?: boolean
+  /** Types de fichiers proposés au choix (par défaut : photos, PDF, texte, audio). */
+  accept?: string
+  attachLabel?: string
   placeholder?: string
   /** Libellé accessible de la zone de saisie. */
   label?: string
@@ -53,6 +58,9 @@ export function Composer({
   onNotify,
   savedPrompts = [],
   allowAttachments = true,
+  allowVoice = allowAttachments,
+  accept = acceptAttribute,
+  attachLabel = 'Joindre une photo ou un fichier',
   placeholder = 'Demandez n’importe quoi, en français ou en mooré…',
   label = 'Votre message',
 }: ComposerProps) {
@@ -260,7 +268,7 @@ export function Composer({
             ref={fileInputRef}
             type="file"
             multiple
-            accept={acceptAttribute}
+            accept={accept}
             className="visually-hidden"
             tabIndex={-1}
             aria-hidden="true"
@@ -273,7 +281,7 @@ export function Composer({
             <button
               type="button"
               className="composer-tool"
-              aria-label="Joindre une photo ou un fichier"
+              aria-label={attachLabel}
               title="Joindre une photo, un PDF ou un fichier texte"
               onClick={() => fileInputRef.current?.click()}
             >
@@ -290,7 +298,7 @@ export function Composer({
           >
             <Keyboard size={20} />
           </button>
-          {allowAttachments && <button
+          {allowVoice && <button
             type="button"
             className={`composer-tool ${isRecording ? 'is-recording' : ''}`}
             disabled={!canRecord || recording.state === 'processing'}

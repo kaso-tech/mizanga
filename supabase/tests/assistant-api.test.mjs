@@ -31,6 +31,13 @@ const provider = {
       failNext = false
       throw new UpstreamError('Le moteur est momentanément indisponible. Réessayez plus tard.', 503)
     }
+    if (request.messages.at(-1)?.content.startsWith('Enregistre')) {
+      yield { text: 'Voici les fiches à vérifier.' }
+      yield { functionCall: { name: 'proposer_creation_produit', args: { nom: 'Huile Dinor 5 L', unite: 'bidon', prix_achat: 9000, prix_vente: 10500, quantite_initiale: 12 } } }
+      yield { functionCall: { name: 'proposer_mouvement_stock', args: { produit: 'riz 25kg', type: 'achat', quantite: 5, cout_unitaire: 14500 } } }
+      yield { usage: { inputTokens: 2500, outputTokens: 100 } }
+      return
+    }
     yield { text: 'Votre marge brute du jour est de ' }
     yield { text: '4 075 F CFA.' }
     yield { usage: { inputTokens: 2000, outputTokens: 400 } }
@@ -40,7 +47,7 @@ const provider = {
 
 beforeAll(async () => {
   db = await createTestDatabase()
-  await db.query("update public.plans set daily_ai_requests = 3 where id = 'test'")
+  await db.query("update public.plans set daily_ai_requests = 4 where id = 'test'")
   tokens['jeton-alice'] = { id: await createUser(db, 'alice@example.test'), email: 'alice@example.test' }
   tokens['jeton-bob'] = { id: await createUser(db, 'bob@example.test'), email: 'bob@example.test' }
   const alice = tokens['jeton-alice'].id
@@ -75,15 +82,15 @@ const quota = async () => /** @type {any} */ (await (await fetch(`${base}/api/bu
 
 describe('assistant Business', () => {
   it('répond à partir des chiffres calculés par la base, sans recherche web', async () => {
-    expect(await quota()).toMatchObject({ used: 0, limit: 3 })
+    expect(await quota()).toMatchObject({ used: 0, limit: 4 })
     const { status, lines } = await ask('jeton-alice', question)
     expect(status).toBe(200)
     const [first, ...rest] = lines
-    expect(first.quota).toMatchObject({ used: 1, limit: 3 })
+    expect(first.quota).toMatchObject({ used: 1, limit: 4 })
     expect(first.context.periods[0]).toMatchObject({ key: 'today', summary: { revenue: 34375, costOfGoodsSold: 30300, grossMargin: 4075, expenses: 6500, estimatedResult: -2425, salesCount: 1 } })
     expect(first.context.stock).toMatchObject({ productCount: 3, value: 8 * 15000 + 3.5 * 600 })
     expect(first.context.stock.products.map((/** @type {any} */ product) => [product.name, product.level])).toEqual([['Savon', 'out'], ['Riz 25 kg', 'low'], ['Sucre', 'ok']])
-    expect(rest).toEqual([{ text: 'Votre marge brute du jour est de ' }, { text: '4 075 F CFA.' }, { done: true, quota: { used: 1, limit: 3, resetsAt: first.quota.resetsAt } }])
+    expect(rest).toEqual([{ text: 'Votre marge brute du jour est de ' }, { text: '4 075 F CFA.' }, { done: true, quota: { used: 1, limit: 4, resetsAt: first.quota.resetsAt } }])
 
     const sent = requests.at(-1)
     expect(sent.webSearch).toBe(false)
@@ -112,11 +119,43 @@ describe('assistant Business', () => {
     expect(await quota()).toMatchObject({ used: 1 })
   })
 
+  it('prépare des fiches à confirmer à partir d’une photo, sans rien enregistrer', async () => {
+    const photo = { name: 'huile.jpg', mimeType: 'image/jpeg', data: 'AAAA' }
+    const older = { name: 'ancienne.png', mimeType: 'image/png', data: 'BBBB' }
+    const { status, lines } = await ask('jeton-alice', { messages: [
+      { role: 'user', content: 'Regarde', attachments: [older] },
+      { role: 'assistant', content: 'Je vois un savon.' },
+      { role: 'user', content: 'Enregistre cette huile : achat 9000, vente 10500, 12 bidons. Et 5 sacs de riz reçus à 14500.', attachments: [photo] },
+    ] })
+    expect(status).toBe(200)
+    const sent = requests.at(-1)
+    expect(sent.functions.map((/** @type {any} */ fn) => fn.name)).toEqual(['proposer_creation_produit', 'proposer_mouvement_stock'])
+    expect(sent.messages[0].attachments).toBeUndefined()
+    expect(sent.messages[2].attachments).toEqual([photo])
+    const proposals = lines.find((line) => line.proposals)?.proposals
+    expect(proposals).toEqual([
+      { id: expect.any(String), action: 'create_product', values: { name: 'Huile Dinor 5 L', unit: 'bidon', purchasePrice: 9000, salePrice: 10500, initialQuantity: 12, alertThreshold: null } },
+      { id: expect.any(String), action: 'stock_movement', values: { productId: expect.any(String), productName: 'riz 25kg', kind: 'purchase', quantity: 5, unitCost: 14500, note: null } },
+    ])
+    expect(lines.at(-1)).toMatchObject({ done: true })
+    // Rien n’est écrit tant que le commerçant n’a pas confirmé.
+    const products = await asUser(db, tokens['jeton-alice'].id, async () => (await db.query('select name, quantity from public.products order by name')).rows)
+    expect(products.map((/** @type {any} */ row) => row.name)).not.toContain('Huile Dinor 5 L')
+    expect(products.find((/** @type {any} */ row) => row.name === 'Riz 25 kg')).toMatchObject({ quantity: '8.000' })
+  })
+
+  it('refuse les fichiers qui ne sont pas des photos', async () => {
+    const pdf = { name: 'facture.pdf', mimeType: 'application/pdf', data: 'AAAA' }
+    expect(await ask('jeton-alice', { messages: [{ role: 'user', content: 'Lis ceci', attachments: [pdf] }] })).toEqual({ status: 422, lines: [{ error: 'Seules les photos (JPEG, PNG, WebP) sont acceptées.' }] })
+    const many = Array.from({ length: 4 }, () => ({ name: 'p.jpg', mimeType: 'image/jpeg', data: 'AAAA' }))
+    expect((await ask('jeton-alice', { messages: [{ role: 'user', content: '', attachments: many }] })).status).toBe(422)
+  })
+
   it('refuse au-delà de la limite du jour', async () => {
     await ask('jeton-alice', question)
     await ask('jeton-alice', question)
     const refused = await ask('jeton-alice', question)
-    expect(refused).toEqual({ status: 429, lines: [{ error: 'Limite du jour atteinte (3 questions). Elle sera renouvelée demain.' }] })
+    expect(refused).toEqual({ status: 429, lines: [{ error: 'Limite du jour atteinte (4 questions). Elle sera renouvelée demain.' }] })
   })
 
   it('refuse les autres commerçants, les visiteurs et les questions invalides', async () => {

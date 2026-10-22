@@ -136,6 +136,33 @@ test('parcours complet du commerçant', async ({ page }, info) => {
   await expectFitsScreen(page, 'formule')
 })
 
+test('assistant : une photo et une phrase préparent une fiche de produit, enregistrée après confirmation', async ({ page }, info) => {
+  await signInAndCreateShop(page, emailFor(info), 'Boutique Photo')
+  await page.getByRole('tab', { name: 'Assistant' }).tap()
+  // Petite image PNG valide (1 × 1 pixel).
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+  await page.locator('input[type="file"]').setInputFiles({ name: 'huile.png', mimeType: 'image/png', buffer: png })
+  await expect(page.getByText('huile.png')).toBeVisible()
+  await page.getByRole('textbox', { name: 'Votre question' }).fill('Enregistre cette huile : achat 9000, j’en ai 12 bidons')
+  await page.getByRole('button', { name: 'Envoyer' }).tap()
+  const card = page.getByRole('form', { name: 'Fiche à vérifier : Nouveau produit' })
+  await expect(card).toBeVisible()
+  await expect(card.getByLabel('Nom')).toHaveValue('Huile Dinor 5 L')
+  await expectFitsScreen(page, 'fiche de produit')
+  // Rien n’est encore enregistré.
+  await page.getByRole('tab', { name: 'Produits' }).tap()
+  await expect(page.getByText('Ajoutez votre premier produit')).toBeVisible()
+  // De retour sur l’assistant, la conversation et la fiche en attente sont toujours là.
+  await page.getByRole('tab', { name: 'Assistant' }).tap()
+  await expect(card).toBeVisible()
+  await card.getByLabel(/Prix de vente/).fill('10 500')
+  await card.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
+  await expect(card).toContainText('Produit « Huile Dinor 5 L » enregistré.')
+  await page.getByRole('tab', { name: 'Produits' }).tap()
+  await expect(page.locator('.product-card', { hasText: 'Huile Dinor 5 L' })).toContainText('12')
+  await expect(page.locator('.product-card', { hasText: 'Huile Dinor 5 L' })).toContainText('10 500')
+})
+
 test('le bouton « retour » d’Android ferme la fenêtre sans quitter l’espace Business', async ({ page }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Retour')
   await page.getByRole('button', { name: /Ajouter un produit/ }).tap()

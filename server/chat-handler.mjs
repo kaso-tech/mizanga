@@ -316,7 +316,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
           started = true
         }
         // Les jetons consommés servent au suivi des coûts côté serveur : le navigateur ne les reçoit pas.
-        if ('usage' in event) continue
+        if ('usage' in event || 'functionCall' in event) continue
         res.write(`${JSON.stringify(event)}\n`)
       }
       if (!started) res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' })

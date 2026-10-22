@@ -977,7 +977,9 @@ button.account-chip:hover { opacity: .9; }
 .business-tabs { overflow-x: auto; scrollbar-width: none; }
 .business-tabs button { white-space: nowrap; }
 /* Assistant Business : mêmes messages et même zone de saisie que le chatbot. */
-.business-view:has(.assistant-panel) { display: flex; flex-direction: column; min-height: 100%; }
+.business-view:has(.assistant-tab:not([hidden])) { display: flex; flex-direction: column; min-height: 100%; }
+.assistant-tab { display: flex; flex: 1 0 auto; flex-direction: column; }
+.assistant-tab[hidden] { display: none; }
 .assistant-panel { display: flex; flex: 1 0 auto; flex-direction: column; gap: 24px; min-width: 0; }
 .assistant-welcome { flex: 1 0 auto; padding: 16px 0; gap: 16px; }
 .assistant-welcome h2 { margin: 8px 0 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
@@ -986,8 +988,19 @@ button.account-chip:hover { opacity: .9; }
 .assistant-message { display: grid; gap: 8px; min-width: 0; }
 .assistant-message .assistant-context { margin-left: 44px; }
 /* Sur mobile, le logo des réponses est masqué : les chiffres s’alignent sur le texte. */
-@media (max-width: 639px) { .assistant-message .assistant-context { margin-left: 0; } }
+@media (max-width: 639px) { .assistant-message .assistant-context, .assistant-message .proposal-card { margin-left: 0; } }
 .assistant-context { font-size: 13px; color: var(--muted-foreground); }
+.proposal-card { display: grid; gap: 12px; margin-left: 44px; padding: 14px 16px; border: 1px solid var(--primary); border-radius: 16px; background: var(--card); box-shadow: var(--shadow-composer); }
+.proposal-card.is-done { border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); box-shadow: none; }
+.proposal-card.is-dismissed { border-color: var(--border); box-shadow: none; opacity: .65; }
+.proposal-card fieldset { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.proposal-title { display: flex; align-items: center; gap: 8px; margin: 0; }
+.proposal-title svg { color: var(--primary); }
+.proposal-status { margin-left: auto; padding: 2px 10px; border-radius: 999px; background: var(--ochre-soft); color: var(--foreground); font-size: 12px; }
+.proposal-card.is-done .proposal-status { background: var(--accent); }
+.proposal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.proposal-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.proposal-result { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--primary); font-size: 14px; font-weight: 500; }
 .assistant-context summary { cursor: pointer; font-weight: 500; color: var(--foreground); }
 .assistant-context p { margin: 8px 0 0; }
 .assistant-composer-zone { position: sticky; bottom: 0; z-index: 2; padding-top: 8px; background: linear-gradient(to bottom, transparent, var(--background) 16px); }

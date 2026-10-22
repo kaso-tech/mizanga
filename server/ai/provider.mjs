@@ -9,16 +9,17 @@ import { createGeminiProvider } from './gemini.mjs'
  * @typedef {{ responseLanguage?: string, userWritingMode?: string, customInstructions?: string }} AiPreferences
  * @typedef {{ title: string, url: string }} AiSource
  * @typedef {{ inputTokens: number, outputTokens: number }} AiUsage
- * @typedef {{ text: string } | { sources: AiSource[], searchSuggestionsHtml?: string } | { usage: AiUsage }} AiReplyEvent
+ * @typedef {{ name: string, description: string, parameters: Record<string, unknown> }} AiFunction
+ * @typedef {{ text: string } | { sources: AiSource[], searchSuggestionsHtml?: string } | { usage: AiUsage } | { functionCall: { name: string, args: Record<string, unknown> } }} AiReplyEvent
  *
  * @typedef {object} AiProvider
  * @property {string} name Identifiant du fournisseur (annoncé par /api/health, ex. « gemini »).
  * @property {boolean} configured Vrai si le fournisseur peut répondre (clé présente…).
  * @property {{ standard: string, lite: string }} models Modèles réellement utilisés (console d’administration).
- * @property {(request: { messages: AiMessage[], preferences: AiPreferences, reference?: string, instructions?: string, webSearch?: boolean, tier?: 'standard' | 'lite', signal?: AbortSignal }) => AsyncGenerator<AiReplyEvent>} streamReply
+ * @property {(request: { messages: AiMessage[], preferences: AiPreferences, reference?: string, instructions?: string, webSearch?: boolean, functions?: AiFunction[], tier?: 'standard' | 'lite', signal?: AbortSignal }) => AsyncGenerator<AiReplyEvent>} streamReply
  *   Réponse diffusée par fragments, terminée par les jetons consommés (`usage`) quand le fournisseur
  *   les donne ; `instructions` remplace les consignes générales, `webSearch: false` retire la recherche
- *   web. Lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
+ *   web ; `functions` propose des actions que le modèle demande par `functionCall`. Lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
  * @property {(request: { text: string, signal?: AbortSignal }) => Promise<string | null>} generateTitle
  *   Titre court d’une conversation à partir de son premier message.
  */

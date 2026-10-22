@@ -180,7 +180,12 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
           ))}
         </div>
       )}
-      {business && api && tab === 'assistant' && <AssistantPanel api={api} business={business} />}
+      {/* Toujours monté : la conversation et les fiches en attente restent quand on change d’onglet. */}
+      {business && api && (
+        <div className="assistant-tab" hidden={tab !== 'assistant'}>
+          <AssistantPanel api={api} business={business} products={products ?? []} onDataChanged={() => loadProducts(business.id)} onNotify={onNotify} />
+        </div>
+      )}
       {business && products && api && tab !== 'products' && tab !== 'assistant' && (() => {
         const period = periodFor(preset, business.timezone)
         const picker = <PeriodPicker preset={preset} period={period} onChange={setPreset} />

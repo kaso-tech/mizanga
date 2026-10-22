@@ -73,6 +73,13 @@ createServer(async (req, res) => {
   const instructions = payload.systemInstruction?.parts?.[0]?.text ?? ''
   const today = instructions.split('\n').find((/** @type {string} */ line) => line.startsWith('- Aujourd’hui')) ?? 'Bonjour, je suis Gilli.'
   res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+  // « Enregistre… » avec une photo : le modèle prépare une fiche de produit (prix de vente laissé vide).
+  const lastParts = payload.contents?.at(-1)?.parts ?? []
+  if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('Enregistre')) && lastParts.some((/** @type {any} */ part) => part.inlineData)) {
+    const call = { functionCall: { name: 'proposer_creation_produit', args: { nom: 'Huile Dinor 5 L', unite: 'bidon', prix_achat: 9000, quantite_initiale: 12 } } }
+    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'J’ai préparé la fiche : vérifiez-la.' }, call] } }], usageMetadata: { promptTokenCount: 2000, candidatesTokenCount: 20 } })}\n\n`)
+    return void res.end()
+  }
   const words = `D’après vos chiffres : ${today.replace(/^- /, '')}`.split(/(?<= )/)
   for (const [index, word] of words.entries()) {
     res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: word }] } }], usageMetadata: { promptTokenCount: 1500, candidatesTokenCount: index + 1 } })}\n\n`)

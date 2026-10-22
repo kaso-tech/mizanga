@@ -1,11 +1,13 @@
 import { RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { isImage, prepareAttachments } from '../../app/attachments'
 import { formatAmount, formatQuantity } from '../../app/businessFormat'
-import type { ChatMessage as ChatMessageType } from '../../domain/types'
-import { BusinessApiError, type AiQuota, type AssistantContext, type AssistantMessage, type Business, type BusinessApi } from '../../services/businessApi'
+import type { Attachment, ChatMessage as ChatMessageType } from '../../domain/types'
+import { BusinessApiError, type AiQuota, type AssistantContext, type AssistantMessage, type AssistantProposal, type Business, type BusinessApi, type Product } from '../../services/businessApi'
 import { BrandMark } from '../Brand'
 import { ChatMessage } from '../ChatMessage'
 import { Composer } from '../Composer'
+import { ProposalCard, type ProposalStatus } from './ProposalCard'
 
 const suggestions = [
   'Comment se passent mes ventes ce mois-ci ?',
@@ -13,6 +15,21 @@ const suggestions = [
   'Quel produit me rapporte le plus de marge ?',
   'Où partent mes dépenses ?',
 ]
+
+const PHOTO_TYPES = 'image/jpeg,image/png,image/webp'
+
+interface ProposalState {
+  proposal: AssistantProposal
+  status: ProposalStatus
+  result?: string
+}
+
+/** Résumé d’une fiche pour la suite de la conversation (le modèle sait ce qui a été confirmé). */
+function describeProposal({ proposal, status }: ProposalState) {
+  const what = proposal.action === 'create_product' ? `nouveau produit « ${proposal.values.name} »` : `mouvement de stock pour « ${proposal.values.productName} »`
+  const outcome = status === 'done' ? 'confirmée et enregistrée par le commerçant' : status === 'dismissed' ? 'ignorée par le commerçant' : 'pas encore confirmée'
+  return `[Fiche ${what} : ${outcome}]`
+}
 
 const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 
@@ -53,10 +70,20 @@ function ContextDetails({ context }: { context: AssistantContext }) {
  * actions) mais répondant à partir des chiffres du commerce. La conversation reste sur cet écran
  * (elle n’est pas enregistrée) ; chaque question compte dans la limite du jour.
  */
-export function AssistantPanel({ api, business }: { api: BusinessApi; business: Business }) {
+export function AssistantPanel({ api, business, products, onDataChanged, onNotify }: {
+  api: BusinessApi
+  business: Business
+  products: Product[]
+  /** Appelé après un enregistrement confirmé (les produits et le stock ont changé). */
+  onDataChanged: () => Promise<void>
+  onNotify: (message: string, tone?: 'success' | 'info') => void
+}) {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
   const [contexts, setContexts] = useState<Record<string, AssistantContext>>({})
+  const [proposals, setProposals] = useState<Record<string, ProposalState[]>>({})
   const [draft, setDraft] = useState('')
+  const [draftAttachments, setDraftAttachments] = useState<Attachment[]>([])
+  const [isPreparingFiles, setIsPreparingFiles] = useState(false)
   const [focusToken, setFocusToken] = useState(0)
   const [quota, setQuota] = useState<AiQuota | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -83,6 +110,7 @@ export function AssistantPanel({ api, business }: { api: BusinessApi; business: 
     controllerRef.current = controller
     const answerId = newId()
     let context: AssistantContext | undefined
+    let hasProposals = false
     /** Crée la réponse au premier fragment, puis la met à jour. */
     const updateAnswer = (change: (answer: ChatMessageType) => ChatMessageType) => setMessages((current) => {
       const existing = current.find((message) => message.id === answerId)
@@ -91,17 +119,28 @@ export function AssistantPanel({ api, business }: { api: BusinessApi; business: 
       return existing ? current.map((message) => (message.id === answerId ? updated : message)) : [...current, updated]
     })
     try {
-      await api.askAssistant(business.id, history.map(({ role, content }): AssistantMessage => ({ role, content })).slice(-20), (event) => {
+      const sent = history.slice(-20).map((message, index, all): AssistantMessage => ({
+        role: message.role,
+        content: [message.content, ...(proposals[message.id] ?? []).map(describeProposal)].filter(Boolean).join('\n\n'),
+        // Seules les photos de la question posée partent au serveur.
+        ...(index === all.length - 1 && message.attachments?.length ? { attachments: message.attachments.map(({ name, mimeType, data }) => ({ name, mimeType, data: data ?? '' })) } : {}),
+      }))
+      await api.askAssistant(business.id, sent, (event) => {
         if ('context' in event) {
           context = event.context
           setQuota(event.quota)
         } else if ('text' in event) {
           updateAnswer((answer) => ({ ...answer, content: answer.content + event.text }))
+        } else if ('proposals' in event) {
+          hasProposals = true
+          updateAnswer((answer) => answer)
+          setProposals((current) => ({ ...current, [answerId]: event.proposals.map((proposal) => ({ proposal, status: 'pending' })) }))
         } else {
           setQuota(event.quota)
         }
       }, controller.signal)
-      updateAnswer((answer) => ({ ...answer, status: 'complete' }))
+      // Fiches sans texte : une phrase d’accompagnement plutôt qu’une réponse vide.
+      updateAnswer((answer) => ({ ...answer, status: 'complete', content: answer.content || (hasProposals ? 'Voici la fiche à vérifier avant l’enregistrement.' : '') }))
       if (context) setContexts((current) => ({ ...current, [answerId]: context as AssistantContext }))
     } catch (caught) {
       if (controller.signal.aborted) {
@@ -119,9 +158,45 @@ export function AssistantPanel({ api, business }: { api: BusinessApi; business: 
 
   const ask = (text: string) => {
     const content = text.trim()
-    if (!content || isGenerating) return
+    if ((!content && draftAttachments.length === 0) || isGenerating) return
+    const attachments = draftAttachments
     setDraft('')
-    void run([...messages, { id: newId(), role: 'user', content, createdAt: new Date().toISOString() }])
+    setDraftAttachments([])
+    void run([...messages, { id: newId(), role: 'user', content, createdAt: new Date().toISOString(), ...(attachments.length ? { attachments } : {}) }])
+  }
+
+  const addFiles = async (files: File[]) => {
+    const photos = files.filter((file) => PHOTO_TYPES.split(',').includes(file.type === 'image/jpg' ? 'image/jpeg' : file.type))
+    if (photos.length < files.length) onNotify('L’assistant Business lit seulement les photos (JPEG, PNG, WebP).')
+    if (photos.length === 0) return
+    setIsPreparingFiles(true)
+    try {
+      const { attachments, problems } = await prepareAttachments(photos, draftAttachments)
+      setDraftAttachments((current) => [...current, ...attachments.filter(isImage)].slice(0, 3))
+      if (problems.length > 0) onNotify(problems.join(' '))
+    } catch {
+      onNotify('La photo n’a pas pu être lue. Essayez une autre image.')
+    } finally {
+      setIsPreparingFiles(false)
+    }
+  }
+
+  /** Met à jour une fiche ; une erreur d’enregistrement la remet « à vérifier » (message dans la fiche). */
+  const setProposalState = (answerId: string, proposalId: string, change: Partial<ProposalState>) => setProposals((current) => ({
+    ...current,
+    [answerId]: (current[answerId] ?? []).map((state) => (state.proposal.id === proposalId ? { ...state, ...change } : state)),
+  }))
+  const confirm = async (answerId: string, proposalId: string, save: () => Promise<string>) => {
+    setProposalState(answerId, proposalId, { status: 'saving' })
+    try {
+      const result = await save()
+      setProposalState(answerId, proposalId, { status: 'done', result })
+      onNotify(result, 'success')
+      await onDataChanged().catch(() => onNotify('La liste des produits n’a pas pu être actualisée. Rechargez la page.'))
+    } catch (error) {
+      setProposalState(answerId, proposalId, { status: 'pending' })
+      throw error
+    }
   }
 
   /** Repose la dernière question (la réponse précédente est remplacée). */
@@ -149,6 +224,7 @@ export function AssistantPanel({ api, business }: { api: BusinessApi; business: 
   const reset = () => {
     setMessages([])
     setContexts({})
+    setProposals({})
     setFocusToken((token) => token + 1)
   }
 
@@ -185,6 +261,25 @@ export function AssistantPanel({ api, business }: { api: BusinessApi; business: 
                 onCopy={(copied) => void copy(copied)}
                 onRegenerate={regenerate}
               />
+              {(proposals[message.id] ?? []).map((state) => (
+                <ProposalCard
+                  key={state.proposal.id}
+                  proposal={state.proposal}
+                  status={state.status}
+                  result={state.result}
+                  products={products}
+                  currency={business.currency}
+                  onDismiss={() => setProposalState(message.id, state.proposal.id, { status: 'dismissed' })}
+                  onConfirmProduct={(input) => confirm(message.id, state.proposal.id, async () => {
+                    const created = await api.createProduct(business.id, input)
+                    return `Produit « ${created.name} » enregistré.`
+                  })}
+                  onConfirmMovement={(product, input) => confirm(message.id, state.proposal.id, async () => {
+                    await api.recordMovement(business.id, product.id, input)
+                    return `Stock de « ${product.name} » mis à jour.`
+                  })}
+                />
+              ))}
               {contexts[message.id] && <ContextDetails context={contexts[message.id]} />}
             </div>
           ))}
@@ -216,16 +311,18 @@ export function AssistantPanel({ api, business }: { api: BusinessApi; business: 
           isDemonstration={false}
           stopLabel="Arrêter la réponse"
           focusToken={focusToken}
-          attachments={[]}
-          isPreparingFiles={false}
-          onAddFiles={() => undefined}
-          onRemoveAttachment={() => undefined}
+          attachments={draftAttachments}
+          isPreparingFiles={isPreparingFiles}
+          onAddFiles={(files) => void addFiles(files)}
+          onRemoveAttachment={(id) => setDraftAttachments((current) => current.filter((attachment) => attachment.id !== id))}
           onValueChange={setDraft}
           onSend={ask}
           onStop={() => controllerRef.current?.abort()}
-          onNotify={() => undefined}
-          allowAttachments={false}
-          placeholder={remaining === 0 ? 'Limite du jour atteinte : revenez demain.' : 'Posez une question sur votre commerce…'}
+          onNotify={onNotify}
+          allowVoice={false}
+          accept={PHOTO_TYPES}
+          attachLabel="Joindre une photo de produit"
+          placeholder={remaining === 0 ? 'Limite du jour atteinte : revenez demain.' : 'Question, ou « enregistre ce produit… » avec une photo'}
           label="Votre question"
         />
       </div>

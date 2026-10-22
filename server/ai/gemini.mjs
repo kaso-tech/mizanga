@@ -110,7 +110,9 @@ function errorForStatus(status) {
 /**
  * @typedef {{ title: string, url: string }} WebSource
  * @typedef {{ inputTokens: number, outputTokens: number }} TokenUsage
- * @typedef {{ text: string } | { sources: WebSource[], searchSuggestionsHtml?: string } | { usage: TokenUsage }} ReplyEvent
+ * @typedef {{ name: string, args: Record<string, unknown> }} FunctionCall
+ * @typedef {{ name: string, description: string, parameters: Record<string, unknown> }} FunctionDeclaration
+ * @typedef {{ text: string } | { sources: WebSource[], searchSuggestionsHtml?: string } | { usage: TokenUsage } | { functionCall: FunctionCall }} ReplyEvent
  */
 
 /**
@@ -144,7 +146,8 @@ export const readUsage = (metadata) => ({
  * ses sources et les suggestions de recherche Google (à afficher telles quelles, conditions de Google),
  * et enfin les jetons consommés (`usage`, pour le suivi des coûts ; jamais montré tel quel).
  * `instructions` remplace les consignes générales de Gilli (assistant Business) ; `webSearch: false`
- * retire la recherche Google.
+ * retire la recherche Google ; `functions` propose au modèle des actions, qu’il demande par un
+ * événement `functionCall` (le modèle n’exécute rien lui-même : c’est à l’application de décider).
  * @param {{
  *   apiKey: string,
  *   model: string,
@@ -154,11 +157,12 @@ export const readUsage = (metadata) => ({
  *   reference?: string,
  *   instructions?: string,
  *   webSearch?: boolean,
+ *   functions?: FunctionDeclaration[],
  *   signal?: AbortSignal,
  * }} options
  * @returns {AsyncGenerator<ReplyEvent>}
  */
-export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, reference = '', instructions, webSearch = true, signal }) {
+export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, reference = '', instructions, webSearch = true, functions, signal }) {
   const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -166,7 +170,7 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
       systemInstruction: { parts: [{ text: instructions ?? buildSystemInstruction(preferences, reference) }] },
       contents: toGeminiContents(messages),
       // Recherche Google proposée au chatbot : le modèle décide seul de l’utiliser selon la demande.
-      ...(webSearch ? { tools: [{ google_search: {} }] } : {}),
+      ...(webSearch ? { tools: [{ google_search: {} }] } : functions?.length ? { tools: [{ functionDeclarations: functions }] } : {}),
     }),
     signal,
   })
@@ -202,6 +206,7 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
         for (const part of candidate.content?.parts ?? []) {
           // Les « pensées » internes du modèle ne sont jamais montrées.
           if (typeof part.text === 'string' && part.text && !part.thought) yield { text: part.text }
+          if (part.functionCall && typeof part.functionCall.name === 'string') yield { functionCall: { name: part.functionCall.name, args: part.functionCall.args ?? {} } }
         }
         if (candidate.groundingMetadata) {
           const found = readGroundingSources(candidate.groundingMetadata)

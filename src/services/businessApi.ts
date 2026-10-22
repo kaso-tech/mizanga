@@ -151,11 +151,19 @@ export interface AssistantContext {
 export interface AssistantMessage {
   role: 'user' | 'assistant'
   content: string
+  /** Photos (seulement sur le dernier message de l’utilisateur). */
+  attachments?: Array<{ name: string; mimeType: string; data: string }>
 }
+
+/** Fiche préparée par l’assistant ; rien n’est enregistré avant la confirmation de l’utilisateur. */
+export type AssistantProposal =
+  | { id: string; action: 'create_product'; values: { name: string; unit: string | null; purchasePrice: number | null; salePrice: number | null; initialQuantity: number | null; alertThreshold: number | null } }
+  | { id: string; action: 'stock_movement'; values: { productId: string | null; productName: string; kind: 'purchase' | 'return' | 'loss' | 'count'; quantity: number | null; unitCost: number | null; note: string | null } }
 
 export type AssistantEvent =
   | { context: AssistantContext; quota: AiQuota }
   | { text: string }
+  | { proposals: AssistantProposal[] }
   | { done: true; quota: AiQuota }
 
 /** Erreur dont le message peut être montré tel quel à l’utilisateur. */

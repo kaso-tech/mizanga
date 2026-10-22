@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createBusinessApi, type AssistantContext, type Business } from '../../services/businessApi'
+import { createBusinessApi, type AssistantContext, type Business, type Product } from '../../services/businessApi'
 import { AssistantPanel } from './AssistantPanel'
 
 const business: Business = { id: 'b1', name: 'Boutique Awa', currency: 'XOF', countryCode: 'BF', timezone: 'Africa/Ouagadougou', role: 'owner' }
@@ -39,14 +39,18 @@ function fakeServer(limit = 50) {
 
 afterEach(() => vi.unstubAllGlobals())
 
-const renderPanel = () => render(<AssistantPanel api={createBusinessApi(async () => 'jeton')} business={business} />)
+const products: Product[] = [{ id: 'p1', name: 'Riz 25 kg', unit: 'sac', sku: null, quantity: 8, purchasePrice: 15000, salePrice: 17500, alertThreshold: 9, archived: false, updatedAt: '2026-10-22T08:00:00Z' }]
+const renderPanel = (props: { onDataChanged?: () => Promise<void> } = {}) => render(
+  <AssistantPanel api={createBusinessApi(async () => 'jeton')} business={business} products={products} onDataChanged={props.onDataChanged ?? (async () => {})} onNotify={() => {}} />,
+)
 
 describe('assistant Business (présenté comme le chatbot)', () => {
   it('répond à une question suggérée avec les messages du chatbot, les chiffres utilisés et les questions restantes', async () => {
     const { asked } = fakeServer()
     renderPanel()
     expect(await screen.findByText(/50 questions restantes aujourd’hui/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Joindre une photo ou un fichier' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Joindre une photo de produit' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /message vocal/ })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Comment se passent mes ventes ce mois-ci ?' }))
     const answer = await screen.findByRole('article', { name: 'Réponse de Gilli' })
     expect(await within(answer).findByText(/Pensez au riz/)).toBeInTheDocument()
@@ -77,6 +81,65 @@ describe('assistant Business (présenté comme le chatbot)', () => {
     expect(asked[2]).toEqual(asked[1])
     await userEvent.click(await screen.findByRole('button', { name: /Nouvelle conversation/ }))
     expect(screen.getByRole('button', { name: 'Quels produits dois-je réapprovisionner ?' })).toBeInTheDocument()
+  })
+
+  it('prépare des fiches à partir d’une photo ; rien n’est enregistré sans confirmation', async () => {
+    const asked: Array<{ messages: Array<{ content: string; attachments?: unknown[] }> }> = []
+    const writes: Array<{ url: string; body: unknown }> = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (url === '/api/business/b1/assistant' && method === 'GET') return Response.json({ quota: { used: 0, limit: 50, resetsAt } })
+      if (url === '/api/business/b1/assistant') {
+        asked.push(JSON.parse(String(init?.body)))
+        return ndjson([
+          { context, quota: { used: 1, limit: 50, resetsAt } },
+          { proposals: [
+            { id: 'f1', action: 'create_product', values: { name: 'Huile Dinor 5 L', unit: 'bidon', purchasePrice: 9000, salePrice: null, initialQuantity: 12, alertThreshold: null } },
+            { id: 'f2', action: 'stock_movement', values: { productId: 'p1', productName: 'riz', kind: 'purchase', quantity: 5, unitCost: 14500, note: null } },
+          ] },
+          { done: true, quota: { used: 1, limit: 50, resetsAt } },
+        ])
+      }
+      writes.push({ url, body: JSON.parse(String(init?.body)) })
+      if (url === '/api/business/b1/products') return Response.json({ product: { ...products[0], id: 'p2', name: 'Huile Dinor 5 L' } }, { status: 201 })
+      return Response.json({ error: 'Introuvable.' }, { status: 404 })
+    }))
+    const onDataChanged = vi.fn(async () => {})
+    renderPanel({ onDataChanged })
+    const photo = new File([new Uint8Array([255, 216, 255])], 'huile.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(document.querySelector('input[type="file"]') as HTMLInputElement, photo)
+    expect(await screen.findByText('huile.jpg')).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'Enregistre cette huile, achat 9000, 12 bidons')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
+
+    const productCard = await screen.findByRole('form', { name: 'Fiche à vérifier : Nouveau produit' })
+    expect(asked[0].messages[0].attachments).toEqual([{ name: 'huile.jpg', mimeType: 'image/jpeg', data: '/9j/' }])
+    expect(screen.getByText('Voici la fiche à vérifier avant l’enregistrement.')).toBeInTheDocument()
+    expect(within(productCard).getByLabelText('Nom')).toHaveValue('Huile Dinor 5 L')
+    expect(within(productCard).getByLabelText(/Prix de vente/)).toHaveValue('')
+    expect(writes).toEqual([])
+
+    // Le commerçant complète le prix de vente, puis confirme.
+    await userEvent.type(within(productCard).getByLabelText(/Prix de vente/), '10 500')
+    await userEvent.click(within(productCard).getByRole('button', { name: 'Confirmer et enregistrer' }))
+    expect(await within(productCard).findByText('Produit « Huile Dinor 5 L » enregistré.')).toBeInTheDocument()
+    expect(writes).toEqual([{ url: '/api/business/b1/products', body: { name: 'Huile Dinor 5 L', unit: 'bidon', purchasePrice: 9000, salePrice: 10500, initialQuantity: 12, alertThreshold: 0 } }])
+    expect(onDataChanged).toHaveBeenCalled()
+
+    // La fiche de stock est ignorée : aucun enregistrement.
+    const movementCard = screen.getByRole('form', { name: 'Fiche à vérifier : Mouvement de stock' })
+    expect(within(movementCard).getByLabelText('Produit')).toHaveValue('p1')
+    await userEvent.click(within(movementCard).getByRole('button', { name: 'Ignorer' }))
+    expect(within(movementCard).getByText('Ignoré')).toBeInTheDocument()
+    expect(writes).toHaveLength(1)
+
+    // La question suivante dit au modèle ce qui a été confirmé ou ignoré.
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'Merci')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
+    await waitFor(() => expect(asked).toHaveLength(2))
+    expect(asked[1].messages[1].content).toContain('[Fiche nouveau produit « Huile Dinor 5 L » : confirmée et enregistrée par le commerçant]')
+    expect(asked[1].messages[1].content).toContain('[Fiche mouvement de stock pour « riz » : ignorée par le commerçant]')
+    expect(asked[1].messages[0].attachments).toBeUndefined()
   })
 
   it('affiche la limite du jour', async () => {
