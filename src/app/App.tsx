@@ -221,6 +221,14 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
 
   const accountView = { status: account.status, email: account.user?.email ?? null }
 
+  // Page ouverte depuis un lien de connexion reçu par e-mail : on dit ce qu’il en est.
+  const redirectOutcome = account.redirectOutcome
+  useEffect(() => {
+    if (redirectOutcome === 'signedIn') notify('Vous êtes connecté.', 'success')
+    if (redirectOutcome === 'otherBrowser') notify('Ce lien de connexion doit être ouvert dans le navigateur où vous l’avez demandé. Demandez un nouveau lien depuis ce navigateur.')
+    if (redirectOutcome === 'expired') notify('Ce lien de connexion a expiré ou a déjà servi. Demandez-en un nouveau.')
+  }, [redirectOutcome])
+
   /** Ouvre Paramètres › Compte (remonte la page pour afficher le bon onglet). */
   const openAccountSettings = () => {
     window.history.pushState({}, '', `${routeByView.settings}#compte`)
@@ -573,6 +581,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
         <Suspense fallback={null}>
           <AccountDialog
             client={account.client}
+            isSignedIn={account.status === 'signedIn'}
             onClose={() => setAccountDialogOpen(false)}
             onSignedIn={() => {
               setAccountDialogOpen(false)

@@ -20,7 +20,16 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * Résultat de l’ouverture d’un lien de connexion reçu par e-mail :
+ * signedIn : connecté ; otherBrowser : lien ouvert ailleurs que dans le navigateur qui l’a demandé
+ * (la sécurité PKCE l’exige) ; expired : lien expiré ou déjà utilisé ; null : pas de lien.
+ */
+export type RedirectOutcome = 'signedIn' | 'otherBrowser' | 'expired' | null
+
 export interface AuthClient {
+  /** Résultat du lien de connexion avec lequel la page a été ouverte, s’il y en a un. */
+  redirectOutcome?: RedirectOutcome
   getUser(): Promise<AccountUser | null>
   /** Prévient à chaque connexion ou déconnexion ; renvoie la fonction de désabonnement. */
   onChange(listener: (user: AccountUser | null) => void): () => void
@@ -51,8 +60,40 @@ const toAccountUser = (user: { id: string; email?: string | null } | null | unde
   user ? { id: user.id, email: user.email ?? null } : null
 )
 
+const AUTH_URL_PARAMS = ['code', 'error', 'error_code', 'error_description']
+
+/** Paramètres de retour d’un lien de connexion, dans l’adresse (?…) ou le fragment (#…). */
+export function readAuthRedirect(href: string) {
+  const url = new URL(href)
+  const hash = new URLSearchParams(url.hash.slice(1))
+  const get = (name: string) => url.searchParams.get(name) ?? hash.get(name)
+  return { hasCode: Boolean(get('code')), hasError: Boolean(get('error') || get('error_code') || get('error_description')) }
+}
+
+/** Retire de l’adresse les paramètres de connexion restants (lien inutilisable ou expiré). */
+export function cleanAuthRedirect() {
+  const url = new URL(window.location.href)
+  const hash = new URLSearchParams(url.hash.slice(1))
+  let changed = false
+  for (const name of [...url.searchParams.keys()]) {
+    if (AUTH_URL_PARAMS.includes(name) || name.startsWith('sb-') || name.includes('flow_id')) {
+      url.searchParams.delete(name)
+      changed = true
+    }
+  }
+  // Le fragment n’est réécrit que s’il porte des paramètres de connexion (sinon « #compte » resterait intact).
+  if (AUTH_URL_PARAMS.some((name) => hash.has(name))) {
+    for (const name of AUTH_URL_PARAMS) hash.delete(name)
+    url.hash = hash.toString()
+    changed = true
+  }
+  if (changed) window.history.replaceState(window.history.state, '', url.toString())
+}
+
 /** Client réel, adossé à @supabase/supabase-js (chargé à la demande). */
 export const createSupabaseAuthClient: AuthClientFactory = async ({ supabaseUrl, publishableKey }) => {
+  // Lu avant la création du client, qui traite et nettoie l’adresse quand la connexion réussit.
+  const redirect = readAuthRedirect(window.location.href)
   const { createClient } = await import('@supabase/supabase-js')
   const supabase = createClient(supabaseUrl, publishableKey, {
     auth: {
@@ -65,7 +106,15 @@ export const createSupabaseAuthClient: AuthClientFactory = async ({ supabaseUrl,
     },
   })
 
+  let redirectOutcome: RedirectOutcome = null
+  if (redirect.hasCode || redirect.hasError) {
+    const { data } = await supabase.auth.getSession()
+    redirectOutcome = data.session && redirect.hasCode && !redirect.hasError ? 'signedIn' : redirect.hasError ? 'expired' : 'otherBrowser'
+    cleanAuthRedirect()
+  }
+
   return {
+    redirectOutcome,
     async getUser() {
       const { data } = await supabase.auth.getSession()
       return toAccountUser(data.session?.user)

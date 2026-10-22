@@ -8,12 +8,17 @@ const RESEND_DELAY_SECONDS = 60
 
 interface AccountDialogProps {
   client: AuthClient
+  /** Vrai dès que la connexion a abouti, y compris par le lien ouvert dans un autre onglet. */
+  isSignedIn: boolean
   onClose: () => void
   onSignedIn: () => void
 }
 
-/** Connexion sans mot de passe : un code est envoyé par e-mail, puis saisi ici. */
-export function AccountDialog({ client, onClose, onSignedIn }: AccountDialogProps) {
+/**
+ * Connexion sans mot de passe : Supabase envoie un e-mail contenant un lien de connexion (et un code
+ * si le modèle d’e-mail le prévoit, ce qui demande un service d’envoi personnalisé).
+ */
+export function AccountDialog({ client, isSignedIn, onClose, onSignedIn }: AccountDialogProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
   const codeRef = useRef<HTMLInputElement>(null)
@@ -25,6 +30,14 @@ export function AccountDialog({ client, onClose, onSignedIn }: AccountDialogProp
   const [error, setError] = useState('')
   const [isBusy, setIsBusy] = useState(false)
   const [resendIn, setResendIn] = useState(0)
+  const [showCode, setShowCode] = useState(false)
+
+  // Lien ouvert dans un autre onglet du même navigateur : la session y est partagée, on ferme ici.
+  const onSignedInRef = useRef(onSignedIn)
+  onSignedInRef.current = onSignedIn
+  useEffect(() => {
+    if (isSignedIn) onSignedInRef.current()
+  }, [isSignedIn])
 
   useEffect(() => {
     if (resendIn <= 0) return
@@ -33,8 +46,8 @@ export function AccountDialog({ client, onClose, onSignedIn }: AccountDialogProp
   }, [resendIn])
 
   useEffect(() => {
-    if (step === 'code') codeRef.current?.focus()
-  }, [step])
+    if (showCode) codeRef.current?.focus()
+  }, [showCode])
 
   const run = async (action: () => Promise<void>) => {
     setIsBusy(true)
@@ -57,6 +70,7 @@ export function AccountDialog({ client, onClose, onSignedIn }: AccountDialogProp
     void run(async () => {
       await client.sendCode(email)
       setStep('code')
+      setShowCode(false)
       setCode('')
       setResendIn(RESEND_DELAY_SECONDS)
     })
@@ -86,13 +100,19 @@ export function AccountDialog({ client, onClose, onSignedIn }: AccountDialogProp
             </label>
             {error && <p className="message-error" role="alert">{error}</p>}
             <button type="submit" className="primary-button is-block" disabled={isBusy || !email.trim()}>
-              {isBusy ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Mail size={16} aria-hidden="true" />} Recevoir un code
+              {isBusy ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Mail size={16} aria-hidden="true" />} Recevoir un lien de connexion
             </button>
-            <p className="dialog-footnote">Pas de mot de passe : un code vous est envoyé à chaque connexion.</p>
+            <p className="dialog-footnote">Pas de mot de passe : un lien vous est envoyé par e-mail à chaque connexion.</p>
           </form>
         ) : (
           <form onSubmit={verifyCode}>
-            <p className="dialog-description">Code envoyé à <strong>{email.trim()}</strong>. Pensez à regarder dans les courriers indésirables.</p>
+            <p className="dialog-description" role="status">
+              E-mail envoyé à <strong>{email.trim()}</strong>. Ouvrez le lien qu’il contient <strong>sur cet appareil, dans ce navigateur</strong> : vous serez connecté automatiquement. Pensez aux courriers indésirables.
+            </p>
+            {!showCode && (
+              <button type="button" className="text-button" onClick={() => setShowCode(true)}>J’ai reçu un code</button>
+            )}
+            {showCode && (<>
             <label className="field">
               <span className="field-label">Code reçu par e-mail</span>
               <input
@@ -105,14 +125,15 @@ export function AccountDialog({ client, onClose, onSignedIn }: AccountDialogProp
                 onChange={(event) => setCode(event.target.value.replace(/[^\d\s]/g, ''))}
               />
             </label>
-            {error && <p className="message-error" role="alert">{error}</p>}
             <button type="submit" className="primary-button is-block" disabled={isBusy || cleanCode.length < 6}>
               {isBusy ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : null} Se connecter
             </button>
+            </>)}
+            {error && <p className="message-error" role="alert">{error}</p>}
             <div className="account-dialog-links">
               <button type="button" className="text-button" onClick={() => { setStep('email'); setError('') }}>Changer d’adresse</button>
               <button type="button" className="text-button" disabled={resendIn > 0 || isBusy} onClick={() => sendCode()}>
-                {resendIn > 0 ? `Renvoyer le code (${resendIn} s)` : 'Renvoyer le code'}
+                {resendIn > 0 ? `Renvoyer l’e-mail (${resendIn} s)` : 'Renvoyer l’e-mail'}
               </button>
             </div>
           </form>

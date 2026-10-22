@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createSupabaseAuthClient, type AccountUser, type AuthClient, type AuthClientFactory, type AuthConfig } from '../services/authService'
+import { createSupabaseAuthClient, type AccountUser, type AuthClient, type AuthClientFactory, type AuthConfig, type RedirectOutcome } from '../services/authService'
 
 /**
  * unavailable : les comptes ne sont pas configurés sur le serveur ; loading : session en cours de lecture ;
@@ -11,6 +11,8 @@ export interface Account {
   status: AccountStatus
   user: AccountUser | null
   client: AuthClient | null
+  /** Résultat du lien de connexion avec lequel la page a été ouverte. */
+  redirectOutcome?: RedirectOutcome
 }
 
 /** Compte de l’utilisateur : le client d’authentification est créé après l’affichage de l’application. */
@@ -24,9 +26,9 @@ export function useAccount(config: AuthConfig | undefined, createClient: AuthCli
     void createClient(config)
       .then(async (client) => {
         if (cancelled) return
-        unsubscribe = client.onChange((user) => setState({ status: user ? 'signedIn' : 'signedOut', user, client }))
+        unsubscribe = client.onChange((user) => setState((current) => ({ ...current, status: user ? 'signedIn' : 'signedOut', user, client })))
         const user = await client.getUser()
-        if (!cancelled) setState({ status: user ? 'signedIn' : 'signedOut', user, client })
+        if (!cancelled) setState({ status: user ? 'signedIn' : 'signedOut', user, client, redirectOutcome: client.redirectOutcome ?? null })
       })
       .catch(() => {
         // Bibliothèque non chargée (hors connexion…) : l’application reste utilisable sans compte.

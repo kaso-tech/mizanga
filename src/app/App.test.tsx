@@ -358,6 +358,8 @@ describe('App', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Se connecter à Gilli' })
     await userEvent.type(within(dialog).getByLabelText('Adresse e-mail'), 'awa@example.bf{Enter}')
     expect(sent).toEqual(['awa@example.bf'])
+    expect(await within(dialog).findByText(/Ouvrez le lien qu’il contient/)).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'J’ai reçu un code' }))
     const codeField = await within(dialog).findByLabelText('Code reçu par e-mail')
     await userEvent.type(codeField, '000000{Enter}')
     expect(await within(dialog).findByText(/Code incorrect ou expiré/)).toBeInTheDocument()
@@ -376,5 +378,31 @@ describe('App', () => {
   it('laisse la connexion indisponible quand les comptes ne sont pas configurés', () => {
     renderApp()
     expect(screen.getByRole('button', { name: 'Connexion (bientôt disponible)' })).toBeDisabled()
+  })
+
+  it('ferme la fenêtre quand le lien est ouvert dans un autre onglet, et annonce le résultat d’un lien', async () => {
+    const listeners = new Set<(user: AccountUser | null) => void>()
+    const client: AuthClient = {
+      redirectOutcome: 'expired',
+      getUser: async () => null,
+      onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
+      sendCode: async () => {},
+      verifyCode: async () => {},
+      signOut: async () => {},
+      accessToken: async () => null,
+    }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={instantService} authConfig={{ supabaseUrl: 'https://projet.supabase.co', publishableKey: 'sb_publishable_test' }} createAuthClient={async () => client} />)
+    expect(await screen.findByText(/Ce lien de connexion a expiré ou a déjà servi/)).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Se connecter' })).toHaveLength(2))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Se connecter' })[1])
+    const dialog = await screen.findByRole('dialog', { name: 'Se connecter à Gilli' })
+    await userEvent.type(within(dialog).getByLabelText('Adresse e-mail'), 'awa@example.bf{Enter}')
+    await within(dialog).findByText(/Ouvrez le lien qu’il contient/)
+    // Le lien est ouvert dans un autre onglet : Supabase prévient cet onglet-ci.
+    act(() => listeners.forEach((listener) => listener({ id: 'u1', email: 'awa@example.bf' })))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Se connecter à Gilli' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Compte : awa@example.bf' })).toBeInTheDocument()
   })
 })
