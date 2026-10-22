@@ -73,8 +73,17 @@ createServer(async (req, res) => {
   const instructions = payload.systemInstruction?.parts?.[0]?.text ?? ''
   const today = instructions.split('\n').find((/** @type {string} */ line) => line.startsWith('- Aujourd’hui')) ?? 'Bonjour, je suis Gilli.'
   res.writeHead(200, { 'Content-Type': 'text/event-stream' })
-  // « Enregistre… » avec une photo : le modèle prépare une fiche de produit (prix de vente laissé vide).
   const lastParts = payload.contents?.at(-1)?.parts ?? []
+  // « Vends 2 Savon, et 1500 de transport » : fiches de vente et de dépense.
+  if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('Vends'))) {
+    const calls = [
+      { functionCall: { name: 'proposer_vente', args: { lignes: [{ produit: 'savon', quantite: 2 }], client: 'Mariam' } } },
+      { functionCall: { name: 'proposer_depense', args: { montant: 1500, categorie: 'Transport' } } },
+    ]
+    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Voici les fiches à vérifier.' }, ...calls] } }], usageMetadata: { promptTokenCount: 1800, candidatesTokenCount: 30 } })}\n\n`)
+    return void res.end()
+  }
+  // « Enregistre… » avec une photo : le modèle prépare une fiche de produit (prix de vente laissé vide).
   if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('Enregistre')) && lastParts.some((/** @type {any} */ part) => part.inlineData)) {
     const call = { functionCall: { name: 'proposer_creation_produit', args: { nom: 'Huile Dinor 5 L', unite: 'bidon', prix_achat: 9000, quantite_initiale: 12 } } }
     res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'J’ai préparé la fiche : vérifiez-la.' }, call] } }], usageMetadata: { promptTokenCount: 2000, candidatesTokenCount: 20 } })}\n\n`)

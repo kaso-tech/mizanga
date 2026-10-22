@@ -1,10 +1,14 @@
-// Actions que l’assistant Business peut proposer (étape « assistant de gestion », partie 1 : produits et stock).
+// Actions que l’assistant Business peut proposer : produits et stock (partie 1), ventes, dépenses et
+// annulation d’une vente (partie 2).
 //
 // Le modèle ne fait que proposer : chaque proposition devient une fiche que l’utilisateur vérifie,
 // corrige et confirme dans l’application. L’enregistrement passe ensuite par les adresses habituelles
 // (/api/business/…), avec les mêmes contrôles que les formulaires. Rien n’est écrit par le modèle.
 
 /** Déclarations transmises au modèle (format OpenAPI simplifié de Gemini). */
+/** Catégories de dépenses, identiques à celles du formulaire Dépenses. */
+export const EXPENSE_CATEGORIES = ['Loyer', 'Transport', 'Électricité / eau', 'Abonnement Wi-Fi', 'Communication', 'Marketing', 'Salaires', 'Taxes et impôts', 'Entretien', 'Autre']
+
 export const ASSISTANT_FUNCTIONS = [
   {
     name: 'proposer_creation_produit',
@@ -35,6 +39,57 @@ export const ASSISTANT_FUNCTIONS = [
         note: { type: 'string', description: 'Précision utile (fournisseur, motif de la perte…).' },
       },
       required: ['produit', 'type', 'quantite'],
+    },
+  },
+  {
+    name: 'proposer_vente',
+    description: 'Prépare une fiche de vente (un ou plusieurs produits de la liste du commerce), que le commerçant vérifiera puis confirmera. Le stock baissera à la confirmation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        lignes: {
+          type: 'array',
+          description: 'Produits vendus, un seul élément par produit.',
+          items: {
+            type: 'object',
+            properties: {
+              produit: { type: 'string', description: 'Nom du produit, tel qu’il figure dans la liste des produits du commerce.' },
+              quantite: { type: 'number', description: 'Quantité vendue.' },
+              prix_unitaire: { type: 'integer', description: 'Prix unitaire en francs, seulement si le commerçant l’a donné (remise, prix négocié).' },
+            },
+            required: ['produit', 'quantite'],
+          },
+        },
+        client: { type: 'string', description: 'Nom du client, s’il a été donné.' },
+        note: { type: 'string', description: 'Précision utile.' },
+      },
+      required: ['lignes'],
+    },
+  },
+  {
+    name: 'proposer_depense',
+    description: 'Prépare une fiche de dépense (loyer, transport, Wi-Fi…), que le commerçant vérifiera puis confirmera. Pas pour les marchandises achetées pour être revendues (mouvement de stock « achat »).',
+    parameters: {
+      type: 'object',
+      properties: {
+        montant: { type: 'integer', description: 'Montant en francs, donné par le commerçant.' },
+        categorie: { type: 'string', enum: EXPENSE_CATEGORIES, description: 'Catégorie la plus proche.' },
+        description: { type: 'string', description: 'Précision courte (fournisseur, mois…).' },
+        date: { type: 'string', description: 'Date de la dépense au format AAAA-MM-JJ, si ce n’est pas aujourd’hui.' },
+      },
+      required: ['montant', 'categorie'],
+    },
+  },
+  {
+    name: 'proposer_annulation_vente',
+    description: 'Prépare une fiche d’annulation d’une vente récente (le stock revient), que le propriétaire confirmera. Seulement sur demande claire.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reference: { type: 'string', description: 'Référence de la vente, entre crochets dans la liste des ventes récentes.' },
+        motif: { type: 'string', description: 'Motif de l’annulation, s’il a été donné.' },
+      },
+      required: ['reference'],
     },
   },
 ]
@@ -74,17 +129,28 @@ export function matchProduct(name, products) {
 /**
  * @typedef {{ id: string, action: 'create_product', values: { name: string, unit: string | null, purchasePrice: number | null, salePrice: number | null, initialQuantity: number | null, alertThreshold: number | null } }} ProductProposal
  * @typedef {{ id: string, action: 'stock_movement', values: { productId: string | null, productName: string, kind: string, quantity: number | null, unitCost: number | null, note: string | null } }} MovementProposal
- * @typedef {ProductProposal | MovementProposal} Proposal
+ * @typedef {{ id: string, action: 'sale', values: { items: Array<{ productId: string | null, productName: string, quantity: number | null, unitPrice: number | null }>, customerName: string | null, note: string | null } }} SaleProposal
+ * @typedef {{ id: string, action: 'expense', values: { amount: number | null, category: string, description: string | null, spentOn: string | null } }} ExpenseProposal
+ * @typedef {{ id: string, action: 'cancel_sale', values: { saleId: string | null, reference: string, sale: { soldAt: string, totalAmount: number, status: string, items: Array<{ productName: string, quantity: number, unit: string }> } | null, reason: string | null } }} CancelSaleProposal
+ * @typedef {ProductProposal | MovementProposal | SaleProposal | ExpenseProposal | CancelSaleProposal} Proposal
+ * @typedef {{ products: Array<{ id: string, name: string }>, sales: Array<{ id: string, reference: string, soldAt: string, totalAmount: number, status: string, items: Array<{ productName: string, quantity: number, unit: string }> }>, today: string }} ProposalData
  */
+
+/** Date AAAA-MM-JJ réelle et pas dans le futur, sinon vide (aujourd’hui par défaut dans la fiche). @param {unknown} value @param {string} today */
+const pastDay = (value, today) => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value && value <= today ? value : null
+}
 
 /**
  * Transforme les demandes d’action du modèle en fiches à confirmer ; les valeurs douteuses restent vides.
  * @param {Array<{ name: string, args: Record<string, unknown> }>} calls
- * @param {Array<{ id: string, name: string }>} products
+ * @param {ProposalData} data
  * @param {() => string} newId
  * @returns {Proposal[]}
  */
-export function toProposals(calls, products, newId) {
+export function toProposals(calls, { products, sales, today }, newId) {
   /** @type {Proposal[]} */
   const proposals = []
   for (const { name, args } of calls.slice(0, MAX_PROPOSALS)) {
@@ -119,6 +185,31 @@ export function toProposals(calls, products, newId) {
           unitCost: kind === 'purchase' ? amount(args.cout_unitaire) : null,
           note: text(args.note, 500),
         },
+      })
+    }
+    if (name === 'proposer_vente' && Array.isArray(args.lignes)) {
+      /** @type {SaleProposal['values']['items']} */
+      const items = []
+      for (const line of args.lignes.slice(0, 100)) {
+        const productName = text(line?.produit, 120)
+        if (!productName) continue
+        items.push({ productId: matchProduct(productName, products)?.id ?? null, productName, quantity: quantity(line.quantite), unitPrice: amount(line.prix_unitaire) })
+      }
+      if (items.length === 0) continue
+      proposals.push({ id: newId(), action: 'sale', values: { items, customerName: text(args.client, 120), note: text(args.note, 500) } })
+    }
+    if (name === 'proposer_depense') {
+      const category = typeof args.categorie === 'string' && EXPENSE_CATEGORIES.includes(args.categorie) ? args.categorie : 'Autre'
+      proposals.push({ id: newId(), action: 'expense', values: { amount: amount(args.montant) || null, category, description: text(args.description, 500), spentOn: pastDay(args.date, today) } })
+    }
+    if (name === 'proposer_annulation_vente') {
+      const reference = text(args.reference, 40)?.replace(/^\[|\]$/g, '').toLowerCase()
+      if (!reference) continue
+      const sale = sales.find((candidate) => candidate.reference === reference) ?? null
+      proposals.push({
+        id: newId(),
+        action: 'cancel_sale',
+        values: { saleId: sale?.id ?? null, reference, sale: sale ? { soldAt: sale.soldAt, totalAmount: sale.totalAmount, status: sale.status, items: sale.items } : null, reason: text(args.motif, 500) },
       })
     }
   }

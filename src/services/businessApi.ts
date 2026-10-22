@@ -159,6 +159,9 @@ export interface AssistantMessage {
 export type AssistantProposal =
   | { id: string; action: 'create_product'; values: { name: string; unit: string | null; purchasePrice: number | null; salePrice: number | null; initialQuantity: number | null; alertThreshold: number | null } }
   | { id: string; action: 'stock_movement'; values: { productId: string | null; productName: string; kind: 'purchase' | 'return' | 'loss' | 'count'; quantity: number | null; unitCost: number | null; note: string | null } }
+  | { id: string; action: 'sale'; values: { items: Array<{ productId: string | null; productName: string; quantity: number | null; unitPrice: number | null }>; customerName: string | null; note: string | null } }
+  | { id: string; action: 'expense'; values: { amount: number | null; category: string; description: string | null; spentOn: string | null } }
+  | { id: string; action: 'cancel_sale'; values: { saleId: string | null; reference: string; sale: { soldAt: string; totalAmount: number; status: string; items: Array<{ productName: string; quantity: number; unit: string }> } | null; reason: string | null } }
 
 export type AssistantEvent =
   | { context: AssistantContext; quota: AiQuota }

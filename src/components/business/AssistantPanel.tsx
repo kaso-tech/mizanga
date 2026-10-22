@@ -26,7 +26,15 @@ interface ProposalState {
 
 /** Résumé d’une fiche pour la suite de la conversation (le modèle sait ce qui a été confirmé). */
 function describeProposal({ proposal, status }: ProposalState) {
-  const what = proposal.action === 'create_product' ? `nouveau produit « ${proposal.values.name} »` : `mouvement de stock pour « ${proposal.values.productName} »`
+  const what = (() => {
+    switch (proposal.action) {
+      case 'create_product': return `nouveau produit « ${proposal.values.name} »`
+      case 'stock_movement': return `mouvement de stock pour « ${proposal.values.productName} »`
+      case 'sale': return `vente (${proposal.values.items.map((item) => item.productName).join(', ')})`
+      case 'expense': return `dépense ${proposal.values.category}`
+      case 'cancel_sale': return `annulation de la vente [${proposal.values.reference}]`
+    }
+  })()
   const outcome = status === 'done' ? 'confirmée et enregistrée par le commerçant' : status === 'dismissed' ? 'ignorée par le commerçant' : 'pas encore confirmée'
   return `[Fiche ${what} : ${outcome}]`
 }
@@ -267,17 +275,11 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
                   proposal={state.proposal}
                   status={state.status}
                   result={state.result}
+                  api={api}
+                  business={business}
                   products={products}
-                  currency={business.currency}
                   onDismiss={() => setProposalState(message.id, state.proposal.id, { status: 'dismissed' })}
-                  onConfirmProduct={(input) => confirm(message.id, state.proposal.id, async () => {
-                    const created = await api.createProduct(business.id, input)
-                    return `Produit « ${created.name} » enregistré.`
-                  })}
-                  onConfirmMovement={(product, input) => confirm(message.id, state.proposal.id, async () => {
-                    await api.recordMovement(business.id, product.id, input)
-                    return `Stock de « ${product.name} » mis à jour.`
-                  })}
+                  onConfirm={(save) => confirm(message.id, state.proposal.id, save)}
                 />
               ))}
               {contexts[message.id] && <ContextDetails context={contexts[message.id]} />}
@@ -322,7 +324,7 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
           allowVoice={false}
           accept={PHOTO_TYPES}
           attachLabel="Joindre une photo de produit"
-          placeholder={remaining === 0 ? 'Limite du jour atteinte : revenez demain.' : 'Question, ou « enregistre ce produit… » avec une photo'}
+          placeholder={remaining === 0 ? 'Limite du jour atteinte : revenez demain.' : 'Question ou demande : vente, dépense, produit (photo possible)…'}
           label="Votre question"
         />
       </div>

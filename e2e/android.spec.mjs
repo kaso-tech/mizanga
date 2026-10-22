@@ -163,6 +163,30 @@ test('assistant : une photo et une phrase préparent une fiche de produit, enreg
   await expect(page.locator('.product-card', { hasText: 'Huile Dinor 5 L' })).toContainText('10 500')
 })
 
+test('assistant : une phrase prépare une vente et une dépense, enregistrées après confirmation', async ({ page }, info) => {
+  await signInAndCreateShop(page, emailFor(info), 'Boutique Ventes')
+  await addProduct(page, { name: 'Savon', unit: 'pièce', buy: '250', sell: '300', quantity: '20' })
+  await page.getByRole('tab', { name: 'Assistant' }).tap()
+  await page.getByRole('textbox', { name: 'Votre question' }).fill('Vends 2 savons à Mariam, et ajoute 1500 de transport')
+  await page.getByRole('button', { name: 'Envoyer' }).tap()
+  const sale = page.getByRole('form', { name: 'Fiche à vérifier : Vente' })
+  await expect(sale.getByLabel('Prix unitaire 1')).toHaveValue('300')
+  expect(plain(await sale.locator('.sale-total').textContent())).toBe('Total : 600 F CFA')
+  await expectFitsScreen(page, 'fiches de vente et de dépense')
+  await sale.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
+  await expect(sale).toContainText('Vente de 600 F CFA enregistrée.')
+  const expense = page.getByRole('form', { name: 'Fiche à vérifier : Dépense' })
+  await expense.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
+  await expect(expense).toContainText('Dépense de 1 500 F CFA enregistrée (Transport).')
+  // Les onglets montrent les enregistrements : stock diminué, vente et dépense du jour.
+  await page.getByRole('tab', { name: 'Produits' }).tap()
+  await expect(page.locator('.product-card', { hasText: 'Savon' })).toContainText('18')
+  await page.getByRole('tab', { name: 'Ventes' }).tap()
+  await expect(page.getByRole('list', { name: 'Liste des ventes' })).toContainText('Client : Mariam')
+  await page.getByRole('tab', { name: 'Dépenses' }).tap()
+  await expect(page.getByRole('list', { name: 'Liste des dépenses' })).toContainText('Transport')
+})
+
 test('le bouton « retour » d’Android ferme la fenêtre sans quitter l’espace Business', async ({ page }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Retour')
   await page.getByRole('button', { name: /Ajouter un produit/ }).tap()

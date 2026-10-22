@@ -1000,6 +1000,9 @@ button.account-chip:hover { opacity: .9; }
 .proposal-card.is-done .proposal-status { background: var(--accent); }
 .proposal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .proposal-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.proposal-line { display: grid; gap: 10px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+.proposal-summary { display: grid; gap: 4px; font-size: 14px; }
+.proposal-summary p { margin: 0; }
 .proposal-result { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--primary); font-size: 14px; font-weight: 500; }
 .assistant-context summary { cursor: pointer; font-weight: 500; color: var(--foreground); }
 .assistant-context p { margin: 8px 0 0; }

@@ -142,6 +142,79 @@ describe('assistant Business (présenté comme le chatbot)', () => {
     expect(asked[1].messages[0].attachments).toBeUndefined()
   })
 
+  it('prépare une vente, une dépense et une annulation, enregistrées seulement après confirmation', async () => {
+    const writes: Array<{ url: string; body: unknown }> = []
+    const sale = { soldAt: '2026-10-22T06:30:00.000Z', totalAmount: 34000, status: 'completed', items: [{ productName: 'Riz 25 kg', quantity: 2, unit: 'sac' }] }
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (url === '/api/business/b1/assistant' && method === 'GET') return Response.json({ quota: { used: 0, limit: 50, resetsAt } })
+      if (url === '/api/business/b1/assistant') {
+        return ndjson([
+          { context, quota: { used: 1, limit: 50, resetsAt } },
+          { text: 'Voici les fiches.' },
+          { proposals: [
+            { id: 's1', action: 'sale', values: { items: [{ productId: 'p1', productName: 'riz', quantity: 2, unitPrice: null }], customerName: 'Mariam', note: null } },
+            { id: 'e1', action: 'expense', values: { amount: 5000, category: 'Abonnement Wi-Fi', description: null, spentOn: null } },
+            { id: 'c1', action: 'cancel_sale', values: { saleId: 'v1', reference: 'ab12cd34', sale, reason: 'Erreur' } },
+          ] },
+          { done: true, quota: { used: 1, limit: 50, resetsAt } },
+        ])
+      }
+      const body = init?.body ? JSON.parse(String(init.body)) : null
+      writes.push({ url, body })
+      if (url === '/api/business/b1/sales') return Response.json({ sale: { id: 'v2', soldAt: sale.soldAt, status: 'completed', totalAmount: 35000, totalCost: 30000, customerName: 'Mariam', note: null } }, { status: 201 })
+      if (url === '/api/business/b1/expenses') return Response.json({ expense: { id: 'x1', amount: 5000, category: 'Abonnement Wi-Fi', description: null, spentAt: sale.soldAt, createdBy: 'u1' } }, { status: 201 })
+      if (url === '/api/business/b1/sales/v1/cancel') return Response.json({ sale: { ...sale, id: 'v1', status: 'cancelled', totalCost: 30000, customerName: null, note: null } })
+      return Response.json({ error: 'Introuvable.' }, { status: 404 })
+    }))
+    renderPanel()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'Fais tout ça')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
+
+    // Vente : prix habituel du produit proposé, total calculé, stock vérifié avant l’envoi.
+    const saleCard = await screen.findByRole('form', { name: 'Fiche à vérifier : Vente' })
+    expect(within(saleCard).getByLabelText('Prix unitaire 1')).toHaveValue('17500')
+    expect(within(saleCard).getByText('35 000 F CFA')).toBeInTheDocument()
+    await userEvent.clear(within(saleCard).getByLabelText('Quantité (sac) 1'))
+    await userEvent.type(within(saleCard).getByLabelText('Quantité (sac) 1'), '20')
+    await userEvent.click(within(saleCard).getByRole('button', { name: 'Confirmer et enregistrer' }))
+    expect(within(saleCard).getByRole('alert')).toHaveTextContent('Stock insuffisant pour « Riz 25 kg » : il reste 8 sac.')
+    expect(writes).toEqual([])
+    await userEvent.clear(within(saleCard).getByLabelText('Quantité (sac) 1'))
+    await userEvent.type(within(saleCard).getByLabelText('Quantité (sac) 1'), '2')
+    await userEvent.click(within(saleCard).getByRole('button', { name: 'Confirmer et enregistrer' }))
+    expect(await within(saleCard).findByText('Vente de 35 000 F CFA enregistrée.')).toBeInTheDocument()
+    expect(writes[0]).toEqual({ url: '/api/business/b1/sales', body: { items: [{ productId: 'p1', quantity: 2, unitPrice: 17500 }], customerName: 'Mariam', note: null } })
+
+    // Dépense : catégorie et date du jour proposées.
+    const expenseCard = screen.getByRole('form', { name: 'Fiche à vérifier : Dépense' })
+    expect(within(expenseCard).getByLabelText('Catégorie')).toHaveValue('Abonnement Wi-Fi')
+    await userEvent.click(within(expenseCard).getByRole('button', { name: 'Confirmer et enregistrer' }))
+    expect(await within(expenseCard).findByText('Dépense de 5 000 F CFA enregistrée (Abonnement Wi-Fi).')).toBeInTheDocument()
+    expect(writes[1]).toMatchObject({ url: '/api/business/b1/expenses', body: { amount: 5000, category: 'Abonnement Wi-Fi', spentOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) } })
+
+    // Annulation : résumé de la vente visé, confirmation explicite.
+    const cancelCard = screen.getByRole('form', { name: 'Fiche à vérifier : Annulation de vente' })
+    expect(within(cancelCard).getByText('34 000 F CFA')).toBeInTheDocument()
+    await userEvent.click(within(cancelCard).getByRole('button', { name: 'Confirmer l’annulation' }))
+    expect(await within(cancelCard).findByText('Vente annulée, stock rétabli.')).toBeInTheDocument()
+    expect(writes[2]).toEqual({ url: '/api/business/b1/sales/v1/cancel', body: { reason: 'Erreur' } })
+  })
+
+  it('ne propose pas à un employé de confirmer une annulation', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => (
+      (init?.method ?? 'GET') === 'GET'
+        ? Response.json({ quota: { used: 0, limit: 50, resetsAt } })
+        : ndjson([{ context, quota: { used: 1, limit: 50, resetsAt } }, { proposals: [{ id: 'c1', action: 'cancel_sale', values: { saleId: 'v1', reference: 'ab12cd34', sale: { soldAt: '2026-10-22T06:30:00.000Z', totalAmount: 34000, status: 'completed', items: [] }, reason: null } }] }, { done: true, quota: { used: 1, limit: 50, resetsAt } }])
+    )))
+    render(<AssistantPanel api={createBusinessApi(async () => 'jeton')} business={{ ...business, role: 'staff' }} products={products} onDataChanged={async () => {}} onNotify={() => {}} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'Annule la vente')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
+    const card = await screen.findByRole('form', { name: 'Fiche à vérifier : Annulation de vente' })
+    expect(within(card).getByText('Seul le propriétaire peut annuler une vente.')).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Confirmer l’annulation' })).toBeDisabled()
+  })
+
   it('affiche la limite du jour', async () => {
     fakeServer(1)
     renderPanel()

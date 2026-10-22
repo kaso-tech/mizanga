@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { parseAmount } from '../../app/businessFormat'
+import { expenseCategories } from '../../app/expenseCategories'
 import type { ExpenseInput } from '../../services/businessApi'
 import { Modal } from '../Modal'
 
-const expenseCategories = ['Loyer', 'Transport', 'Électricité / eau', 'Abonnement Wi-Fi', 'Communication', 'Marketing', 'Salaires', 'Taxes et impôts', 'Entretien', 'Autre']
 
 /** Nouvelle dépense ; la date ne peut pas être dans le futur (jour du commerce). */
 export function ExpenseDialog({ today, onSave, onClose }: { today: string; onSave: (input: ExpenseInput) => Promise<void>; onClose: () => void }) {

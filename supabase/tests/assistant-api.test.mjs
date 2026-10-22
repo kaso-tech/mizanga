@@ -31,6 +31,12 @@ const provider = {
       failNext = false
       throw new UpstreamError('Le moteur est momentanément indisponible. Réessayez plus tard.', 503)
     }
+    if (request.messages.at(-1)?.content.startsWith('Annule')) {
+      const reference = /\[([0-9a-f]{8})\]/.exec(request.instructions ?? '')?.[1]
+      yield { functionCall: { name: 'proposer_annulation_vente', args: { reference, motif: 'Erreur de saisie' } } }
+      yield { functionCall: { name: 'proposer_depense', args: { montant: 5000, categorie: 'Abonnement Wi-Fi' } } }
+      return
+    }
     if (request.messages.at(-1)?.content.startsWith('Enregistre')) {
       yield { text: 'Voici les fiches à vérifier.' }
       yield { functionCall: { name: 'proposer_creation_produit', args: { nom: 'Huile Dinor 5 L', unite: 'bidon', prix_achat: 9000, prix_vente: 10500, quantite_initiale: 12 } } }
@@ -47,7 +53,7 @@ const provider = {
 
 beforeAll(async () => {
   db = await createTestDatabase()
-  await db.query("update public.plans set daily_ai_requests = 4 where id = 'test'")
+  await db.query("update public.plans set daily_ai_requests = 5 where id = 'test'")
   tokens['jeton-alice'] = { id: await createUser(db, 'alice@example.test'), email: 'alice@example.test' }
   tokens['jeton-bob'] = { id: await createUser(db, 'bob@example.test'), email: 'bob@example.test' }
   const alice = tokens['jeton-alice'].id
@@ -82,15 +88,15 @@ const quota = async () => /** @type {any} */ (await (await fetch(`${base}/api/bu
 
 describe('assistant Business', () => {
   it('répond à partir des chiffres calculés par la base, sans recherche web', async () => {
-    expect(await quota()).toMatchObject({ used: 0, limit: 4 })
+    expect(await quota()).toMatchObject({ used: 0, limit: 5 })
     const { status, lines } = await ask('jeton-alice', question)
     expect(status).toBe(200)
     const [first, ...rest] = lines
-    expect(first.quota).toMatchObject({ used: 1, limit: 4 })
+    expect(first.quota).toMatchObject({ used: 1, limit: 5 })
     expect(first.context.periods[0]).toMatchObject({ key: 'today', summary: { revenue: 34375, costOfGoodsSold: 30300, grossMargin: 4075, expenses: 6500, estimatedResult: -2425, salesCount: 1 } })
     expect(first.context.stock).toMatchObject({ productCount: 3, value: 8 * 15000 + 3.5 * 600 })
     expect(first.context.stock.products.map((/** @type {any} */ product) => [product.name, product.level])).toEqual([['Savon', 'out'], ['Riz 25 kg', 'low'], ['Sucre', 'ok']])
-    expect(rest).toEqual([{ text: 'Votre marge brute du jour est de ' }, { text: '4 075 F CFA.' }, { done: true, quota: { used: 1, limit: 4, resetsAt: first.quota.resetsAt } }])
+    expect(rest).toEqual([{ text: 'Votre marge brute du jour est de ' }, { text: '4 075 F CFA.' }, { done: true, quota: { used: 1, limit: 5, resetsAt: first.quota.resetsAt } }])
 
     const sent = requests.at(-1)
     expect(sent.webSearch).toBe(false)
@@ -129,7 +135,7 @@ describe('assistant Business', () => {
     ] })
     expect(status).toBe(200)
     const sent = requests.at(-1)
-    expect(sent.functions.map((/** @type {any} */ fn) => fn.name)).toEqual(['proposer_creation_produit', 'proposer_mouvement_stock'])
+    expect(sent.functions.map((/** @type {any} */ fn) => fn.name)).toEqual(['proposer_creation_produit', 'proposer_mouvement_stock', 'proposer_vente', 'proposer_depense', 'proposer_annulation_vente'])
     expect(sent.messages[0].attachments).toBeUndefined()
     expect(sent.messages[2].attachments).toEqual([photo])
     const proposals = lines.find((line) => line.proposals)?.proposals
@@ -144,6 +150,19 @@ describe('assistant Business', () => {
     expect(products.find((/** @type {any} */ row) => row.name === 'Riz 25 kg')).toMatchObject({ quantity: '8.000' })
   })
 
+  it('montre les ventes récentes au modèle (sans client) et prépare une annulation et une dépense', async () => {
+    const { lines } = await ask('jeton-alice', { messages: [{ role: 'user', content: 'Annule la vente de ce matin et ajoute 5000 de Wi-Fi' }] })
+    const sent = requests.at(-1).instructions
+    expect(sent).toMatch(/- \[[0-9a-f]{8}\] \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} : 34375 ; 2 sac Riz 25 kg, 0\.5 kg Sucre\./)
+    expect(sent).toContain('L’utilisateur est le propriétaire.')
+    expect(sent).not.toContain('Mariam')
+    const [cancel, expense] = lines.find((line) => line.proposals).proposals
+    const [sale] = await asUser(db, tokens['jeton-alice'].id, async () => (await db.query('select id from public.sales')).rows)
+    expect(cancel.values).toMatchObject({ saleId: /** @type {any} */ (sale).id, reason: 'Erreur de saisie', sale: { totalAmount: 34375, status: 'completed' } })
+    expect(expense.values).toEqual({ amount: 5000, category: 'Abonnement Wi-Fi', description: null, spentOn: null })
+    expect((await asUser(db, tokens['jeton-alice'].id, async () => (await db.query("select status from public.sales")).rows))).toEqual([{ status: 'completed' }])
+  })
+
   it('refuse les fichiers qui ne sont pas des photos', async () => {
     const pdf = { name: 'facture.pdf', mimeType: 'application/pdf', data: 'AAAA' }
     expect(await ask('jeton-alice', { messages: [{ role: 'user', content: 'Lis ceci', attachments: [pdf] }] })).toEqual({ status: 422, lines: [{ error: 'Seules les photos (JPEG, PNG, WebP) sont acceptées.' }] })
@@ -155,7 +174,7 @@ describe('assistant Business', () => {
     await ask('jeton-alice', question)
     await ask('jeton-alice', question)
     const refused = await ask('jeton-alice', question)
-    expect(refused).toEqual({ status: 429, lines: [{ error: 'Limite du jour atteinte (4 questions). Elle sera renouvelée demain.' }] })
+    expect(refused).toEqual({ status: 429, lines: [{ error: 'Limite du jour atteinte (5 questions). Elle sera renouvelée demain.' }] })
   })
 
   it('refuse les autres commerçants, les visiteurs et les questions invalides', async () => {
