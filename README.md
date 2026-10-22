@@ -45,6 +45,7 @@ Sans clé, tout fonctionne en mode démonstration. Une clé gratuite se crée su
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | Vérification TypeScript |
 | `pnpm test` | Tests Vitest (une fois) ; `pnpm test:watch` pour le mode continu |
+| `pnpm test:e2e` | Après `pnpm build` : parcours sur téléphone Android émulé (Playwright, Chromium) |
 | `pnpm build` | Vérification des types puis build de production dans `dist/` |
 | `pnpm preview` | Sert le build de production localement (avec l’API) |
 | `pnpm start` | Serveur de production : site compilé + API (après `pnpm build`) |
@@ -117,8 +118,9 @@ Le schéma est dans `supabase/migrations/` : profils, entreprises et membres (pr
 - **Calculs (déterministes, faits par la base — fonctions `business_summary` et `business_product_sales`) :** total d’une ligne = quantité × prix, arrondi au franc ; coût d’une ligne = quantité × prix d’achat au moment de la vente ; chiffre d’affaires et coût des produits vendus sur les ventes non annulées ; marge brute = chiffre d’affaires − coût des produits vendus ; résultat estimé = marge brute − dépenses. Les périodes sont des jours du calendrier local du commerce. L’écran rappelle qu’il s’agit d’une estimation, pas d’un résultat comptable ou fiscal certifié.
 - **Assistant Business** (onglet Assistant) : questions en langage courant sur le commerce. Le serveur calcule un résumé chiffré avec les droits de l’utilisateur (résultats d’aujourd’hui, des 7 derniers jours, du mois et du mois dernier, ventes par produit, dépenses par catégorie, état du stock) et le transmet au moteur d’IA avec la consigne de n’inventer aucun chiffre ; ni noms de clients, ni notes, ni descriptions, ni identifiants ne sont transmis, et la recherche web est désactivée. Le résumé est montré sous chaque réponse (« Chiffres utilisés par l’assistant »). La conversation n’est pas enregistrée.
 - **Limites et coûts de l’IA :** chaque question est réservée dans `ai_usage` (fonction `begin_ai_request`, limite quotidienne de la formule de l’abonnement, ou de la formule « test » : 50 par jour), puis complétée avec le modèle, les jetons consommés et le coût estimé (`finish_ai_request`) ; une question dont le moteur a échoué ne compte pas. Le coût vaut 0 tant que `AI_PRICE_USD_PER_MILLION` (« entrée,sortie », en dollars par million de jetons) n’est pas défini, ce qui correspond à l’offre gratuite de Gemini.
-- **Migrations à appliquer dans Supabase, dans l’ordre :** `20261021120000_business_schema.sql`, `20261022100000_products_stock.sql`, `20261022140000_sales_expenses.sql`, puis `20261023090000_ai_usage.sql`.
-- **À venir :** tests Android et abonnements (étape 6).
+- **Abonnements (mode test, aucun paiement) :** chaque commerce reçoit la formule « Test (gratuit) » (50 questions par jour à l’assistant, 1 commerce) ; le nombre de commerces suit la formule ; « Formule et limites » l’affiche. Les formules payantes, leurs prix et le moyen de paiement restent à décider ; un changement de formule se fait pour l’instant dans la base (`subscriptions.plan_id`).
+- **Migrations (dans l’ordre, historique dans `supabase_migrations.schema_migrations`) :** `20261021120000_business_schema.sql`, `20261022100000_products_stock.sql`, `20261022140000_sales_expenses.sql`, `20261023090000_ai_usage.sql`, `20261024090000_subscriptions.sql`.
+- **Tests Android (`e2e/`, `pnpm test:e2e`, aussi dans la CI) :** Chromium avec l’écran, le tactile et le navigateur de deux téléphones Android (360 et 412 px). Le serveur de test (`e2e/server.mjs`) lance l’application compilée et le vrai serveur, avec une base PostgreSQL en mémoire et des services de connexion et d’IA simulés. Scénarios : parcours complet du commerçant avec les montants vérifiés, aucun débordement horizontal, bouton « retour » qui ferme une fenêtre, clavier ouvert, réseau 3G lent, hors connexion.
 
 ## Routes
 

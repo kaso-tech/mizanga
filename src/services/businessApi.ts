@@ -119,6 +119,20 @@ export interface Period {
   end: string
 }
 
+/** Formule du commerce ; en mode test, aucun paiement n’est demandé. */
+export interface Subscription {
+  planId: string
+  planName: string
+  isTest: boolean
+  status: 'test' | 'active' | 'past_due' | 'cancelled'
+  monthlyPrice: number
+  currency: string
+  dailyAiRequests: number
+  maxBusinesses: number
+  currentPeriodEnd: string | null
+  aiUsedToday: number
+}
+
 export interface AiQuota {
   used: number
   limit: number
@@ -197,6 +211,7 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     recordExpense: async (businessId: string, input: ExpenseInput) => (await request<{ expense: Expense }>('POST', `/${businessId}/expenses`, input)).expense,
     deleteExpense: async (businessId: string, expenseId: string) => { await request<{ deleted: boolean }>('DELETE', `/${businessId}/expenses/${expenseId}`) },
     summary: async (businessId: string, period: Period) => request<{ summary: Summary; products: ProductSales[] }>('GET', `/${businessId}/summary?from=${period.start}&to=${period.end}`),
+    subscription: async (businessId: string) => (await request<{ subscription: Subscription }>('GET', `/${businessId}/subscription`)).subscription,
     assistantQuota: async (businessId: string) => (await request<{ quota: AiQuota }>('GET', `/${businessId}/assistant`)).quota,
     /** Pose une question à l’assistant ; la réponse arrive par fragments (`onEvent`). */
     askAssistant: async (businessId: string, messages: AssistantMessage[], onEvent: (event: AssistantEvent) => void, signal?: AbortSignal) => {

@@ -124,7 +124,8 @@ describe('dépenses et résultats', () => {
   })
 
   it('compte les jours selon le fuseau horaire de l’entreprise', async () => {
-    const lagos = (await queryAs(alice, "insert into public.businesses (name, timezone) values ('Boutique de Lagos', 'Africa/Lagos') returning id"))[0].id
+    // Second commerce d’Alice, créé par l’administrateur (la formule « test » n’en permet qu’un).
+    const lagos = (await db.query("insert into public.businesses (name, timezone, created_by) values ('Boutique de Lagos', 'Africa/Lagos', $1) returning id", [alice])).rows.map((/** @type {any} */ row) => row.id)[0]
     const item = (await queryAs(alice, "select id from public.create_product($1, 'Pain', 'unité', 100, 150, 0, 10)", [lagos]))[0].id
     const [sale] = await queryAs(alice, 'select * from public.record_sale($1, $2::jsonb)', [lagos, JSON.stringify([{ product_id: item, quantity: 1 }])])
     // 23 h 30 UTC le 10 mars = 0 h 30 le 11 mars à Lagos (UTC+1).

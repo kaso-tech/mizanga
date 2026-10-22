@@ -69,6 +69,9 @@ export function createBusinessRoutes({ store, verify, bearerToken, readJson, sen
         await store.deleteExpense(session, businessId, productId)
         return sendJson(res, 200, { deleted: true })
       }
+      if (collection === 'subscription' && segments.length === 3 && method === 'GET') {
+        return sendJson(res, 200, { subscription: await store.subscription(session, businessId) })
+      }
       if (collection === 'summary' && segments.length === 3 && method === 'GET') {
         return sendJson(res, 200, await store.summary(session, businessId, period()))
       }

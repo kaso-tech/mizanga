@@ -51,10 +51,10 @@ describe('consommation de l’IA', () => {
 
   it('prend la limite de la formule de l’abonnement du commerce', async () => {
     await db.query("insert into public.plans (id, name, daily_ai_requests, max_businesses) values ('pro-test', 'Pro (test)', 10, 3)")
-    await db.query("insert into public.subscriptions (business_id, plan_id) values ($1, 'pro-test')", [shop])
+    await db.query("update public.subscriptions set plan_id = 'pro-test' where business_id = $1", [shop])
     expect(await quota(alice)).toEqual({ used: 3, daily_limit: 10 })
     await begin(alice)
-    await db.query('delete from public.subscriptions where business_id = $1', [shop])
+    await db.query("update public.subscriptions set plan_id = 'test' where business_id = $1", [shop])
   })
 
   it('isole les utilisateurs : rien chez un commerce dont on n’est pas membre, rien sur les lignes des autres', async () => {

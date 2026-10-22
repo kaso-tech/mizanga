@@ -33,6 +33,7 @@ function fakeServer(role: Business['role'] = 'owner') {
     requests.push(`${method} ${path}`)
     if (path === '') return json(200, { businesses: [business] })
     if (path === '/b1/products') return json(200, { products })
+    if (path === '/b1/subscription') return json(200, { subscription: { planId: 'test', planName: 'Test (gratuit)', isTest: true, status: 'test', monthlyPrice: 0, currency: 'XOF', dailyAiRequests: 50, maxBusinesses: 1, currentPeriodEnd: null, aiUsedToday: 3 } })
     if (path.startsWith('/b1/sales?')) return json(200, { sales: [...sales].reverse() })
     if (path === '/b1/sales' && method === 'POST') {
       const items = body.items.map((item: { productId: string; quantity: number; unitPrice: number }) => {
@@ -200,6 +201,19 @@ describe('espace Business : ventes, dépenses et résultats', () => {
     await userEvent.selectOptions(within(panel).getByLabelText('Période'), 'lastMonth')
     await waitFor(() => expect(server.requests.filter((request) => request.startsWith('GET /b1/summary'))).toHaveLength(2))
     expect(server.requests.at(-1)).toMatch(/from=\d{4}-\d{2}-01&to=/)
+  })
+
+  it('montre la formule du commerce, en mode test et sans paiement', async () => {
+    fakeServer()
+    renderView()
+    await screen.findByText('Riz 25 kg')
+    await userEvent.click(screen.getByRole('button', { name: /Formule et limites/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Votre formule' })
+    expect(await within(dialog).findByText('Test (gratuit)')).toBeInTheDocument()
+    expect(within(dialog).getByText('Mode test : aucun paiement')).toBeInTheDocument()
+    expect(within(dialog).getByText('Gratuit')).toBeInTheDocument()
+    expect(within(dialog).getByText('3 sur 50 aujourd’hui')).toBeInTheDocument()
+    expect(within(dialog).getByText('1 au maximum')).toBeInTheDocument()
   })
 
   it('n’offre ni annulation de vente ni suppression de dépense à un employé', async () => {

@@ -1,12 +1,14 @@
 import { X } from 'lucide-react'
 import { useRef, type ReactNode } from 'react'
+import { useBackToClose } from '../app/useBackToClose'
 import { useModalFocus } from '../app/useModalFocus'
 
-/** Fenêtre modale accessible : titre, fermeture par Échap ou en dehors, focus gardé à l’intérieur. */
+/** Fenêtre modale accessible : titre, fermeture par Échap, en dehors ou par « retour », focus gardé à l’intérieur. */
 export function Modal({ title, onClose, children, className = '' }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
   const dialogRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   useModalFocus(dialogRef, closeRef, onClose)
+  useBackToClose(onClose)
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
       <section ref={dialogRef} className={`dialog ${className}`} role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>

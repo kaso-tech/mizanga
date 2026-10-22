@@ -33,4 +33,13 @@ export default tseslint.config(
       globals: globals.node,
     },
   },
+  {
+    // Tests de bout en bout (Playwright) : Node, avec du code exécuté dans la page.
+    files: ['e2e/**/*.mjs', 'playwright.config.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 )

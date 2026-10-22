@@ -1,4 +1,4 @@
-import { AlertTriangle, History, PackagePlus, Pencil, Plus, Search, Store } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, History, PackagePlus, Pencil, Plus, Search, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { AccountView } from '../../app/accountView'
 import { periodFor, type PeriodPreset } from '../../app/businessPeriods'
@@ -13,6 +13,7 @@ import { PeriodPicker } from './PeriodPicker'
 import { ProductDialog } from './ProductDialog'
 import { ResultsPanel } from './ResultsPanel'
 import { SalesPanel } from './SalesPanel'
+import { SubscriptionDialog } from './SubscriptionDialog'
 
 /** Pays de la zone UEMOA (franc CFA, XOF) proposés à la création ; d’autres pays suivront. */
 const countries: Array<{ code: string; name: string }> = [
@@ -41,6 +42,7 @@ type DialogState =
   | { type: 'edit'; product: Product }
   | { type: 'movement'; product: Product }
   | { type: 'history'; product: Product }
+  | { type: 'subscription' }
   | null
 
 interface BusinessViewProps {
@@ -155,6 +157,11 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
   return (
     <div className="page-view business-view">
       <h1>{business?.name ?? 'Espace Business'}</h1>
+      {business && api && (
+        <button type="button" className="subscription-chip" onClick={() => setDialog({ type: 'subscription' })}>
+          <BadgeCheck size={14} aria-hidden="true" /> Formule et limites
+        </button>
+      )}
       {error && <p className="message-error" role="alert">{error}</p>}
       {business === undefined && !error && <div className="page-loading" aria-busy="true" />}
       {business === null && api && (
@@ -252,6 +259,9 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
       )}
       {business && api && dialog?.type === 'movement' && (
         <MovementDialog product={dialog.product} onClose={() => setDialog(null)} onSave={(input) => mutate(() => api.recordMovement(business.id, dialog.product.id, input), 'Stock mis à jour.')} />
+      )}
+      {business && api && dialog?.type === 'subscription' && (
+        <SubscriptionDialog load={() => api.subscription(business.id)} onClose={() => setDialog(null)} />
       )}
       {business && api && dialog?.type === 'history' && (
         <HistoryDialog product={dialog.product} currency={currency} load={() => api.listMovements(business.id, dialog.product.id)} onClose={() => setDialog(null)} />

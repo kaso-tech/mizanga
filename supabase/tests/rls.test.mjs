@@ -35,7 +35,7 @@ beforeAll(async () => {
   await db.query("insert into public.stock_movements (business_id, product_id, kind, quantity_delta, unit_cost, sale_id, created_by) values ($1, $2, 'sale', -1, 15000, $3, $4)", [aliceShop, aliceProduct, aliceSale, alice])
   await db.query("insert into public.expenses (business_id, amount, category, created_by) values ($1, 2000, 'transport', $2)", [aliceShop, alice])
   await db.query("insert into public.ai_usage (user_id, feature, provider, model, input_tokens, output_tokens) values ($1, 'business_assistant', 'gemini', 'test', 100, 50), ($2, 'chat', 'gemini', 'test', 10, 5)", [alice, bob])
-  await db.query("insert into public.subscriptions (business_id, plan_id) values ($1, 'test')", [aliceShop])
+  // Les abonnements « test » sont créés automatiquement avec chaque entreprise (étape 6).
 }, 60_000)
 
 describe('comptes et entreprises', () => {
@@ -161,11 +161,11 @@ describe('ventes, dépenses, IA et abonnements', () => {
   it('montre les formules ; l’abonnement seulement aux membres de l’entreprise', async () => {
     await asUser(db, bob, async () => {
       expect(await count('select * from public.plans')).toBe(1)
-      expect(await count('select * from public.subscriptions')).toBe(0)
+      expect((await db.query('select business_id from public.subscriptions')).rows).toEqual([{ business_id: bobShop }])
       expect(await errorOf(db.query("insert into public.subscriptions (business_id, plan_id) values ($1, 'test')", [bobShop]))).toMatch(/permission denied/)
     })
     await asUser(db, carla, async () => {
-      expect(await count('select * from public.subscriptions')).toBe(1)
+      expect((await db.query('select business_id from public.subscriptions')).rows).toEqual([{ business_id: aliceShop }])
     })
   })
 

@@ -78,6 +78,9 @@ export function createPgliteBusinessStore(db) {
       const productRows = await query(userId, 'select * from public.business_product_sales($1, $2, $3)', params)
       return { summary: toSummary(summaryRow), products: productRows.map(toProductSales) }
     },
+    async subscription({ userId }, businessId) {
+      return (await query(userId, 'select public.business_subscription($1) as result', [businessId]))[0].result
+    },
     async aiQuota({ userId }, businessId) {
       return toAiQuota((await query(userId, 'select * from public.ai_quota($1)', [businessId]))[0])
     },

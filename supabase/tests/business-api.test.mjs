@@ -98,6 +98,13 @@ describe('espace Business : produits et stocks', () => {
     expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products`)).body.products[0]).toMatchObject({ salePrice: 18000, quantity: 14 })
   })
 
+  it('donne la formule du commerce (mode test) et limite le nombre de commerces', async () => {
+    const { body } = await call('jeton-alice', 'GET', `/api/business/${shop}/subscription`)
+    expect(body.subscription).toMatchObject({ planId: 'test', planName: 'Test (gratuit)', isTest: true, status: 'test', monthlyPrice: 0, dailyAiRequests: 50, maxBusinesses: 1 })
+    expect((await call('jeton-bob', 'GET', `/api/business/${shop}/subscription`)).status).toBe(403)
+    expect(await call('jeton-alice', 'POST', '/api/business', { name: 'Deuxième boutique' })).toEqual({ status: 409, body: { error: 'Votre formule permet 1 commerce(s) : vous avez atteint cette limite.' } })
+  })
+
   it('refuse les adresses mal formées', async () => {
     expect((await call('jeton-alice', 'GET', '/api/business/pas-un-uuid/products')).status).toBe(404)
     expect((await call('jeton-alice', 'DELETE', `/api/business/${shop}/products`)).status).toBe(404)

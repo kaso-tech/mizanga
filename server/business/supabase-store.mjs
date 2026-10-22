@@ -24,6 +24,7 @@ import { BusinessError } from './validate.mjs'
  * @property {(session: BusinessSession, businessId: string, expenseId: string) => Promise<void>} deleteExpense
  * @property {(session: BusinessSession, businessId: string, period: Period) => Promise<{ summary: Summary, products: ProductSales[] }>} summary
  * @property {(session: BusinessSession, businessId: string) => Promise<AiQuota>} aiQuota
+ * @property {(session: BusinessSession, businessId: string) => Promise<Subscription>} subscription
  * @property {(session: BusinessSession, businessId: string) => Promise<string>} beginAiRequest Réserve une question (erreur 429 au-delà de la limite du jour).
  * @property {(session: BusinessSession, requestId: string, result: AiRequestResult) => Promise<void>} finishAiRequest
  *
@@ -33,6 +34,7 @@ import { BusinessError } from './validate.mjs'
  * @typedef {{ revenue: number, costOfGoodsSold: number, grossMargin: number, expenses: number, estimatedResult: number, salesCount: number, cancelledSalesCount: number }} Summary
  * @typedef {{ productId: string, productName: string, unit: string, quantity: number, revenue: number, cost: number, grossMargin: number }} ProductSales
  * @typedef {{ used: number, limit: number, resetsAt: string }} AiQuota
+ * @typedef {{ planId: string, planName: string, isTest: boolean, status: string, monthlyPrice: number, currency: string, dailyAiRequests: number, maxBusinesses: number, currentPeriodEnd: string | null, aiUsedToday: number }} Subscription
  * @typedef {{ status: 'completed' | 'failed', provider: string, model: string, inputTokens: number, outputTokens: number, costMicroUsd: number }} AiRequestResult
  */
 
@@ -241,6 +243,9 @@ export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { f
         request(session, 'POST', 'rpc/business_product_sales', params),
       ])
       return { summary: toSummary(summaryRows[0]), products: productRows.map(toProductSales) }
+    },
+    async subscription(session, businessId) {
+      return request(session, 'POST', 'rpc/business_subscription', { p_business_id: businessId })
     },
     async aiQuota(session, businessId) {
       return toAiQuota((await request(session, 'POST', 'rpc/ai_quota', { p_business_id: businessId }))[0])

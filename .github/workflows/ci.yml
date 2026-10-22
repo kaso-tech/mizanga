@@ -16,7 +16,7 @@ jobs:
   check:
     name: Lint, types, tests et build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -33,3 +33,14 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+      # Parcours sur téléphone Android émulé (Chromium) : écran 360 et 412 px, tactile, réseau lent,
+      # hors connexion, bouton « retour ». Base PostgreSQL en mémoire et services simulés.
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: rapport-e2e
+          path: playwright-report/
+          retention-days: 7

@@ -990,6 +990,16 @@ button.account-chip:hover { opacity: .9; }
 .assistant-composer .icon-only { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; }
 .assistant-composer .icon-button { width: 48px; height: 48px; }
 .assistant-reset { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
+.business-view > h1 + .subscription-chip { margin-top: 6px; }
+.subscription-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--muted-foreground); font: inherit; font-size: 13px; cursor: pointer; }
+.subscription-chip:hover { color: var(--foreground); }
+.subscription-chip svg { color: var(--primary); }
+.subscription-details { display: grid; gap: 14px; }
+.subscription-plan { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; font-size: 17px; }
+.subscription-details dl { display: grid; gap: 0; margin: 0; }
+.subscription-details dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.subscription-details dt { color: var(--muted-foreground); }
+.subscription-details dd { margin: 0; font-weight: 500; text-align: right; }
 @media (max-width: 560px) {
   .field-pair { grid-template-columns: 1fr; }
   .business-tabs button { padding: 0 2px; font-size: 13px; }
