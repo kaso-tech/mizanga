@@ -872,7 +872,8 @@ html[data-text-size="xlarge"] .messages-list { zoom: 1.3; }
   .label-short { display: inline; }
   .settings-section { padding: 16px; }
   .page-view h1 { font-size: 24px; }
-  .toast { right: 12px; bottom: 12px; }
+  /* En haut sur téléphone : en bas, la notification recouvrait la zone de saisie et le bouton d’envoi. */
+  .toast { top: calc(64px + env(safe-area-inset-top)); right: 12px; bottom: auto; left: 12px; max-width: none; }
 }
 
 @media (max-width: 419px) {

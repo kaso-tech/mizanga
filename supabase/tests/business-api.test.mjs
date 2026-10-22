@@ -144,4 +144,12 @@ describe('espace Business : produits et stocks', () => {
     expect((await call('jeton-bob', 'GET', `/api/business/${shop}/summary?from=${today}&to=${today}`)).status).toBe(403)
     expect((await call('jeton-bob', 'POST', `/api/business/${shop}/sales`, { items: [{ productId: rice, quantity: 1 }] })).status).toBe(403)
   })
+
+  it('limite les demandes par compte : des commerçants derrière la même adresse ne se bloquent pas', async () => {
+    const statuses = []
+    for (let index = 0; index < 121; index += 1) statuses.push((await call('jeton-alice', 'GET', '/api/business')).status)
+    expect(statuses.at(-1)).toBe(429)
+    expect(statuses.filter((status) => status === 200).length).toBeLessThanOrEqual(120)
+    expect((await call('jeton-bob', 'GET', '/api/business')).status).toBe(200)
+  })
 })

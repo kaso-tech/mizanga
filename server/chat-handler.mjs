@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { createAdminAuth } from './admin.mjs'
 import { UpstreamError } from './ai/errors.mjs'
 import { createAiProvider } from './ai/provider.mjs'
@@ -201,11 +202,19 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
   const market = marketplace ?? (auth ? createSupabaseMarketplace(auth) : null)
   const marketRoutes = market ? createMarketplaceRoutes({ ...market, moderate: createListingModerator({ ai }), moderationKey: moderationKey || null, readJson, sendJson }) : null
   const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant, marketplace: marketRoutes }) : null
-  // Marketplace publique : lecture large, signalements limités (10 par heure et par adresse).
-  const marketLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
+  // Marketplace publique : lecture large (une adresse IP peut regrouper de nombreux abonnés mobiles),
+  // signalements limités (10 par heure et par adresse).
+  const marketLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 300 })
   const reportLimit = createRateLimiter({ windowMs: 3_600_000, maxRequests: 10 })
-  // Limite propre à l’espace Business, plus large que celle du moteur d’IA (opérations légères).
+  // Espace Business : limite par compte (jeton de connexion), car les opérateurs mobiles font souvent
+  // partager une même adresse IP à de nombreux abonnés ; une limite large par adresse reste en garde-fou.
   const businessLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
+  const businessAddressLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 1200 })
+  /** Clé de limite d’une demande Business : empreinte du jeton, sinon l’adresse. @param {import('node:http').IncomingMessage} req */
+  const businessClient = (req) => {
+    const token = bearerToken(req)
+    return token ? `compte:${createHash('sha256').update(token).digest('hex').slice(0, 32)}` : `adresse:${clientOf(req)}`
+  }
   const admin = createAdminAuth({ password: adminPassword })
 
   /**
@@ -280,7 +289,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
     }
     if (path === '/api/business' || path.startsWith('/api/business/')) {
       if (!handleBusiness) return sendJson(res, 503, { error: 'L’espace Business n’est pas configuré sur ce serveur.' })
-      const blocked = businessLimit(clientOf(req))
+      const blocked = businessAddressLimit(clientOf(req)) ?? businessLimit(businessClient(req))
       if (blocked) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blocked))
       return handleBusiness(req, res, path)
     }

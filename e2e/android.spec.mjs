@@ -144,7 +144,15 @@ test('assistant : une photo et une phrase préparent une fiche de produit, enreg
   await page.locator('input[type="file"]').setInputFiles({ name: 'huile.png', mimeType: 'image/png', buffer: png })
   await expect(page.getByText('huile.png')).toBeVisible()
   await page.getByRole('textbox', { name: 'Votre question' }).fill('Enregistre cette huile : achat 9000, j’en ai 12 bidons')
+  // La notification « commerce créé » ne doit jamais recouvrir la zone de saisie.
+  const toast = await page.locator('.toast').first().boundingBox().catch(() => null)
+  const composer = await page.locator('.assistant-composer-zone .composer').boundingBox()
+  if (toast && composer) expect(toast.y + toast.height <= composer.y || toast.y >= composer.y + composer.height, 'notification sur la zone de saisie').toBe(true)
   await page.getByRole('button', { name: 'Envoyer' }).tap()
+  // Étapes vérifiées une à une : question partie (avec sa photo), réponse reçue, puis fiche.
+  await expect(page.getByRole('article', { name: 'Votre message' })).toContainText('Enregistre cette huile')
+  await expect(page.getByRole('article', { name: 'Votre message' }).locator('img')).toHaveCount(1)
+  await expect(page.getByRole('article', { name: 'Réponse de Gilli' })).toContainText('J’ai préparé la fiche', { timeout: 10_000 })
   const card = page.getByRole('form', { name: 'Fiche à vérifier : Nouveau produit' })
   await expect(card).toBeVisible()
   await expect(card.getByLabel('Nom')).toHaveValue('Huile Dinor 5 L')
