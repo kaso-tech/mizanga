@@ -60,7 +60,7 @@ export function validateBusinessInput(body) {
 export function validateProductInput(body) {
   return {
     name: /** @type {string} */ (text(body?.name, 'Le nom du produit', { min: 1, max: 120, required: true })),
-    unit: text(body?.unit, 'L’unité', { max: 24 }) || 'unité',
+    unit: text(body?.unit, 'L’unité', { max: 24 }) || 'pièce',
     sku: text(body?.sku, 'La référence', { max: 64 }) || null,
     purchasePrice: amount(body?.purchasePrice, 'Le prix d’achat') ?? 0,
     salePrice: amount(body?.salePrice, 'Le prix de vente') ?? 0,

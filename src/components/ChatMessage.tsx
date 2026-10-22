@@ -162,8 +162,9 @@ interface ChatMessageProps {
   onEdit: (content: string) => void
   onCopy: (message: ChatMessageType) => void
   onRegenerate: () => void
-  onRate: (message: ChatMessageType, rating: MessageRating) => void
-  onReport: (message: ChatMessageType, selectedPassage: string) => void
+  /** Avis et signalement : absents, leurs boutons ne sont pas proposés (assistant Business). */
+  onRate?: (message: ChatMessageType, rating: MessageRating) => void
+  onReport?: (message: ChatMessageType, selectedPassage: string) => void
   onSpeak?: (message: ChatMessageType) => void
   isSpeaking?: boolean
   /** Changer de version ; seulement pour la dernière réponse, que la suite de la conversation ne contredit pas. */
@@ -225,20 +226,26 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
             {canRegenerate && (
               <button type="button" onClick={onRegenerate} aria-label="Régénérer" title="Régénérer"><RefreshCw size={16} /></button>
             )}
-            <button type="button" className={message.rating === 'positive' ? 'is-positive' : ''} aria-pressed={message.rating === 'positive'} onClick={() => onRate(message, 'positive')} aria-label="Avis positif" title="Avis positif">
-              <ThumbsUp size={16} fill={message.rating === 'positive' ? 'currentColor' : 'none'} />
-            </button>
-            <button type="button" className={message.rating === 'negative' ? 'is-negative' : ''} aria-pressed={message.rating === 'negative'} onClick={() => onRate(message, 'negative')} aria-label="Avis négatif" title="Avis négatif">
-              <ThumbsDown size={16} fill={message.rating === 'negative' ? 'currentColor' : 'none'} />
-            </button>
-            <button type="button" className={`has-label ${message.rating === 'correct' ? 'is-positive' : ''}`} aria-pressed={message.rating === 'correct'} onClick={() => onRate(message, 'correct')}>
-              <CheckCheck size={16} aria-hidden="true" />
-              <span className="label-long">Cette réponse est correcte</span><span className="label-short">Correct</span>
-            </button>
-            <button type="button" className="has-label" onClick={() => onReport(message, selectedPassage)}>
-              <Flag size={16} aria-hidden="true" />
-              <span className="label-long">Signaler une erreur en mooré</span><span className="label-short">Signaler</span>
-            </button>
+            {onRate && (
+              <>
+                <button type="button" className={message.rating === 'positive' ? 'is-positive' : ''} aria-pressed={message.rating === 'positive'} onClick={() => onRate(message, 'positive')} aria-label="Avis positif" title="Avis positif">
+                  <ThumbsUp size={16} fill={message.rating === 'positive' ? 'currentColor' : 'none'} />
+                </button>
+                <button type="button" className={message.rating === 'negative' ? 'is-negative' : ''} aria-pressed={message.rating === 'negative'} onClick={() => onRate(message, 'negative')} aria-label="Avis négatif" title="Avis négatif">
+                  <ThumbsDown size={16} fill={message.rating === 'negative' ? 'currentColor' : 'none'} />
+                </button>
+                <button type="button" className={`has-label ${message.rating === 'correct' ? 'is-positive' : ''}`} aria-pressed={message.rating === 'correct'} onClick={() => onRate(message, 'correct')}>
+                  <CheckCheck size={16} aria-hidden="true" />
+                  <span className="label-long">Cette réponse est correcte</span><span className="label-short">Correct</span>
+                </button>
+              </>
+            )}
+            {onReport && (
+              <button type="button" className="has-label" onClick={() => onReport(message, selectedPassage)}>
+                <Flag size={16} aria-hidden="true" />
+                <span className="label-long">Signaler une erreur en mooré</span><span className="label-short">Signaler</span>
+              </button>
+            )}
           </div>
         )}
       </div>

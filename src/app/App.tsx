@@ -523,7 +523,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
             messages={conversation.messages}
             isGenerating={conversation.isGenerating}
             isDemonstration={aiService.isDemonstration}
-            composer={composer}
             copiedMessageId={copiedMessageId}
             onSuggestion={(prompt) => { setDraft(prompt); setFocusToken((token) => token + 1) }}
             onNewConversation={startNewConversation}
@@ -578,9 +577,8 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
           onOpenAccount={openAccountSettings}
         />
         <div className="content-scroll"><div className="content-frame"><Suspense fallback={<div className="page-loading" aria-busy="true" />}>{renderView()}</Suspense></div></div>
-        {activeView === 'chat' && !isEmptyChat && (
-          <div className="composer-zone">{composer}</div>
-        )}
+        {/* Zone de saisie toujours en bas, dès l’accueil, comme dans les applications de messagerie. */}
+        {activeView === 'chat' && <div className="composer-zone">{composer}</div>}
       </main>
       {accountDialogOpen && account.client && (
         <Suspense fallback={null}>

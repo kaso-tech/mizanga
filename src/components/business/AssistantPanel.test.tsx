@@ -41,53 +41,65 @@ afterEach(() => vi.unstubAllGlobals())
 
 const renderPanel = () => render(<AssistantPanel api={createBusinessApi(async () => 'jeton')} business={business} />)
 
-describe('assistant Business', () => {
-  it('répond à une question suggérée, montre les chiffres utilisés et le nombre de questions restantes', async () => {
+describe('assistant Business (présenté comme le chatbot)', () => {
+  it('répond à une question suggérée avec les messages du chatbot, les chiffres utilisés et les questions restantes', async () => {
     const { asked } = fakeServer()
     renderPanel()
-    expect(await screen.findByText('50 questions restantes aujourd’hui')).toBeInTheDocument()
+    expect(await screen.findByText(/50 questions restantes aujourd’hui/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Joindre une photo ou un fichier' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Comment se passent mes ventes ce mois-ci ?' }))
-    expect(await screen.findByText(/Pensez au riz/)).toBeInTheDocument()
-    expect(screen.getByText('4 075 F CFA', { selector: 'strong' })).toBeInTheDocument()
-    expect(screen.getByText('49 questions restantes aujourd’hui')).toBeInTheDocument()
+    const answer = await screen.findByRole('article', { name: 'Réponse de Gilli' })
+    expect(await within(answer).findByText(/Pensez au riz/)).toBeInTheDocument()
+    expect(await within(answer).findByText('4 075 F CFA')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Votre message' })).toHaveTextContent('Comment se passent mes ventes ce mois-ci ?')
+    expect(within(answer).getByRole('button', { name: 'Copier' })).toBeInTheDocument()
+    expect(within(answer).queryByRole('button', { name: 'Avis positif' })).not.toBeInTheDocument()
+    expect(screen.getByText(/49 questions restantes aujourd’hui/)).toBeInTheDocument()
     expect(asked).toEqual([{ messages: [{ role: 'user', content: 'Comment se passent mes ventes ce mois-ci ?' }] }])
 
     const details = screen.getByText('Chiffres utilisés par l’assistant').closest('details') as HTMLElement
     expect(within(details).getByRole('rowheader', { name: 'Aujourd’hui' })).toBeInTheDocument()
     expect(within(details).getByText(/À surveiller : Riz 25 kg \(8 sac\)/)).toBeInTheDocument()
 
-    // La question suivante renvoie l’historique de la conversation.
-    await userEvent.type(screen.getByLabelText('Votre question'), 'Et hier ?{Enter}')
+    // Question suivante dans la même zone de saisie que le chatbot : l’historique est renvoyé.
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'Et hier ?')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
     await waitFor(() => expect(asked).toHaveLength(2))
     expect(asked[1]).toEqual({ messages: [
       { role: 'user', content: 'Comment se passent mes ventes ce mois-ci ?' },
       { role: 'assistant', content: 'Votre marge brute du jour est de **4 075 F CFA**. Pensez au riz.' },
       { role: 'user', content: 'Et hier ?' },
     ] })
+
+    // Régénérer repose la dernière question sans la dupliquer.
+    await userEvent.click(await screen.findByRole('button', { name: 'Régénérer' }))
+    await waitFor(() => expect(asked).toHaveLength(3))
+    expect(asked[2]).toEqual(asked[1])
     await userEvent.click(await screen.findByRole('button', { name: /Nouvelle conversation/ }))
     expect(screen.getByRole('button', { name: 'Quels produits dois-je réapprovisionner ?' })).toBeInTheDocument()
   })
 
-  it('explique la limite du jour et garde la question', async () => {
+  it('affiche la limite du jour', async () => {
     fakeServer(1)
     renderPanel()
-    await screen.findByText('1 question restante aujourd’hui')
-    await userEvent.type(screen.getByLabelText('Votre question'), 'Première{Enter}')
+    await screen.findByText(/1 question restante aujourd’hui/)
+    await userEvent.click(screen.getByRole('button', { name: 'Où partent mes dépenses ?' }))
     await screen.findByText(/Pensez au riz/)
-    expect(screen.getByText('0 question restante aujourd’hui')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Envoyer la question' })).toBeDisabled()
+    expect(screen.getByText(/0 question restante aujourd’hui/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Votre question' })).toHaveAttribute('placeholder', 'Limite du jour atteinte : revenez demain.')
   })
 
-  it('affiche le refus du serveur sans perdre la question', async () => {
+  it('affiche le refus du serveur comme le chatbot, avec « Réessayer »', async () => {
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => (
       (init?.method ?? 'GET') === 'GET'
         ? Response.json({ quota: { used: 0, limit: 50, resetsAt } })
         : Response.json({ error: 'L’assistant n’est pas disponible : aucun moteur d’IA n’est configuré sur ce serveur.' }, { status: 503 })
     )))
     renderPanel()
-    await userEvent.type(screen.getByLabelText('Votre question'), 'Mon stock ?{Enter}')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'Mon stock ?')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('aucun moteur d’IA n’est configuré')
-    expect(screen.getByLabelText('Votre question')).toHaveValue('Mon stock ?')
-    expect(screen.queryByRole('list', { name: 'Conversation avec l’assistant' })).not.toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Votre message' })).toHaveTextContent('Mon stock ?')
+    expect(screen.getByRole('button', { name: /Réessayer/ })).toBeInTheDocument()
   })
 })

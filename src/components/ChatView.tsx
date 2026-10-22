@@ -1,5 +1,5 @@
 import { ArrowDown, Bookmark, RotateCcw } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SavedPrompt } from '../app/savedPrompts'
 import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
@@ -9,8 +9,6 @@ interface ChatViewProps {
   messages: ChatMessageType[]
   isGenerating: boolean
   isDemonstration: boolean
-  /** Zone de saisie affichée au centre de l’écran d’accueil. */
-  composer: ReactNode
   copiedMessageId?: string
   /** Insère une consigne enregistrée dans la zone de saisie. */
   onSuggestion: (prompt: string) => void
@@ -36,7 +34,6 @@ export function ChatView({
   messages,
   isGenerating,
   isDemonstration,
-  composer,
   copiedMessageId,
   onSuggestion,
   onNewConversation,
@@ -105,7 +102,6 @@ export function ChatView({
           <div className="weave-band welcome-band" aria-hidden="true" />
           <h1 id="welcome-title">Comment puis-je vous aider&#8239;?</h1>
         </div>
-        <div className="welcome-composer">{composer}</div>
         {savedPrompts.length > 0 && (
           <div className="saved-prompt-row" aria-label="Vos consignes">
             {savedPrompts.slice(0, 6).map((item) => (

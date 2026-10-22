@@ -4,7 +4,7 @@ import { validateExpenseInput, validateMovementInput, validatePeriod, validatePr
 
 describe('contrôle des données Business', () => {
   it('complète un produit avec des valeurs par défaut sûres', () => {
-    expect(validateProductInput({ name: ' Savon ' })).toEqual({ name: 'Savon', unit: 'unité', sku: null, purchasePrice: 0, salePrice: 0, alertThreshold: 0, initialQuantity: 0 })
+    expect(validateProductInput({ name: ' Savon ' })).toEqual({ name: 'Savon', unit: 'pièce', sku: null, purchasePrice: 0, salePrice: 0, alertThreshold: 0, initialQuantity: 0 })
   })
 
   it('refuse les montants non entiers, les quantités négatives ou trop précises', () => {

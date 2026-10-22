@@ -18,7 +18,7 @@ const quantityText = (value: number | undefined) => (value === undefined ? '' : 
 /** Création ou modification d’un produit. La quantité en stock ne se change que par un mouvement. */
 export function ProductDialog({ product, currency, onClose, onSave, onArchive }: ProductDialogProps) {
   const [name, setName] = useState(product?.name ?? '')
-  const [unit, setUnit] = useState(product?.unit ?? 'unité')
+  const [unit, setUnit] = useState(product?.unit ?? 'pièce')
   const [purchasePrice, setPurchasePrice] = useState(amountText(product?.purchasePrice))
   const [salePrice, setSalePrice] = useState(amountText(product?.salePrice))
   const [alertThreshold, setAlertThreshold] = useState(quantityText(product?.alertThreshold))
@@ -38,7 +38,7 @@ export function ProductDialog({ product, currency, onClose, onSave, onArchive }:
     setIsSaving(true)
     setError('')
     try {
-      await onSave({ name: name.trim(), unit: unit.trim() || 'unité', purchasePrice: purchase, salePrice: sale, alertThreshold: threshold, ...(product ? {} : { initialQuantity: initial }) })
+      await onSave({ name: name.trim(), unit: unit.trim() || 'pièce', purchasePrice: purchase, salePrice: sale, alertThreshold: threshold, ...(product ? {} : { initialQuantity: initial }) })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'L’enregistrement a échoué.')
       setIsSaving(false)
@@ -56,7 +56,7 @@ export function ProductDialog({ product, currency, onClose, onSave, onArchive }:
         </label>
         <label className="field">
           <span className="field-label">Unité</span>
-          <input value={unit} maxLength={24} onChange={(event) => setUnit(event.target.value)} placeholder="unité, kg, sac, litre…" />
+          <input value={unit} maxLength={24} onChange={(event) => setUnit(event.target.value)} placeholder="pièce, kg, sac, litre…" />
         </label>
         <div className="field-pair">
           <label className="field">

@@ -27,6 +27,11 @@ interface ComposerProps {
   onNotify: (message: string) => void
   /** Consignes proposées quand le message commence par « / ». */
   savedPrompts?: SavedPrompt[]
+  /** Fichiers joints et messages vocaux ; désactivés quand le destinataire ne les lit pas (assistant Business). */
+  allowAttachments?: boolean
+  placeholder?: string
+  /** Libellé accessible de la zone de saisie. */
+  label?: string
 }
 
 export function Composer({
@@ -47,6 +52,9 @@ export function Composer({
   onStop,
   onNotify,
   savedPrompts = [],
+  allowAttachments = true,
+  placeholder = 'Demandez n’importe quoi, en français ou en mooré…',
+  label = 'Votre message',
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -169,7 +177,7 @@ export function Composer({
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={(event) => {
-          if (event.dataTransfer.files.length === 0) return
+          if (event.dataTransfer.files.length === 0 || !allowAttachments) return
           event.preventDefault()
           setIsDragging(false)
           onAddFiles([...event.dataTransfer.files])
@@ -208,14 +216,14 @@ export function Composer({
           rows={1}
           spellCheck={false}
           enterKeyHint="enter"
-          aria-label="Votre message"
+          aria-label={label}
           aria-controls={isPromptMenuOpen ? 'prompt-menu' : undefined}
-          placeholder="Demandez n’importe quoi, en français ou en mooré…"
+          placeholder={placeholder}
           onChange={(event) => onValueChange(event.target.value)}
           onPaste={(event) => {
             // Une capture d’écran collée devient une pièce jointe ; le texte collé reste du texte.
             const files = [...event.clipboardData.files]
-            if (files.length === 0) return
+            if (files.length === 0 || !allowAttachments) return
             event.preventDefault()
             onAddFiles(files)
           }}
@@ -248,7 +256,7 @@ export function Composer({
           }}
         />
         <div className="composer-toolbar">
-          <input
+          {allowAttachments && <input
             ref={fileInputRef}
             type="file"
             multiple
@@ -260,16 +268,18 @@ export function Composer({
               onAddFiles([...(event.target.files ?? [])])
               event.target.value = ''
             }}
-          />
-          <button
-            type="button"
-            className="composer-tool"
-            aria-label="Joindre une photo ou un fichier"
-            title="Joindre une photo, un PDF ou un fichier texte"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Paperclip size={20} />
-          </button>
+          />}
+          {allowAttachments && (
+            <button
+              type="button"
+              className="composer-tool"
+              aria-label="Joindre une photo ou un fichier"
+              title="Joindre une photo, un PDF ou un fichier texte"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip size={20} />
+            </button>
+          )}
           <button
             type="button"
             className={`composer-tool ${showCharacters ? 'is-active' : ''}`}
@@ -280,7 +290,7 @@ export function Composer({
           >
             <Keyboard size={20} />
           </button>
-          <button
+          {allowAttachments && <button
             type="button"
             className={`composer-tool ${isRecording ? 'is-recording' : ''}`}
             disabled={!canRecord || recording.state === 'processing'}
@@ -290,7 +300,7 @@ export function Composer({
             onClick={() => (isRecording ? recording.stop() : void recording.start())}
           >
             <Mic size={20} />
-          </button>
+          </button>}
           <span className="composer-spacer" />
           {isGenerating ? (
             <button type="button" className="send-button is-stop" aria-label={stopLabel} title={stopLabel} onClick={onStop}>

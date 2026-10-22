@@ -124,7 +124,7 @@ test('parcours complet du commerçant', async ({ page }, info) => {
   await page.getByRole('tab', { name: 'Assistant' }).tap()
   await expect(page.getByText('50 questions restantes aujourd’hui')).toBeVisible()
   await page.getByRole('button', { name: 'Comment se passent mes ventes ce mois-ci ?' }).tap()
-  await expect(page.locator('.assistant-turn.is-assistant')).toContainText('chiffre d’affaires 34375')
+  await expect(page.getByRole('article', { name: 'Réponse de Gilli' })).toContainText('chiffre d’affaires 34375')
   await expect(page.getByText('49 questions restantes aujourd’hui')).toBeVisible()
   await expectFitsScreen(page, 'assistant')
 
@@ -154,7 +154,7 @@ test('le bouton « retour » d’Android ferme la fenêtre sans quitter l’espa
 
 test('clavier ouvert : la fenêtre de vente reste utilisable', async ({ page }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Clavier')
-  await addProduct(page, { name: 'Savon', unit: 'unité', buy: '250', sell: '300', quantity: '20' })
+  await addProduct(page, { name: 'Savon', unit: 'pièce', buy: '250', sell: '300', quantity: '20' })
   await page.getByRole('tab', { name: 'Ventes' }).tap()
   // Le clavier virtuel réduit la hauteur visible à environ 330 px.
   await page.setViewportSize({ width: page.viewportSize()?.width ?? 360, height: 330 })
@@ -162,13 +162,29 @@ test('clavier ouvert : la fenêtre de vente reste utilisable', async ({ page }, 
   const sale = page.getByRole('dialog', { name: 'Nouvelle vente' })
   const box = await sale.boundingBox()
   expect(box && box.y >= 0 && box.y + box.height <= 331).toBe(true)
-  await sale.getByRole('combobox', { name: /^Produit 1/ }).selectOption({ label: 'Savon (20 unité)' })
+  await sale.getByRole('combobox', { name: /^Produit 1/ }).selectOption({ label: 'Savon (20 pièce)' })
   const submit = sale.getByRole('button', { name: 'Enregistrer la vente' })
   await submit.scrollIntoViewIfNeeded()
   await expect(submit).toBeInViewport()
   await submit.tap()
   await expect(sale).toBeHidden()
   await expect(page.getByRole('list', { name: 'Liste des ventes' })).toContainText('300 F CFA')
+})
+
+test('accueil du chatbot : zone de saisie en bas de l’écran et bouton d’envoi rond', async ({ page }) => {
+  await page.goto('/')
+  const input = page.getByRole('textbox', { name: 'Votre message' })
+  await expect(input).toBeVisible()
+  const viewport = page.viewportSize()
+  const composer = await page.locator('.composer').boundingBox()
+  // Le bas de la zone de saisie est à moins de 120 px du bas de l’écran (avertissement compris).
+  expect(composer && viewport && viewport.height - (composer.y + composer.height)).toBeLessThan(120)
+  await input.fill('Bonjour')
+  const send = page.getByRole('button', { name: 'Envoyer' })
+  const box = await send.boundingBox()
+  expect(box && Math.round(box.width)).toBe(34)
+  expect(await send.evaluate((element) => getComputedStyle(element).borderRadius)).toBe('50%')
+  await expectFitsScreen(page, 'accueil du chatbot')
 })
 
 test('réseau lent (3G) : l’application s’affiche en moins de 15 secondes', async ({ page, context }) => {

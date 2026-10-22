@@ -3,7 +3,7 @@ import { parseAmount } from '../../app/businessFormat'
 import type { ExpenseInput } from '../../services/businessApi'
 import { Modal } from '../Modal'
 
-const expenseCategories = ['Loyer', 'Transport', 'Électricité / eau', 'Salaires', 'Communication', 'Taxes et impôts', 'Entretien', 'Autre']
+const expenseCategories = ['Loyer', 'Transport', 'Électricité / eau', 'Abonnement Wi-Fi', 'Communication', 'Marketing', 'Salaires', 'Taxes et impôts', 'Entretien', 'Autre']
 
 /** Nouvelle dépense ; la date ne peut pas être dans le futur (jour du commerce). */
 export function ExpenseDialog({ today, onSave, onClose }: { today: string; onSave: (input: ExpenseInput) => Promise<void>; onClose: () => void }) {
