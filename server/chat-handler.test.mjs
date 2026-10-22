@@ -134,6 +134,18 @@ describe('API Gilli', () => {
     expect(delay).toBeLessThanOrEqual(40_000)
   })
 
+  it('garde le détail d’un refus de Gemini pour la console d’administration, sans le montrer à l’utilisateur', async () => {
+    upstreamReply = { status: 429, events: [], body: { error: { code: 429, message: 'You exceeded your current quota.', details: [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', quotaValue: '20' }] }] } } }
+    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, adminPassword })
+    const response = await post(base, validBody)
+    const body = /** @type {Record<string, unknown>} */ (await response.json())
+    expect(JSON.stringify(body)).not.toContain('FreeTier')
+    const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0]
+    const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
+    expect(overview.engineErrors).toEqual([{ at: expect.any(String), feature: 'chat (modèle standard)', model: 'gemini-flash-latest', httpStatus: 429, quotas: ['GenerateRequestsPerDayPerProjectPerModel-FreeTier (limite 20)'], message: 'You exceeded your current quota.' }])
+  })
+
   it('situe la réinitialisation d’un quota journalier à minuit, heure du Pacifique', () => {
     const daily = { error: { details: [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }, { retryDelay: '20s' }] } }
     expect(quotaResetTime(daily, null, new Date('2026-10-20T17:00:00Z'))?.toISOString()).toBe('2026-10-21T07:00:00.000Z')
@@ -281,6 +293,7 @@ describe('API Gilli', () => {
     expect(await (await fetch(`${base}/api/admin/session`, { headers: { cookie } })).json()).toEqual({ configured: true, authenticated: true })
     const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
     expect(overview.engine).toEqual({ provider: 'gemini', configured: false, model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })
+    expect(overview.engineErrors).toEqual([])
 
     // Un cookie modifié est refusé.
     const forged = cookie.replace(/=(\d+)\./, (_match, expires) => `=${Number(expires) + 1000}.`)

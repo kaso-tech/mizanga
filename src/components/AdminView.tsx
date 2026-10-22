@@ -17,6 +17,7 @@ const sections: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
 interface Overview {
   version: { version: string; commit: string; builtAt: string } | null
   engine: { provider: string; configured: boolean; model: string; liteModel: string }
+  engineErrors?: Array<{ at: string; feature: string; model: string; httpStatus: number; quotas: string[]; message: string }>
   reference: {
     sheetChars: number
     examples: number
@@ -109,6 +110,22 @@ function EnginePanel({ overview }: { overview: Overview }) {
       <div className="setting-row">
         <div className="setting-text"><p className="setting-label">Modèle économe</p><p className="setting-description">GEMINI_LITE_MODEL (aussi pour les titres)</p></div>
         <code className="value-pill">{overview.engine.liteModel}</code>
+      </div>
+      <div className="settings-section engine-errors">
+        <h3>Derniers refus du moteur</h3>
+        {!overview.engineErrors?.length ? (
+          <p className="setting-description">Aucun refus depuis le dernier démarrage du serveur.</p>
+        ) : (
+          <ol>
+            {overview.engineErrors.map((error) => (
+              <li key={`${error.at}-${error.feature}`}>
+                <p><strong>{new Date(error.at).toLocaleString('fr', { dateStyle: 'short', timeStyle: 'medium' })}</strong> · {error.feature} · <code>{error.model}</code> · HTTP {error.httpStatus}</p>
+                {error.quotas.length > 0 && <p>Limite dépassée : {error.quotas.map((quota) => <code key={quota}>{quota}</code>)}</p>}
+                {error.message && <p className="setting-description">{error.message}</p>}
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
     </div>
   )

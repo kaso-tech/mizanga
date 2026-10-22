@@ -1010,6 +1010,11 @@ button.account-chip:hover { opacity: .9; }
 }
 
 /* Console d’administration */
+.engine-errors { margin-top: 12px; }
+.engine-errors ol { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.engine-errors li { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: 13px; overflow-wrap: anywhere; }
+.engine-errors p { margin: 0; }
+.engine-errors code { margin-right: 6px; }
 .admin-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .admin-header .secondary-button { display: inline-flex; align-items: center; gap: 6px; }
 .admin-login { display: grid; gap: 12px; max-width: 440px; }

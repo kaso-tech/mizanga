@@ -72,11 +72,29 @@ export function toGeminiContents(messages) {
     }))
 }
 
-/** @param {Response} response */
-async function errorForResponse(response) {
-  if (response.status !== 429) return errorForStatus(response.status)
+/**
+ * Détail technique d’un refus de Gemini : limites dépassées (quotaId ou quotaMetric) et message de Google.
+ * @param {unknown} body @param {string} model @param {number} httpStatus
+ * @returns {import('./errors.mjs').EngineDiagnostic}
+ */
+export function readDiagnostic(body, model, httpStatus) {
+  /** @type {Array<{ violations?: Array<{ quotaId?: string, quotaMetric?: string, quotaValue?: string }> }>} */
+  const details = /** @type {any} */ (body)?.error?.details ?? []
+  const quotas = details.flatMap((detail) => detail.violations ?? []).map((violation) => [violation.quotaId ?? violation.quotaMetric ?? '', violation.quotaValue ? `(limite ${violation.quotaValue})` : ''].join(' ').trim()).filter(Boolean)
+  const message = String(/** @type {any} */ (body)?.error?.message ?? '').slice(0, 500)
+  return { model, httpStatus, quotas: [...new Set(quotas)], message }
+}
+
+/** @param {Response} response @param {string} model */
+async function errorForResponse(response, model) {
   const body = await response.json().catch(() => null)
-  return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte.', 429, quotaResetTime(body, response.headers.get('retry-after')))
+  const diagnostic = readDiagnostic(body, model, response.status)
+  if (response.status !== 429) {
+    const error = errorForStatus(response.status)
+    error.diagnostic = diagnostic
+    return error
+  }
+  return new UpstreamError('La limite d’utilisation gratuite du moteur est atteinte.', 429, quotaResetTime(body, response.headers.get('retry-after')), diagnostic)
 }
 
 /** @param {number} status */
@@ -152,7 +170,7 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
     }),
     signal,
   })
-  if (!response.ok || !response.body) throw await errorForResponse(response)
+  if (!response.ok || !response.body) throw await errorForResponse(response, model)
 
   /** @type {WebSource[]} */
   let sources = []
@@ -213,7 +231,7 @@ export async function generateGeminiTitle({ apiKey, model, apiBase = DEFAULT_API
     }),
     signal,
   })
-  if (!response.ok) throw await errorForResponse(response)
+  if (!response.ok) throw await errorForResponse(response, model)
   const payload = /** @type {{ candidates?: Array<{ content?: { parts?: Array<{ text?: string, thought?: boolean }> } }> }} */ (await response.json())
   const parts = payload.candidates?.[0]?.content?.parts ?? []
   const raw = parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('')

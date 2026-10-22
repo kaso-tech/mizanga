@@ -123,6 +123,33 @@ const quotaCode = (error) => (error instanceof UpstreamError && error.status ===
 const clientOf = (req) => req.socket.remoteAddress || 'inconnu'
 
 /**
+ * Enveloppe un fournisseur pour signaler ses refus (avec leur détail technique) sans changer son comportement.
+ * @param {import('./ai/provider.mjs').AiProvider} ai @param {(error: unknown, feature: string) => void} onError
+ * @returns {import('./ai/provider.mjs').AiProvider}
+ */
+function monitorProvider(ai, onError) {
+  return {
+    ...ai,
+    async *streamReply(request) {
+      try {
+        yield* ai.streamReply(request)
+      } catch (error) {
+        onError(error, request.instructions ? 'assistant Business' : `chat (${request.tier === 'lite' ? 'modèle économe' : 'modèle standard'})`)
+        throw error
+      }
+    },
+    async generateTitle(request) {
+      try {
+        return await ai.generateTitle(request)
+      } catch (error) {
+        onError(error, 'titre')
+        throw error
+      }
+    },
+  }
+}
+
+/**
  * Gestionnaire Node pour `/api/health` et `/api/chat`, partagé par le serveur de développement Vite
  * et le serveur de production. Réponse de `/api/chat` : NDJSON, une ligne `{"text": …}` par fragment,
  * ou `{"error": …}` si le moteur échoue en cours de route.
@@ -141,7 +168,18 @@ const clientOf = (req) => req.socket.remoteAddress || 'inconnu'
 export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, rateLimit, aiPricing } = {}) {
   const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const store = businessStore ?? (auth ? createSupabaseBusinessStore(auth) : null)
-  const ai = provider ?? createAiProvider({ provider: aiProvider, apiKey, model, liteModel, apiBase })
+  /** Derniers refus du moteur (quota, clé…), pour la console d’administration ; jamais montrés aux utilisateurs. */
+  /** @type {Array<import('./ai/errors.mjs').EngineDiagnostic & { at: string, feature: string }>} */
+  const engineErrors = []
+  /** @param {unknown} error @param {string} feature */
+  const recordEngineError = (error, feature) => {
+    if (!(error instanceof UpstreamError) || !error.diagnostic) return
+    const entry = { at: new Date().toISOString(), feature, ...error.diagnostic }
+    engineErrors.unshift(entry)
+    engineErrors.length = Math.min(engineErrors.length, 10)
+    console.warn('[gilli] Refus du moteur :', JSON.stringify(entry))
+  }
+  const ai = monitorProvider(provider ?? createAiProvider({ provider: aiProvider, apiKey, model, liteModel, apiBase }), recordEngineError)
   const limit = createRateLimiter(rateLimit)
   const loadReference = createReferenceLoader(referenceDir)
   const assistant = store ? createAssistant({ store, ai, loadReference, pricing: aiPricing }) : null
@@ -185,6 +223,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       return sendJson(res, 200, {
         version: version ?? null,
         engine: { provider: ai.name, configured: ai.configured, model: ai.models.standard, liteModel: ai.models.lite },
+        engineErrors,
         reference: {
           sheetChars: reference.sheet.length,
           examples: reference.examples.length,
