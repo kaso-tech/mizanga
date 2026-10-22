@@ -100,6 +100,7 @@ const api = createApiHandler({
   aiProvider: process.env.AI_PROVIDER || undefined,
   apiKey: process.env.GEMINI_API_KEY,
   aiPricing: readPricing(process.env.AI_PRICE_USD_PER_MILLION),
+  moderationKey: process.env.MODERATION_KEY || undefined,
   model: process.env.GEMINI_MODEL || undefined,
   liteModel: process.env.GEMINI_LITE_MODEL || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,

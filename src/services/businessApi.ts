@@ -119,6 +119,51 @@ export interface Period {
   end: string
 }
 
+/** Vitrine du commerce sur la marketplace. */
+export interface SellerProfile {
+  businessId: string
+  displayName: string
+  city: string
+  whatsapp: string | null
+  phone: string | null
+  deliversEverywhere: boolean
+  deliveryCities: string[]
+  description: string | null
+  verified: boolean
+}
+
+export type ListingStatus = 'pending' | 'published' | 'review' | 'rejected' | 'hidden' | 'withdrawn'
+
+/** Annonce d’un produit du commerce (vue du vendeur). */
+export interface OwnListing {
+  id: string
+  productId: string
+  title: string
+  description: string
+  category: string
+  subcategory: string | null
+  condition: string
+  attributes: Record<string, string | number | boolean>
+  photos: Array<{ path: string; url: string }>
+  status: ListingStatus
+  revision: number
+  reasons: string[]
+  moderatedBy: string | null
+  updatedAt: string
+}
+
+export interface ListingSubmission {
+  productId: string
+  title: string
+  description: string
+  category: string
+  subcategory: string | null
+  condition: string
+  attributes: Record<string, string | number | boolean>
+  keepPhotos: string[]
+  newPhotos: Array<{ mimeType: string; data: string }>
+}
+
 /** Formule du commerce ; en mode test, aucun paiement n’est demandé. */
 export interface Subscription {
   planId: string
@@ -222,6 +267,11 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     recordExpense: async (businessId: string, input: ExpenseInput) => (await request<{ expense: Expense }>('POST', `/${businessId}/expenses`, input)).expense,
     deleteExpense: async (businessId: string, expenseId: string) => { await request<{ deleted: boolean }>('DELETE', `/${businessId}/expenses/${expenseId}`) },
     summary: async (businessId: string, period: Period) => request<{ summary: Summary; products: ProductSales[] }>('GET', `/${businessId}/summary?from=${period.start}&to=${period.end}`),
+    sellerProfile: async (businessId: string) => (await request<{ profile: SellerProfile | null }>('GET', `/${businessId}/seller`)).profile,
+    saveSellerProfile: async (businessId: string, input: Omit<SellerProfile, 'businessId' | 'verified'>) => (await request<{ profile: SellerProfile }>('PUT', `/${businessId}/seller`, input)).profile,
+    listListings: async (businessId: string) => (await request<{ listings: OwnListing[] }>('GET', `/${businessId}/listings`)).listings,
+    submitListing: async (businessId: string, input: ListingSubmission) => request<{ listing: OwnListing; moderation: 'done' | 'unavailable' }>('POST', `/${businessId}/listings`, input),
+    withdrawListing: async (businessId: string, listingId: string) => (await request<{ listing: OwnListing }>('POST', `/${businessId}/listings/${listingId}/withdraw`)).listing,
     subscription: async (businessId: string) => (await request<{ subscription: Subscription }>('GET', `/${businessId}/subscription`)).subscription,
     assistantQuota: async (businessId: string) => (await request<{ quota: AiQuota }>('GET', `/${businessId}/assistant`)).quota,
     /** Pose une question à l’assistant ; la réponse arrive par fragments (`onEvent`). */

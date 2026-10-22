@@ -16,7 +16,7 @@ const emailFor = (info) => `commercant-${info.project.name.replace(/\W+/g, '-')}
 async function expectFitsScreen(page, screen) {
   const overflowing = await page.evaluate(() => {
     const width = window.innerWidth
-    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, pre, .katex-display')
+    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .settings-nav, .moderation-photos, pre, .katex-display')
     return [...document.querySelectorAll('body *')]
       .filter((element) => {
         const box = element.getBoundingClientRect()
@@ -185,6 +185,81 @@ test('assistant : une phrase prépare une vente et une dépense, enregistrées a
   await expect(page.getByRole('list', { name: 'Liste des ventes' })).toContainText('Client : Mariam')
   await page.getByRole('tab', { name: 'Dépenses' }).tap()
   await expect(page.getByRole('list', { name: 'Liste des dépenses' })).toContainText('Transport')
+})
+
+/** Publie un produit sur la marketplace (vitrine créée au besoin) ; renvoie le badge d’état affiché. @param {import('@playwright/test').Page} page @param {string} productName @param {string} title */
+async function publishListing(page, productName, title, withPhoto = true) {
+  await page.getByRole('button', { name: `Publier sur la marketplace : ${productName}` }).tap()
+  const seller = page.getByRole('dialog', { name: 'Ma vitrine' })
+  if (await seller.isVisible().catch(() => false)) {
+    await seller.getByLabel('Ville', { exact: true }).fill('Ouagadougou')
+    await seller.getByLabel('Numéro WhatsApp').fill('70 12 34 56')
+    await seller.getByRole('button', { name: 'Enregistrer ma vitrine' }).tap()
+  }
+  const dialog = page.getByRole('dialog', { name: 'Publier sur la marketplace' })
+  await dialog.getByLabel('Titre de l’annonce').fill(title)
+  await dialog.getByRole('combobox', { name: /^Catégorie/ }).selectOption('telephones')
+  await dialog.getByRole('combobox', { name: /^Sous-catégorie/ }).selectOption('smartphones')
+  await dialog.getByLabel('Mémoire vive (RAM) (Go)').fill('8')
+  if (withPhoto) {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+    await dialog.locator('input[type="file"]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png })
+    await expect(dialog.getByText('Photos (1/5)')).toBeVisible()
+  }
+  await expectFitsScreen(page, 'publication d’une annonce')
+  await dialog.getByRole('button', { name: 'Publier' }).tap()
+  await expect(dialog).toBeHidden()
+  return page.locator('.product-card', { hasText: productName }).locator('.listing-badge')
+}
+
+test('marketplace : un vendeur publie, un visiteur trouve l’annonce et contacte le vendeur', async ({ page, browser }, info) => {
+  await signInAndCreateShop(page, emailFor(info), 'Awa Téléphones')
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40 000', sell: '48 000', quantity: '3' })
+  const badge = await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 neuf ${info.project.name.includes('360') ? 'A' : 'B'}`)
+  await expect(badge).toHaveText('En ligne')
+
+  // Un visiteur, sans compte, sur un autre téléphone.
+  const visitor = await browser.newPage({ ...info.project.use })
+  await visitor.goto('/marketplace')
+  await visitor.getByRole('searchbox', { name: 'Que cherchez-vous ?' }).fill(`tecno spark 20 neuf ${info.project.name.includes('360') ? 'A' : 'B'}`)
+  await visitor.getByLabel('Ma ville').fill('Ouagadougou')
+  await visitor.getByLabel('Budget maximum').fill('50000')
+  await visitor.getByRole('button', { name: 'Rechercher' }).tap()
+  const card = visitor.locator('.market-card').first()
+  await expect(card).toContainText('48 000')
+  await expectFitsScreen(visitor, 'résultats de la marketplace')
+  await card.locator('a').tap()
+  await expect(visitor.getByRole('heading', { level: 1 })).toContainText('Tecno Spark 20 neuf')
+  await expect(visitor.getByRole('link', { name: /WhatsApp/ })).toHaveAttribute('href', /^https:\/\/wa\.me\/22670123456\?text=/)
+  await expect(visitor.locator('.market-photos img')).toHaveCount(1)
+  expect(await visitor.locator('.market-photos img').evaluate((image) => /** @type {HTMLImageElement} */ (image).naturalWidth)).toBe(1)
+  await expectFitsScreen(visitor, 'page d’une annonce')
+  await visitor.close()
+})
+
+test('marketplace : un article interdit part en vérification et l’administration le refuse', async ({ page, browser }, info) => {
+  await signInAndCreateShop(page, emailFor(info), 'Boutique Douteuse')
+  await addProduct(page, { name: 'Article X', unit: 'pièce', buy: '1000', sell: '2000', quantity: '1' })
+  const badge = await publishListing(page, 'Article X', `Pistolet automatique ${info.project.name}`, false)
+  await expect(badge).toHaveText('En vérification')
+
+  const admin = await browser.newPage({ ...info.project.use })
+  await admin.goto('/admin')
+  await admin.getByLabel(/Mot de passe/).fill('mot-de-passe-admin-e2e')
+  await admin.keyboard.press('Enter')
+  await admin.getByRole('tab', { name: 'Modération marketplace' }).tap()
+  const item = admin.locator('.moderation-card', { hasText: `Pistolet automatique ${info.project.name}` })
+  await expect(item).toContainText('« pistolet »')
+  await expectFitsScreen(admin, 'console de modération')
+  await item.getByLabel(/Motif communiqué/).fill('Arme interdite')
+  await item.getByRole('button', { name: 'Refuser' }).tap()
+  await expect(item).toBeHidden()
+  await admin.close()
+
+  await page.reload()
+  await expect(page.locator('.product-card', { hasText: 'Article X' }).locator('.listing-badge')).toHaveText('Refusée')
+  await page.getByRole('button', { name: 'Annonce : Article X' }).tap()
+  await expect(page.getByRole('dialog', { name: 'Modifier l’annonce' })).toContainText('Administration : Arme interdite')
 })
 
 test('le bouton « retour » d’Android ferme la fenêtre sans quitter l’espace Business', async ({ page }, info) => {

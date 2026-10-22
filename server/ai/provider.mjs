@@ -22,6 +22,8 @@ import { createGeminiProvider } from './gemini.mjs'
  *   web ; `functions` propose des actions que le modèle demande par `functionCall`. Lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
  * @property {(request: { text: string, signal?: AbortSignal }) => Promise<string | null>} generateTitle
  *   Titre court d’une conversation à partir de son premier message.
+ * @property {(request: { instructions: string, text: string, images?: Array<{ mimeType: string, data: string }>, schema: Record<string, unknown>, signal?: AbortSignal }) => Promise<unknown>} [generateJson]
+ *   Réponse structurée (JSON) pour les contrôles automatiques, comme la modération des annonces.
  */
 
 export const AI_PROVIDERS = ['gemini']

@@ -1,10 +1,13 @@
-import { AlertTriangle, BadgeCheck, History, PackagePlus, Pencil, Plus, Search, Store } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, Globe, History, PackagePlus, Pencil, Plus, Search, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { AccountView } from '../../app/accountView'
 import { periodFor, type PeriodPreset } from '../../app/businessPeriods'
 import { formatAmount, formatQuantity, stockLevel, stockValue } from '../../app/businessFormat'
 import type { AuthClient } from '../../services/authService'
-import { createBusinessApi, type Business, type Product } from '../../services/businessApi'
+import { createBusinessApi, type Business, type ListingSubmission, type OwnListing, type Product, type SellerProfile } from '../../services/businessApi'
+import { listingStatusLabels } from '../../app/listingStatus'
+import { ListingDialog } from './ListingDialog'
+import { SellerProfileDialog } from './SellerProfileDialog'
 import { AssistantPanel } from './AssistantPanel'
 import { ExpensesPanel } from './ExpensesPanel'
 import { HistoryDialog } from './HistoryDialog'
@@ -43,6 +46,8 @@ type DialogState =
   | { type: 'movement'; product: Product }
   | { type: 'history'; product: Product }
   | { type: 'subscription' }
+  | { type: 'seller'; then?: Product }
+  | { type: 'listing'; product: Product }
   | null
 
 interface BusinessViewProps {
@@ -100,6 +105,9 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
   const [dialog, setDialog] = useState<DialogState>(null)
   const [tab, setTab] = useState<Tab>('products')
   const [preset, setPreset] = useState<PeriodPreset>('today')
+  // Marketplace (propriétaire seulement) : vitrine et annonces ; undefined tant que non chargées.
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null | undefined>(undefined)
+  const [listings, setListings] = useState<OwnListing[]>([])
 
   const loadProducts = useCallback(async (businessId: string) => {
     if (!api) return
@@ -120,6 +128,22 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
       .catch((caught: unknown) => { if (!cancelled) setError(caught instanceof Error ? caught.message : 'Chargement impossible.') })
     return () => { cancelled = true }
   }, [api, account.status])
+
+  const businessId = business?.id
+  const isOwner = business?.role === 'owner'
+  useEffect(() => {
+    if (!api || !businessId || !isOwner) return
+    let cancelled = false
+    Promise.all([api.sellerProfile(businessId), api.listListings(businessId)])
+      .then(([profile, own]) => {
+        if (cancelled) return
+        setSellerProfile(profile)
+        setListings(own)
+      })
+      // Marketplace absente de ce serveur : les boutons de publication restent cachés.
+      .catch(() => { if (!cancelled) setSellerProfile(undefined) })
+    return () => { cancelled = true }
+  }, [api, businessId, isOwner])
 
   if (account.status === 'unavailable') {
     return <div className="page-view business-view"><h1>Espace Business</h1><p className="settings-callout"><Store size={16} aria-hidden="true" /><span>L’espace Business demande un compte : il n’est pas encore disponible sur ce serveur.</span></p></div>
@@ -158,9 +182,16 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
     <div className="page-view business-view">
       <h1>{business?.name ?? 'Espace Business'}</h1>
       {business && api && (
-        <button type="button" className="subscription-chip" onClick={() => setDialog({ type: 'subscription' })}>
-          <BadgeCheck size={14} aria-hidden="true" /> Formule et limites
-        </button>
+        <div className="business-chips">
+          <button type="button" className="subscription-chip" onClick={() => setDialog({ type: 'subscription' })}>
+            <BadgeCheck size={14} aria-hidden="true" /> Formule et limites
+          </button>
+          {isOwner && sellerProfile !== undefined && (
+            <button type="button" className="subscription-chip" onClick={() => setDialog({ type: 'seller' })}>
+              <Globe size={14} aria-hidden="true" /> {sellerProfile ? 'Ma vitrine' : 'Créer ma vitrine'}
+            </button>
+          )}
+        </div>
       )}
       {error && <p className="message-error" role="alert">{error}</p>}
       {business === undefined && !error && <div className="page-loading" aria-busy="true" />}
@@ -224,6 +255,7 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
             <ul className="product-list" aria-label="Produits">
               {visible.map((product) => {
                 const level = stockLevel(product)
+                const listing = listings.find((item) => item.productId === product.id)
                 return (
                   <li key={product.id} className={`product-card is-${level}`}>
                     <div className="product-main">
@@ -231,6 +263,7 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
                       {level !== 'ok' && (
                         <span className={`stock-badge is-${level}`}><AlertTriangle size={12} aria-hidden="true" /> {level === 'out' ? 'Rupture' : 'Stock bas'}</span>
                       )}
+                      {listing && <span className={`listing-badge is-${listing.status}`}>{listingStatusLabels[listing.status]}</span>}
                     </div>
                     <div className="product-figures">
                       <span><strong>{formatQuantity(product.quantity)}</strong> {product.unit}</span>
@@ -241,6 +274,9 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
                       <button type="button" className="secondary-button" onClick={() => setDialog({ type: 'movement', product })} aria-label={`Mouvement de stock pour ${product.name}`}><PackagePlus size={14} aria-hidden="true" /> Stock</button>
                       <button type="button" className="icon-button" onClick={() => setDialog({ type: 'history', product })} aria-label={`Historique de ${product.name}`} title="Historique"><History size={16} /></button>
                       <button type="button" className="icon-button" onClick={() => setDialog({ type: 'edit', product })} aria-label={`Modifier ${product.name}`} title="Modifier"><Pencil size={16} /></button>
+                      {isOwner && sellerProfile !== undefined && (
+                        <button type="button" className="icon-button" onClick={() => setDialog(sellerProfile ? { type: 'listing', product } : { type: 'seller', then: product })} aria-label={`${listing ? 'Annonce' : 'Publier sur la marketplace'} : ${product.name}`} title={listing ? 'Annonce sur la marketplace' : 'Publier sur la marketplace'}><Globe size={16} /></button>
+                      )}
                     </div>
                   </li>
                 )
@@ -264,6 +300,45 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
       )}
       {business && api && dialog?.type === 'movement' && (
         <MovementDialog product={dialog.product} onClose={() => setDialog(null)} onSave={(input) => mutate(() => api.recordMovement(business.id, dialog.product.id, input), 'Stock mis à jour.')} />
+      )}
+      {business && api && dialog?.type === 'seller' && (
+        <SellerProfileDialog
+          profile={sellerProfile ?? null}
+          defaultName={business.name}
+          onClose={() => setDialog(null)}
+          onSave={async (input) => {
+            setSellerProfile(await api.saveSellerProfile(business.id, input))
+            onNotify('Vitrine enregistrée.', 'success')
+            setDialog(dialog.then ? { type: 'listing', product: dialog.then } : null)
+          }}
+        />
+      )}
+      {business && api && dialog?.type === 'listing' && (
+        <ListingDialog
+          product={dialog.product}
+          listing={listings.find((item) => item.productId === dialog.product.id) ?? null}
+          currency={currency}
+          onClose={() => setDialog(null)}
+          onSubmit={async (input: ListingSubmission) => {
+            const { listing, moderation } = await api.submitListing(business.id, input)
+            setListings((current) => [listing, ...current.filter((item) => item.id !== listing.id)])
+            setDialog(null)
+            onNotify(
+              listing.status === 'published' ? 'Annonce publiée sur la marketplace.'
+                : listing.status === 'review' ? 'Annonce en cours de vérification par l’équipe Gilli.'
+                  : moderation === 'unavailable' ? 'Annonce enregistrée : elle sera publiée après vérification.' : 'Annonce enregistrée.',
+              listing.status === 'published' ? 'success' : 'info',
+            )
+          }}
+          onWithdraw={async () => {
+            const current = listings.find((item) => item.productId === dialog.product.id)
+            if (!current) return
+            const withdrawn = await api.withdrawListing(business.id, current.id)
+            setListings((items) => items.map((item) => (item.id === withdrawn.id ? withdrawn : item)))
+            setDialog(null)
+            onNotify('Annonce retirée de la marketplace.', 'success')
+          }}
+        />
       )}
       {business && api && dialog?.type === 'subscription' && (
         <SubscriptionDialog load={() => api.subscription(business.id)} onClose={() => setDialog(null)} />

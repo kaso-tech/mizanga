@@ -1,4 +1,4 @@
-import { Download, Info, LogIn, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, Star, Store, Trash2, X } from 'lucide-react'
+import { Download, Info, LogIn, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, ShoppingBag, Star, Store, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { accountInitial, type AccountView } from '../app/accountView'
 import { Brand } from './Brand'
@@ -122,6 +122,9 @@ export function Sidebar({
         </nav>
 
         <div className="sidebar-foot">
+          <button type="button" className={`nav-item ${activeView === 'marketplace' ? 'is-active' : ''}`} aria-current={activeView === 'marketplace' ? 'page' : undefined} onClick={() => onNavigate('marketplace')}>
+            <ShoppingBag size={16} aria-hidden="true" /> Marketplace
+          </button>
           <button type="button" className={`nav-item ${activeView === 'business' ? 'is-active' : ''}`} aria-current={activeView === 'business' ? 'page' : undefined} onClick={() => onNavigate('business')}>
             <Store size={16} aria-hidden="true" /> Espace Business
           </button>

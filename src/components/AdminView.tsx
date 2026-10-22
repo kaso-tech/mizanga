@@ -1,14 +1,16 @@
-import { BookOpenCheck, ClipboardCheck, Cpu, Flag, LoaderCircle, LockKeyhole, LogOut, type LucideIcon } from 'lucide-react'
+import { BookOpenCheck, ClipboardCheck, Cpu, Flag, LoaderCircle, LockKeyhole, LogOut, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { AiService } from '../domain/services'
 import type { LinguisticPreferences } from '../domain/types'
 import { formatResetTime } from '../services/remoteAiService'
 import { EvaluationView } from './EvaluationView'
+import { ModerationPanel } from './marketplace/ModerationPanel'
 
-type SectionId = 'apercu' | 'reference' | 'evaluation' | 'signalements'
+type SectionId = 'apercu' | 'moderation' | 'reference' | 'evaluation' | 'signalements'
 
 const sections: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
   { id: 'apercu', label: 'Moteur', icon: Cpu },
+  { id: 'moderation', label: 'Modération marketplace', icon: ShieldCheck },
   { id: 'reference', label: 'Référence du mooré', icon: BookOpenCheck },
   { id: 'evaluation', label: 'Évaluation', icon: ClipboardCheck },
   { id: 'signalements', label: 'Signalements', icon: Flag },
@@ -248,7 +250,8 @@ export function AdminView({ aiService, preferences, onNotify }: AdminViewProps) 
             <div className="panel-heading">
               <h2>{current.label}</h2>
             </div>
-            {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && <div className="page-loading" aria-busy="true" />}
+            {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && activeSection !== 'moderation' && <div className="page-loading" aria-busy="true" />}
+            {activeSection === 'moderation' && <ModerationPanel onNotify={onNotify} />}
             {overview && activeSection === 'apercu' && <EnginePanel overview={overview} />}
             {overview && activeSection === 'reference' && <ReferencePanel reference={overview.reference} />}
             {activeSection === 'evaluation' && <EvaluationView aiService={aiService} preferences={preferences} onNotify={onNotify} />}

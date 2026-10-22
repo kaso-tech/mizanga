@@ -5,6 +5,9 @@ import { bearerToken, createTokenVerifier } from './auth/supabase-auth.mjs'
 import { createAssistant } from './business/assistant.mjs'
 import { createBusinessRoutes } from './business/routes.mjs'
 import { createSupabaseBusinessStore } from './business/supabase-store.mjs'
+import { createListingModerator } from './marketplace/moderation.mjs'
+import { createMarketplaceRoutes } from './marketplace/routes.mjs'
+import { createSupabaseMarketplace } from './marketplace/store.mjs'
 import { buildReferenceText, createReferenceLoader, MAX_REFERENCE_CHARS } from './moore-reference.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
@@ -146,6 +149,16 @@ function monitorProvider(ai, onError) {
         throw error
       }
     },
+    ...(ai.generateJson ? {
+      async generateJson(/** @type {Parameters<NonNullable<typeof ai.generateJson>>[0]} */ request) {
+        try {
+          return await /** @type {NonNullable<typeof ai.generateJson>} */ (ai.generateJson)(request)
+        } catch (error) {
+          onError(error, 'modération')
+          throw error
+        }
+      },
+    } : {}),
   }
 }
 
@@ -162,10 +175,12 @@ function monitorProvider(ai, onError) {
  * `auth` : configuration publique de Supabase Auth (server/auth/supabase-auth.mjs) ; absente, pas de comptes.
  * `businessStore` : accès aux données Business (par défaut Supabase, avec le jeton de l’utilisateur).
  * `aiPricing` : prix du moteur pour le coût estimé de l’assistant Business (server/ai/pricing.mjs), 0 par défaut.
- * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing }} config
+ * `marketplace` : données et photos de la marketplace (par défaut Supabase) ; `moderationKey` : clé de
+ * modération (MODERATION_KEY), sans laquelle les annonces attendent une décision de l’administration.
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, rateLimit, aiPricing } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, rateLimit, aiPricing, marketplace, moderationKey } = {}) {
   const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const store = businessStore ?? (auth ? createSupabaseBusinessStore(auth) : null)
   /** Derniers refus du moteur (quota, clé…), pour la console d’administration ; jamais montrés aux utilisateurs. */
@@ -183,7 +198,12 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
   const limit = createRateLimiter(rateLimit)
   const loadReference = createReferenceLoader(referenceDir)
   const assistant = store ? createAssistant({ store, ai, loadReference, pricing: aiPricing }) : null
-  const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant }) : null
+  const market = marketplace ?? (auth ? createSupabaseMarketplace(auth) : null)
+  const marketRoutes = market ? createMarketplaceRoutes({ ...market, moderate: createListingModerator({ ai }), moderationKey: moderationKey || null, readJson, sendJson }) : null
+  const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant, marketplace: marketRoutes }) : null
+  // Marketplace publique : lecture large, signalements limités (10 par heure et par adresse).
+  const marketLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
+  const reportLimit = createRateLimiter({ windowMs: 3_600_000, maxRequests: 10 })
   // Limite propre à l’espace Business, plus large que celle du moteur d’IA (opérations légères).
   const businessLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
   const admin = createAdminAuth({ password: adminPassword })
@@ -217,6 +237,10 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       return sendJson(res, 200, { authenticated: false })
     }
     if (!admin.isAuthenticated(req)) return sendJson(res, 401, { error: 'Connexion administrateur requise.' })
+    if (path.startsWith('/api/admin/moderation') || path.startsWith('/api/admin/sellers/')) {
+      if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })
+      return marketRoutes.handleAdmin(req, res, path)
+    }
     if (path === '/api/admin/overview' && req.method === 'GET') {
       const { reference } = loadReference()
       const sent = buildReferenceText(reference)
@@ -259,6 +283,16 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       const blocked = businessLimit(clientOf(req))
       if (blocked) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blocked))
       return handleBusiness(req, res, path)
+    }
+    if (path.startsWith('/api/marketplace/')) {
+      if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })
+      const isReport = req.method === 'POST' && path.endsWith('/report')
+      const blocked = (isReport ? reportLimit : marketLimit)(clientOf(req))
+      if (blocked) return sendJson(res, 429, errorBody(isReport ? 'Trop de signalements envoyés : réessayez plus tard.' : 'Trop de demandes en peu de temps.', blocked))
+      // Connexion facultative : un signalement garde l’auteur quand il est connecté.
+      const token = bearerToken(req)
+      const user = token && verify ? await verify(token).catch(() => null) : null
+      return marketRoutes.handlePublic(req, res, path, user ? { token, userId: user.id } : null)
     }
     if (path === '/api/me' && req.method === 'GET') {
       // Compte de l’utilisateur, vérifié auprès de Supabase : base de toutes les futures adresses Business.

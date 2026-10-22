@@ -25,6 +25,8 @@ const AdminView = lazy(() => import('../components/AdminView').then((module) => 
 const AboutView = lazy(() => import('../components/AboutView').then((module) => ({ default: module.AboutView })))
 const CollectionView = lazy(() => import('../components/CollectionView').then((module) => ({ default: module.CollectionView })))
 const BusinessView = lazy(() => import('../components/business/BusinessView').then((module) => ({ default: module.BusinessView })))
+const MarketplaceView = lazy(() => import('../components/marketplace/MarketplaceView').then((module) => ({ default: module.MarketplaceView })))
+const TermsView = lazy(() => import('../components/TermsView').then((module) => ({ default: module.TermsView })))
 const AccountDialog = lazy(() => import('../components/AccountDialog').then((module) => ({ default: module.AccountDialog })))
 const FeedbackDialog = lazy(() => import('../components/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })))
 
@@ -36,6 +38,8 @@ const routeByView: Record<AppView, string> = {
   about: '/a-propos',
   admin: '/admin',
   business: '/business',
+  marketplace: '/marketplace',
+  terms: '/conditions',
 }
 
 /** Anciennes adresses conservées pour les liens existants. */
@@ -49,6 +53,8 @@ const titleByView: Record<AppView, string> = {
   about: 'À propos',
   admin: 'Administration',
   business: 'Espace Business',
+  marketplace: 'Marketplace',
+  terms: 'Conditions d’utilisation',
 }
 
 const themeColorByTheme: Record<'light' | 'dark', string> = {
@@ -58,6 +64,8 @@ const themeColorByTheme: Record<'light' | 'dark', string> = {
 
 function getViewFromPath(pathname: string): AppView {
   const normalizedPath = pathname.replace(/\/+$/, '') || '/'
+  // Pages de la marketplace (annonce, vendeur) : la vue lit elle-même la suite de l’adresse.
+  if (normalizedPath.startsWith('/marketplace/')) return 'marketplace'
   const entry = Object.entries(routeByView).find(([, path]) => path === normalizedPath)
   return (entry?.[0] as AppView | undefined) ?? legacyRoutes[normalizedPath] ?? 'chat'
 }
@@ -65,7 +73,8 @@ function getViewFromPath(pathname: string): AppView {
 /** Remplace une adresse inconnue ou non canonique (ex. « /parametres/ ») par celle de la vue affichée. */
 function syncViewFromLocation(): AppView {
   const view = getViewFromPath(window.location.pathname)
-  if (window.location.pathname !== routeByView[view]) window.history.replaceState({}, '', routeByView[view])
+  const keepsSubpath = view === 'marketplace' && window.location.pathname.startsWith('/marketplace')
+  if (!keepsSubpath && window.location.pathname !== routeByView[view]) window.history.replaceState({}, '', routeByView[view])
   return view
 }
 
@@ -144,6 +153,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   const account = useAccount(authConfig, createAuthClient)
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [settingsVisit, setSettingsVisit] = useState(0)
+  const [marketplaceVisit, setMarketplaceVisit] = useState(0)
   const [activeView, setActiveView] = useState<AppView>(syncViewFromLocation)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -250,6 +260,8 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   }
 
   const navigate = (view: AppView) => {
+    // Revenir à l’accueil de la marketplace depuis une annonce : la vue repart de zéro.
+    if (view === 'marketplace') setMarketplaceVisit((visit) => visit + 1)
     const path = routeByView[view]
     if (window.location.pathname !== path) window.history.pushState({}, '', path)
     setActiveView(view)
@@ -511,6 +523,10 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
             onImportConversations={(file) => void importConversations(file)}
           />
         )
+      case 'marketplace':
+        return <MarketplaceView key={marketplaceVisit} onNotify={notify} />
+      case 'terms':
+        return <TermsView />
       case 'business':
         return <BusinessView account={accountView} client={account.client} onSignIn={() => setAccountDialogOpen(true)} onNotify={notify} />
       case 'admin':

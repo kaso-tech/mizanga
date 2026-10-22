@@ -9,6 +9,7 @@ import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApiHandler } from '../server/chat-handler.mjs'
 import { createTestDatabase } from '../supabase/tests/database.mjs'
+import { createPgliteMarketplace } from '../supabase/tests/pglite-marketplace.mjs'
 import { createPgliteBusinessStore } from '../supabase/tests/pglite-store.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -20,6 +21,11 @@ const geminiPort = appPort + 2
 export const LOGIN_CODE = '123456'
 
 const db = await createTestDatabase()
+const MODERATION_KEY = 'cle-de-moderation-des-tests-de-bout-en-bout'
+await db.query('select public.set_moderation_key($1)', [MODERATION_KEY])
+const marketplace = createPgliteMarketplace(db, { photoBaseUrl: '/photos' })
+/** Mot de passe de la console d’administration pendant les tests. */
+export const ADMIN_PASSWORD = 'mot-de-passe-admin-e2e'
 /** Identifiant stable d’un compte de test, dérivé de son adresse. @param {string} email */
 const userIdOf = (email) => {
   const hex = createHash('sha256').update(email).digest('hex')
@@ -70,6 +76,15 @@ createServer(async (req, res) => {
 // Faux Gemini : cite la ligne « Aujourd’hui » des données reçues, en plusieurs fragments.
 createServer(async (req, res) => {
   const payload = JSON.parse((await readBody(req)) || '{}')
+  // Réponse structurée (modération des annonces) : « Douteux » dans le titre → à vérifier.
+  if (payload.generationConfig?.responseMimeType === 'application/json') {
+    const text = payload.contents?.at(-1)?.parts?.at(-1)?.text ?? ''
+    const verdict = text.includes('Douteux') ? { conforme: false, raisons: ['La photo ne correspond pas au titre.'] } : { conforme: true, raisons: [] }
+    return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] } }] }))
+  }
+  if ((req.url ?? '').endsWith(':generateContent')) {
+    return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Conversation de test' }] } }] }))
+  }
   const instructions = payload.systemInstruction?.parts?.[0]?.text ?? ''
   const today = instructions.split('\n').find((/** @type {string} */ line) => line.startsWith('- Aujourd’hui')) ?? 'Bonjour, je suis Gilli.'
   res.writeHead(200, { 'Content-Type': 'text/event-stream' })
@@ -105,6 +120,9 @@ const handler = createApiHandler({
     return email ? ensureUser(email) : null
   },
   businessStore: createPgliteBusinessStore(db),
+  marketplace,
+  moderationKey: MODERATION_KEY,
+  adminPassword: ADMIN_PASSWORD,
   // Pas de limite par visiteur gênante pendant les tests (tous les navigateurs partagent 127.0.0.1).
   rateLimit: { windowMs: 60_000, maxRequests: 1000 },
 })
@@ -113,6 +131,11 @@ const handler = createApiHandler({
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.woff': 'font/woff' }
 createServer(async (req, res) => {
   if ((req.url ?? '').startsWith('/api/')) return void handler(req, res)
+  if ((req.url ?? '').startsWith('/photos/')) {
+    const photo = marketplace.photos.files.get(decodeURIComponent((req.url ?? '').slice('/photos/'.length)))
+    if (!photo) return void res.writeHead(404).end()
+    return void res.writeHead(200, { 'Content-Type': photo.mimeType }).end(photo.bytes)
+  }
   const path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
   try {
     if (path.includes('..') || path.endsWith('/')) throw new Error('page')

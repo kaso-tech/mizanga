@@ -15,10 +15,11 @@ import { BusinessError, isUuid, validateBusinessInput, validateCancelInput, vali
  *   readJson: ReadJson,
  *   sendJson: SendJson,
  *   assistant?: ReturnType<typeof import('./assistant.mjs').createAssistant> | null,
+ *   marketplace?: ReturnType<typeof import('../marketplace/routes.mjs').createMarketplaceRoutes> | null,
  * }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, path: string) => Promise<void>}
  */
-export function createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant = null }) {
+export function createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant = null, marketplace = null }) {
   return async (req, res, path) => {
     try {
       const token = bearerToken(req)
@@ -79,6 +80,12 @@ export function createBusinessRoutes({ store, verify, bearerToken, readJson, sen
       if (collection === 'assistant' && assistant) {
         if (segments.length === 3 && method === 'GET') return sendJson(res, 200, { quota: await assistant.quota(session, businessId) })
         if (segments.length === 3 && method === 'POST') return await assistant.answer(req, res, session, businessId, await readJson(req))
+      }
+      // Marketplace : vitrine et annonces du commerce.
+      if ((collection === 'seller' || collection === 'listings') && marketplace) {
+        const business = (await store.listBusinesses(session)).find((candidate) => candidate.id === businessId)
+        if (!business) throw new BusinessError(403, 'Accès refusé à cette entreprise.')
+        return await marketplace.handleSeller(req, res, session, business, collection, productId, sub)
       }
       throw new BusinessError(404, 'Introuvable.')
     } catch (error) {

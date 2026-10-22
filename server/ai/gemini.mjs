@@ -243,6 +243,33 @@ export async function generateGeminiTitle({ apiKey, model, apiBase = DEFAULT_API
   return sanitizeTitle(raw)
 }
 
+/**
+ * Réponse structurée (JSON conforme à `schema`) à partir d’un texte et d’images, avec le modèle demandé.
+ * Sert aux contrôles automatiques (modération des annonces), jamais aux conversations.
+ * @param {{ apiKey: string, model: string, apiBase?: string, instructions: string, text: string, images?: Array<{ mimeType: string, data: string }>, schema: Record<string, unknown>, signal?: AbortSignal }} options
+ * @returns {Promise<unknown>}
+ */
+export async function generateGeminiJson({ apiKey, model, apiBase = DEFAULT_API_BASE, instructions, text, images = [], schema, signal }) {
+  const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: instructions }] },
+      contents: [{ role: 'user', parts: [...images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.data } })), { text }] }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0 },
+    }),
+    signal,
+  })
+  if (!response.ok) throw await errorForResponse(response, model)
+  const payload = /** @type {{ candidates?: Array<{ content?: { parts?: Array<{ text?: string, thought?: boolean }> } }> }} */ (await response.json())
+  const raw = (payload.candidates?.[0]?.content?.parts ?? []).filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('')
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw new UpstreamError('Réponse du moteur illisible.', 502, undefined, { model, httpStatus: 200, quotas: [], message: 'JSON invalide' })
+  }
+}
+
 /** @param {string} raw */
 export function sanitizeTitle(raw) {
   const title = raw.trim().split(/\r?\n/)[0].replace(/^[#*\s"'«»“”]+|[\s"'«»“”.!?:;…*]+$/g, '').trim()
@@ -263,5 +290,7 @@ export function createGeminiProvider({ apiKey, model = 'gemini-flash-latest', li
     streamReply: ({ tier, ...request }) => streamGeminiReply({ apiKey: apiKey ?? '', model: tier === 'lite' ? liteModel : model, apiBase, ...request }),
     // Les titres passent par le modèle économe pour préserver le quota du modèle principal.
     generateTitle: ({ text, signal }) => generateGeminiTitle({ apiKey: apiKey ?? '', model: liteModel, apiBase, text, signal }),
+    // Contrôles automatiques : modèle économe (quota distinct, coût réduit).
+    generateJson: (request) => generateGeminiJson({ apiKey: apiKey ?? '', model: liteModel, apiBase, ...request }),
   }
 }
