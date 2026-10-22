@@ -5,6 +5,7 @@ import { periodFor, type PeriodPreset } from '../../app/businessPeriods'
 import { formatAmount, formatQuantity, stockLevel, stockValue } from '../../app/businessFormat'
 import type { AuthClient } from '../../services/authService'
 import { createBusinessApi, type Business, type Product } from '../../services/businessApi'
+import { AssistantPanel } from './AssistantPanel'
 import { ExpensesPanel } from './ExpensesPanel'
 import { HistoryDialog } from './HistoryDialog'
 import { MovementDialog } from './MovementDialog'
@@ -25,13 +26,14 @@ const countries: Array<{ code: string; name: string }> = [
   { code: 'TG', name: 'Togo' },
 ]
 
-type Tab = 'products' | 'sales' | 'expenses' | 'results'
+type Tab = 'products' | 'sales' | 'expenses' | 'results' | 'assistant'
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'products', label: 'Produits' },
   { id: 'sales', label: 'Ventes' },
   { id: 'expenses', label: 'Dépenses' },
   { id: 'results', label: 'Résultats' },
+  { id: 'assistant', label: 'Assistant' },
 ]
 
 type DialogState =
@@ -171,7 +173,8 @@ export function BusinessView({ account, client, onSignIn, onNotify }: BusinessVi
           ))}
         </div>
       )}
-      {business && products && api && tab !== 'products' && (() => {
+      {business && api && tab === 'assistant' && <AssistantPanel api={api} business={business} />}
+      {business && products && api && tab !== 'products' && tab !== 'assistant' && (() => {
         const period = periodFor(preset, business.timezone)
         const picker = <PeriodPicker preset={preset} period={period} onChange={setPreset} />
         if (tab === 'sales') return <SalesPanel api={api} business={business} products={products} period={period} picker={picker} onNotify={onNotify} onStockChanged={() => loadProducts(business.id)} />

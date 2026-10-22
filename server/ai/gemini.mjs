@@ -91,7 +91,8 @@ function errorForStatus(status) {
 
 /**
  * @typedef {{ title: string, url: string }} WebSource
- * @typedef {{ text: string } | { sources: WebSource[], searchSuggestionsHtml?: string }} ReplyEvent
+ * @typedef {{ inputTokens: number, outputTokens: number }} TokenUsage
+ * @typedef {{ text: string } | { sources: WebSource[], searchSuggestionsHtml?: string } | { usage: TokenUsage }} ReplyEvent
  */
 
 /**
@@ -111,8 +112,21 @@ export function readGroundingSources(metadata) {
 }
 
 /**
+ * Jetons consommés d’après les métadonnées de Gemini (les « pensées » du modèle sont facturées en sortie).
+ * @param {any} metadata
+ * @returns {TokenUsage}
+ */
+export const readUsage = (metadata) => ({
+  inputTokens: Number(metadata?.promptTokenCount) || 0,
+  outputTokens: (Number(metadata?.candidatesTokenCount) || 0) + (Number(metadata?.thoughtsTokenCount) || 0),
+})
+
+/**
  * Diffuse la réponse de Gemini fragment par fragment, puis, si la recherche web a servi,
- * ses sources et les suggestions de recherche Google (à afficher telles quelles, conditions de Google).
+ * ses sources et les suggestions de recherche Google (à afficher telles quelles, conditions de Google),
+ * et enfin les jetons consommés (`usage`, pour le suivi des coûts ; jamais montré tel quel).
+ * `instructions` remplace les consignes générales de Gilli (assistant Business) ; `webSearch: false`
+ * retire la recherche Google.
  * @param {{
  *   apiKey: string,
  *   model: string,
@@ -120,19 +134,21 @@ export function readGroundingSources(metadata) {
  *   messages: RelayMessage[],
  *   preferences: { responseLanguage?: string, userWritingMode?: string },
  *   reference?: string,
+ *   instructions?: string,
+ *   webSearch?: boolean,
  *   signal?: AbortSignal,
  * }} options
  * @returns {AsyncGenerator<ReplyEvent>}
  */
-export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, reference = '', signal }) {
+export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_BASE, messages, preferences, reference = '', instructions, webSearch = true, signal }) {
   const response = await fetch(`${apiBase}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildSystemInstruction(preferences, reference) }] },
+      systemInstruction: { parts: [{ text: instructions ?? buildSystemInstruction(preferences, reference) }] },
       contents: toGeminiContents(messages),
-      // Recherche Google toujours proposée : le modèle décide seul de l’utiliser selon la demande.
-      tools: [{ google_search: {} }],
+      // Recherche Google proposée au chatbot : le modèle décide seul de l’utiliser selon la demande.
+      ...(webSearch ? { tools: [{ google_search: {} }] } : {}),
     }),
     signal,
   })
@@ -142,6 +158,8 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
   let sources = []
   /** @type {string | undefined} */
   let searchSuggestionsHtml
+  /** @type {TokenUsage | null} */
+  let usage = null
 
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
@@ -157,6 +175,8 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
       const data = event.split(/\r?\n/).filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('')
       if (!data) continue
       const payload = JSON.parse(data)
+      // Chaque fragment répète le total cumulé : le dernier reçu fait foi.
+      if (payload.usageMetadata) usage = readUsage(payload.usageMetadata)
       if (payload.promptFeedback?.blockReason) {
         throw new UpstreamError('Le moteur a refusé de répondre à cette demande.', 422)
       }
@@ -175,6 +195,7 @@ export async function* streamGeminiReply({ apiKey, model, apiBase = DEFAULT_API_
     }
   }
   if (sources.length > 0 || searchSuggestionsHtml) yield { sources, ...(searchSuggestionsHtml ? { searchSuggestionsHtml } : {}) }
+  if (usage) yield { usage }
 }
 
 /**

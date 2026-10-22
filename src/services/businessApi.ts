@@ -119,6 +119,31 @@ export interface Period {
   end: string
 }
 
+export interface AiQuota {
+  used: number
+  limit: number
+  resetsAt: string
+}
+
+/** Chiffres transmis à l’assistant Business (calculés par la base), montrés à l’utilisateur pour vérification. */
+export interface AssistantContext {
+  business: { name: string; currency: string; today: string }
+  periods: Array<{ key: string; label: string; start: string; end: string; summary: Summary }>
+  productSales: Array<{ name: string; unit: string; quantity: number; revenue: number; grossMargin: number }>
+  expensesByCategory: Array<{ category: string; amount: number }>
+  stock: { productCount: number; value: number; listed: number; products: Array<{ name: string; unit: string; quantity: number; salePrice: number; purchasePrice: number; alertThreshold: number; level: string }> }
+}
+
+export interface AssistantMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export type AssistantEvent =
+  | { context: AssistantContext; quota: AiQuota }
+  | { text: string }
+  | { done: true; quota: AiQuota }
+
 /** Erreur dont le message peut être montré tel quel à l’utilisateur. */
 export class BusinessApiError extends Error {
   constructor(readonly userMessage: string, readonly status: number) {
@@ -131,19 +156,23 @@ export type BusinessApi = ReturnType<typeof createBusinessApi>
 
 /** @param getToken renvoie le jeton de connexion courant (renouvelé par Supabase si besoin). */
 export function createBusinessApi(getToken: () => Promise<string | null>) {
-  const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+  const send = async (method: string, path: string, body?: unknown, signal?: AbortSignal) => {
     const token = await getToken()
     if (!token) throw new BusinessApiError('Connectez-vous pour utiliser l’espace Business.', 401)
-    let response: Response
     try {
-      response = await fetch(`/api/business${path}`, {
+      return await fetch(`/api/business${path}`, {
         method,
         headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
       })
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error
       throw new BusinessApiError(navigator.onLine ? 'Le serveur de Gilli est injoignable. Réessayez.' : 'Vous êtes hors connexion. L’espace Business demande le réseau.', 0)
     }
+  }
+  const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+    const response = await send(method, path, body)
     const data = (await response.json().catch(() => null)) as (T & { error?: string }) | null
     if (!response.ok || !data) throw new BusinessApiError(data?.error ?? 'Une erreur est survenue. Réessayez.', response.status)
     return data
@@ -168,5 +197,34 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     recordExpense: async (businessId: string, input: ExpenseInput) => (await request<{ expense: Expense }>('POST', `/${businessId}/expenses`, input)).expense,
     deleteExpense: async (businessId: string, expenseId: string) => { await request<{ deleted: boolean }>('DELETE', `/${businessId}/expenses/${expenseId}`) },
     summary: async (businessId: string, period: Period) => request<{ summary: Summary; products: ProductSales[] }>('GET', `/${businessId}/summary?from=${period.start}&to=${period.end}`),
+    assistantQuota: async (businessId: string) => (await request<{ quota: AiQuota }>('GET', `/${businessId}/assistant`)).quota,
+    /** Pose une question à l’assistant ; la réponse arrive par fragments (`onEvent`). */
+    askAssistant: async (businessId: string, messages: AssistantMessage[], onEvent: (event: AssistantEvent) => void, signal?: AbortSignal) => {
+      const response = await send('POST', `/${businessId}/assistant`, { messages }, signal)
+      if (!response.ok || !response.body) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new BusinessApiError(data?.error ?? 'L’assistant n’a pas pu répondre. Réessayez.', response.status)
+      }
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+      let buffer = ''
+      let finished = false
+      const handle = (line: string) => {
+        if (!line.trim()) return
+        const event = JSON.parse(line) as AssistantEvent | { error: string }
+        if ('error' in event) throw new BusinessApiError(event.error, 502)
+        if ('done' in event) finished = true
+        onEvent(event)
+      }
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += value
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        lines.forEach(handle)
+      }
+      handle(buffer)
+      if (!finished) throw new BusinessApiError('La réponse a été interrompue. Réessayez.', 502)
+    },
   }
 }

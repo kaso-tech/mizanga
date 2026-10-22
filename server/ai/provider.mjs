@@ -8,14 +8,17 @@ import { createGeminiProvider } from './gemini.mjs'
  * @typedef {{ role: 'user' | 'assistant', content: string, attachments?: AiAttachment[] }} AiMessage
  * @typedef {{ responseLanguage?: string, userWritingMode?: string, customInstructions?: string }} AiPreferences
  * @typedef {{ title: string, url: string }} AiSource
- * @typedef {{ text: string } | { sources: AiSource[], searchSuggestionsHtml?: string }} AiReplyEvent
+ * @typedef {{ inputTokens: number, outputTokens: number }} AiUsage
+ * @typedef {{ text: string } | { sources: AiSource[], searchSuggestionsHtml?: string } | { usage: AiUsage }} AiReplyEvent
  *
  * @typedef {object} AiProvider
  * @property {string} name Identifiant du fournisseur (annoncé par /api/health, ex. « gemini »).
  * @property {boolean} configured Vrai si le fournisseur peut répondre (clé présente…).
  * @property {{ standard: string, lite: string }} models Modèles réellement utilisés (console d’administration).
- * @property {(request: { messages: AiMessage[], preferences: AiPreferences, reference?: string, tier?: 'standard' | 'lite', signal?: AbortSignal }) => AsyncGenerator<AiReplyEvent>} streamReply
- *   Réponse diffusée par fragments ; lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
+ * @property {(request: { messages: AiMessage[], preferences: AiPreferences, reference?: string, instructions?: string, webSearch?: boolean, tier?: 'standard' | 'lite', signal?: AbortSignal }) => AsyncGenerator<AiReplyEvent>} streamReply
+ *   Réponse diffusée par fragments, terminée par les jetons consommés (`usage`) quand le fournisseur
+ *   les donne ; `instructions` remplace les consignes générales, `webSearch: false` retire la recherche
+ *   web. Lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
  * @property {(request: { text: string, signal?: AbortSignal }) => Promise<string | null>} generateTitle
  *   Titre court d’une conversation à partir de son premier message.
  */

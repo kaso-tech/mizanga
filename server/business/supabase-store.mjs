@@ -23,13 +23,21 @@ import { BusinessError } from './validate.mjs'
  * @property {(session: BusinessSession, businessId: string, input: ReturnType<typeof import('./validate.mjs').validateExpenseInput>) => Promise<Expense>} recordExpense
  * @property {(session: BusinessSession, businessId: string, expenseId: string) => Promise<void>} deleteExpense
  * @property {(session: BusinessSession, businessId: string, period: Period) => Promise<{ summary: Summary, products: ProductSales[] }>} summary
+ * @property {(session: BusinessSession, businessId: string) => Promise<AiQuota>} aiQuota
+ * @property {(session: BusinessSession, businessId: string) => Promise<string>} beginAiRequest Réserve une question (erreur 429 au-delà de la limite du jour).
+ * @property {(session: BusinessSession, requestId: string, result: AiRequestResult) => Promise<void>} finishAiRequest
  *
  * @typedef {{ start: string, end: string }} Period
  * @typedef {{ id: string, soldAt: string, status: string, totalAmount: number, totalCost: number, customerName: string | null, note: string | null }} Sale
  * @typedef {{ id: string, amount: number, category: string, description: string | null, spentAt: string, createdBy: string }} Expense
  * @typedef {{ revenue: number, costOfGoodsSold: number, grossMargin: number, expenses: number, estimatedResult: number, salesCount: number, cancelledSalesCount: number }} Summary
  * @typedef {{ productId: string, productName: string, unit: string, quantity: number, revenue: number, cost: number, grossMargin: number }} ProductSales
+ * @typedef {{ used: number, limit: number, resetsAt: string }} AiQuota
+ * @typedef {{ status: 'completed' | 'failed', provider: string, model: string, inputTokens: number, outputTokens: number, costMicroUsd: number }} AiRequestResult
  */
+
+/** @param {any} row @returns {AiQuota} */
+export const toAiQuota = (row) => ({ used: Number(row.used), limit: Number(row.daily_limit), resetsAt: new Date(row.resets_at).toISOString() })
 
 /** @param {any} row @returns {Sale} */
 export const toSale = (row) => ({
@@ -116,6 +124,7 @@ export function toBusinessError(httpStatus, body) {
   if (code === 'GL403') return new BusinessError(403, message || 'Accès refusé.')
   if (code === 'GL409' || code === 'GL410') return new BusinessError(409, message)
   if (code === 'GL422') return new BusinessError(422, message)
+  if (code === 'GL429') return new BusinessError(429, message)
   if (code === '42501' || httpStatus === 403) return new BusinessError(403, 'Accès refusé.')
   if (code === '23514' || code === '23502' || code === '22P02') return new BusinessError(422, 'Une des valeurs saisies est invalide.')
   if (code === 'PGRST301' || code === 'PGRST303' || httpStatus === 401) return new BusinessError(401, 'Votre session a expiré : reconnectez-vous.')
@@ -232,6 +241,23 @@ export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { f
         request(session, 'POST', 'rpc/business_product_sales', params),
       ])
       return { summary: toSummary(summaryRows[0]), products: productRows.map(toProductSales) }
+    },
+    async aiQuota(session, businessId) {
+      return toAiQuota((await request(session, 'POST', 'rpc/ai_quota', { p_business_id: businessId }))[0])
+    },
+    async beginAiRequest(session, businessId) {
+      return String(await request(session, 'POST', 'rpc/begin_ai_request', { p_business_id: businessId }))
+    },
+    async finishAiRequest(session, requestId, result) {
+      await request(session, 'POST', 'rpc/finish_ai_request', {
+        p_id: Number(requestId),
+        p_status: result.status,
+        p_provider: result.provider,
+        p_model: result.model,
+        p_input_tokens: result.inputTokens,
+        p_output_tokens: result.outputTokens,
+        p_estimated_cost_micro_usd: result.costMicroUsd,
+      })
     },
   }
 }

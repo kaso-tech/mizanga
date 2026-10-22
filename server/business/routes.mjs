@@ -14,10 +14,11 @@ import { BusinessError, isUuid, validateBusinessInput, validateCancelInput, vali
  *   bearerToken: (req: import('node:http').IncomingMessage) => string,
  *   readJson: ReadJson,
  *   sendJson: SendJson,
+ *   assistant?: ReturnType<typeof import('./assistant.mjs').createAssistant> | null,
  * }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, path: string) => Promise<void>}
  */
-export function createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson }) {
+export function createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant = null }) {
   return async (req, res, path) => {
     try {
       const token = bearerToken(req)
@@ -70,6 +71,11 @@ export function createBusinessRoutes({ store, verify, bearerToken, readJson, sen
       }
       if (collection === 'summary' && segments.length === 3 && method === 'GET') {
         return sendJson(res, 200, await store.summary(session, businessId, period()))
+      }
+      // Assistant Business (étape 5) : consommation du jour, puis questions (réponse diffusée en NDJSON).
+      if (collection === 'assistant' && assistant) {
+        if (segments.length === 3 && method === 'GET') return sendJson(res, 200, { quota: await assistant.quota(session, businessId) })
+        if (segments.length === 3 && method === 'POST') return await assistant.answer(req, res, session, businessId, await readJson(req))
       }
       throw new BusinessError(404, 'Introuvable.')
     } catch (error) {

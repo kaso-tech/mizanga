@@ -2,6 +2,7 @@ import { createAdminAuth } from './admin.mjs'
 import { UpstreamError } from './ai/errors.mjs'
 import { createAiProvider } from './ai/provider.mjs'
 import { bearerToken, createTokenVerifier } from './auth/supabase-auth.mjs'
+import { createAssistant } from './business/assistant.mjs'
 import { createBusinessRoutes } from './business/routes.mjs'
 import { createSupabaseBusinessStore } from './business/supabase-store.mjs'
 import { buildReferenceText, createReferenceLoader, MAX_REFERENCE_CHARS } from './moore-reference.mjs'
@@ -133,18 +134,20 @@ const clientOf = (req) => req.socket.remoteAddress || 'inconnu'
  * `version` : version déployée (server/build-info.mjs), annoncée par /api/health.
  * `auth` : configuration publique de Supabase Auth (server/auth/supabase-auth.mjs) ; absente, pas de comptes.
  * `businessStore` : accès aux données Business (par défaut Supabase, avec le jeton de l’utilisateur).
- * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, rateLimit?: { windowMs: number, maxRequests: number } }} config
+ * `aiPricing` : prix du moteur pour le coût estimé de l’assistant Business (server/ai/pricing.mjs), 0 par défaut.
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, rateLimit } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, rateLimit, aiPricing } = {}) {
   const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const store = businessStore ?? (auth ? createSupabaseBusinessStore(auth) : null)
-  const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson }) : null
-  // Limite propre à l’espace Business, plus large que celle du moteur d’IA (opérations légères).
-  const businessLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
   const ai = provider ?? createAiProvider({ provider: aiProvider, apiKey, model, liteModel, apiBase })
   const limit = createRateLimiter(rateLimit)
   const loadReference = createReferenceLoader(referenceDir)
+  const assistant = store ? createAssistant({ store, ai, loadReference, pricing: aiPricing }) : null
+  const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant }) : null
+  // Limite propre à l’espace Business, plus large que celle du moteur d’IA (opérations légères).
+  const businessLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
   const admin = createAdminAuth({ password: adminPassword })
 
   /**
@@ -273,6 +276,8 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
           res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
           started = true
         }
+        // Les jetons consommés servent au suivi des coûts côté serveur : le navigateur ne les reçoit pas.
+        if ('usage' in event) continue
         res.write(`${JSON.stringify(event)}\n`)
       }
       if (!started) res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' })

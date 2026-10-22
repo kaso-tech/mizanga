@@ -10,6 +10,7 @@ import { brotliCompress, constants as zlibConstants, gzip } from 'node:zlib'
 import { MIN_ADMIN_PASSWORD_LENGTH } from './admin.mjs'
 import { readAuthConfig } from './auth/supabase-auth.mjs'
 import { readBuildInfo } from './build-info.mjs'
+import { readPricing } from './ai/pricing.mjs'
 import { createApiHandler } from './chat-handler.mjs'
 
 const distDir = resolve(fileURLToPath(new URL('../dist', import.meta.url)))
@@ -98,6 +99,7 @@ async function serveStatic(req, res) {
 const api = createApiHandler({
   aiProvider: process.env.AI_PROVIDER || undefined,
   apiKey: process.env.GEMINI_API_KEY,
+  aiPricing: readPricing(process.env.AI_PRICE_USD_PER_MILLION),
   model: process.env.GEMINI_MODEL || undefined,
   liteModel: process.env.GEMINI_LITE_MODEL || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { readPricing } from './server/ai/pricing.mjs'
 import { readAuthConfig } from './server/auth/supabase-auth.mjs'
 import { computeBuildInfo } from './server/build-info.mjs'
 import { createApiHandler } from './server/chat-handler.mjs'
@@ -15,7 +16,7 @@ const buildInfo = computeBuildInfo(fileURLToPath(new URL('.', import.meta.url)))
 function gilliApi(): Plugin {
   const handlerFor = (mode: string, root: string) => {
     const env = { ...loadEnv(mode, root, ''), ...process.env }
-    return createApiHandler({ aiProvider: env.AI_PROVIDER || undefined, apiKey: env.GEMINI_API_KEY || undefined, model: env.GEMINI_MODEL || undefined, liteModel: env.GEMINI_LITE_MODEL || undefined, adminPassword: env.ADMIN_PASSWORD || undefined, apiBase: env.GEMINI_API_BASE || undefined, version: buildInfo, auth: readAuthConfig(env) })
+    return createApiHandler({ aiProvider: env.AI_PROVIDER || undefined, apiKey: env.GEMINI_API_KEY || undefined, aiPricing: readPricing(env.AI_PRICE_USD_PER_MILLION), model: env.GEMINI_MODEL || undefined, liteModel: env.GEMINI_LITE_MODEL || undefined, adminPassword: env.ADMIN_PASSWORD || undefined, apiBase: env.GEMINI_API_BASE || undefined, version: buildInfo, auth: readAuthConfig(env) })
   }
   return {
     name: 'gilli-api',

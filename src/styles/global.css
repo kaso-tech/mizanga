@@ -971,8 +971,28 @@ button.account-chip:hover { opacity: .9; }
 .results-table th:first-child { text-align: left; white-space: normal; }
 .results-table thead th { white-space: normal; vertical-align: bottom; color: var(--muted-foreground); font-weight: 500; font-size: 13px; }
 .results-table .is-negative { color: var(--destructive, #b42318); }
+.business-tabs { overflow-x: auto; scrollbar-width: none; }
+.business-tabs button { white-space: nowrap; }
+.assistant-panel .settings-callout { margin: 0; }
+.assistant-suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.assistant-suggestions .secondary-button { min-height: 44px; padding: 10px 14px; text-align: left; white-space: normal; line-height: 1.4; }
+.assistant-thread { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.assistant-turn { min-width: 0; padding: 12px 14px; border-radius: 14px; line-height: 1.55; }
+.assistant-turn p { margin: 0; white-space: pre-wrap; }
+.assistant-turn.is-user { justify-self: end; max-width: 85%; color: var(--primary-foreground, #fff); background: var(--primary); }
+.assistant-turn.is-assistant { border: 1px solid var(--border); background: var(--card); }
+.assistant-typing { color: var(--muted-foreground); }
+.assistant-context { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted-foreground); }
+.assistant-context summary { cursor: pointer; font-weight: 500; color: var(--foreground); }
+.assistant-context p { margin: 8px 0 0; white-space: normal; }
+.assistant-composer { display: flex; align-items: flex-end; gap: 8px; }
+.assistant-composer textarea { flex: 1; min-width: 0; min-height: 48px; max-height: 160px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--foreground); font: inherit; font-size: 16px; resize: vertical; }
+.assistant-composer .icon-only { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; }
+.assistant-composer .icon-button { width: 48px; height: 48px; }
+.assistant-reset { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
 @media (max-width: 560px) {
   .field-pair { grid-template-columns: 1fr; }
+  .business-tabs button { padding: 0 2px; font-size: 13px; }
   .results-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .results-grid dd { font-size: 17px; }
   .result-final { grid-column: 1 / -1; }

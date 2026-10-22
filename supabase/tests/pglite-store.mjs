@@ -1,7 +1,7 @@
 // Accès aux données Business pour les tests : mêmes requêtes que l’API REST de Supabase, exécutées sur
 // PGlite avec l’identité de l’utilisateur (rôle authenticated), donc avec les règles RLS et les fonctions
 // contrôlées réelles.
-import { MOVEMENT_COLUMNS, PRODUCT_COLUMNS, toBusiness, toBusinessError, toExpense, toMovement, toProduct, toProductSales, toSale, toSummary } from '../../server/business/supabase-store.mjs'
+import { MOVEMENT_COLUMNS, PRODUCT_COLUMNS, toBusiness, toBusinessError, toExpense, toMovement, toProduct, toAiQuota, toProductSales, toSale, toSummary } from '../../server/business/supabase-store.mjs'
 import { BusinessError } from '../../server/business/validate.mjs'
 import { asUser } from './database.mjs'
 
@@ -77,6 +77,15 @@ export function createPgliteBusinessStore(db) {
       const [summaryRow] = await query(userId, 'select * from public.business_summary($1, $2, $3)', params)
       const productRows = await query(userId, 'select * from public.business_product_sales($1, $2, $3)', params)
       return { summary: toSummary(summaryRow), products: productRows.map(toProductSales) }
+    },
+    async aiQuota({ userId }, businessId) {
+      return toAiQuota((await query(userId, 'select * from public.ai_quota($1)', [businessId]))[0])
+    },
+    async beginAiRequest({ userId }, businessId) {
+      return String((await query(userId, 'select public.begin_ai_request($1) as id', [businessId]))[0].id)
+    },
+    async finishAiRequest({ userId }, requestId, result) {
+      await query(userId, 'select public.finish_ai_request($1, $2, $3, $4, $5, $6, $7)', [requestId, result.status, result.provider, result.model, result.inputTokens, result.outputTokens, result.costMicroUsd])
     },
   }
 }

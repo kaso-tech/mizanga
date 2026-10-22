@@ -39,6 +39,8 @@ describe('service IA centralisé', () => {
         calls.push({ tier: request.tier, messages: request.messages, hasSignal: Boolean(request.signal) })
         yield { text: 'Réponse ' }
         yield { text: 'remplaçable' }
+        // Jetons consommés : gardés par le serveur pour le suivi des coûts, jamais envoyés au navigateur.
+        yield { usage: { inputTokens: 10, outputTokens: 2 } }
       },
       async generateTitle({ text }) {
         return `Titre : ${text}`
