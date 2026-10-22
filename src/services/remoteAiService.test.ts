@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiServiceError } from '../domain/services'
 import { defaultPreferences } from '../domain/types'
-import { createRemoteAiService, detectAiService, formatResetTime, selectHistory } from './remoteAiService'
+import { createRemoteAiService, detectAiService, detectServer, formatResetTime, selectHistory } from './remoteAiService'
 import { demoAiService } from './demoAiService'
 
 const request = {
@@ -136,5 +136,16 @@ describe('remoteAiService', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'La limite d’utilisation gratuite du moteur est atteinte.', code: 'quota' }, { status: 429 })))
     const error = await collect().catch((caught: unknown) => caught)
     expect((error as AiServiceError).code).toBe('quota')
+  })
+
+  it('transmet la configuration publique des comptes annoncée par le serveur', async () => {
+    const auth = { supabaseUrl: 'https://projet.supabase.co', publishableKey: 'sb_publishable_test' }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', liteModel: true, auth })))
+    expect((await detectServer()).authConfig).toEqual(auth)
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'gemini', auth: { supabaseUrl: 'javascript:alert(1)', publishableKey: 'x' } })))
+    expect((await detectServer()).authConfig).toBeUndefined()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'demo' })))
+    expect((await detectServer()).authConfig).toBeUndefined()
   })
 })

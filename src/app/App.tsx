@@ -7,6 +7,7 @@ import { Sidebar } from '../components/Sidebar'
 import type { AiService } from '../domain/services'
 import { responseLanguageLabels } from '../data/content'
 import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
+import type { AuthClientFactory, AuthConfig } from '../services/authService'
 import { demoAiService } from '../services/demoAiService'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS, MAX_MESSAGE_CHARS } from '../services/remoteAiService'
 import { prepareAttachments } from './attachments'
@@ -14,6 +15,7 @@ import { createBackup, readBackup } from './conversationStorage'
 import { downloadFile } from './exportConversation'
 import { addSavedPrompt, loadSavedPrompts, storeSavedPrompts, type SavedPrompt } from './savedPrompts'
 import { isSpeechSupported, speak, speechRates, stopSpeaking } from './speech'
+import { useAccount } from './useAccount'
 import { useConversation } from './useConversation'
 
 // Pages secondaires chargées à la demande : l’accueil s’affiche plus vite sur réseau mobile.
@@ -22,6 +24,7 @@ const SettingsView = lazy(() => import('../components/SettingsView').then((modul
 const AdminView = lazy(() => import('../components/AdminView').then((module) => ({ default: module.AdminView })))
 const AboutView = lazy(() => import('../components/AboutView').then((module) => ({ default: module.AboutView })))
 const CollectionView = lazy(() => import('../components/CollectionView').then((module) => ({ default: module.CollectionView })))
+const AccountDialog = lazy(() => import('../components/AccountDialog').then((module) => ({ default: module.AccountDialog })))
 const FeedbackDialog = lazy(() => import('../components/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })))
 
 const routeByView: Record<AppView, string> = {
@@ -128,9 +131,16 @@ const readTextFile = (file: File) => new Promise<string>((resolve, reject) => {
 interface AppProps {
   /** Fournisseur d’IA injecté : remplacer l’adaptateur de démonstration ne touche pas l’interface. */
   aiService?: AiService
+  /** Accès à Supabase Auth annoncé par le serveur ; absent, les comptes sont indisponibles. */
+  authConfig?: AuthConfig
+  /** Création du client d’authentification (remplaçable dans les tests). */
+  createAuthClient?: AuthClientFactory
 }
 
-export function App({ aiService = demoAiService }: AppProps) {
+export function App({ aiService = demoAiService, authConfig, createAuthClient }: AppProps) {
+  const account = useAccount(authConfig, createAuthClient)
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false)
+  const [settingsVisit, setSettingsVisit] = useState(0)
   const [activeView, setActiveView] = useState<AppView>(syncViewFromLocation)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -207,6 +217,25 @@ export function App({ aiService = demoAiService }: AppProps) {
     setToast({ message, tone })
     if (toastTimer.current) window.clearTimeout(toastTimer.current)
     toastTimer.current = window.setTimeout(() => setToast(undefined), 4600)
+  }
+
+  const accountView = { status: account.status, email: account.user?.email ?? null }
+
+  /** Ouvre Paramètres › Compte (remonte la page pour afficher le bon onglet). */
+  const openAccountSettings = () => {
+    window.history.pushState({}, '', `${routeByView.settings}#compte`)
+    setActiveView('settings')
+    setSettingsVisit((visit) => visit + 1)
+    setDrawerOpen(false)
+  }
+
+  const signOut = async () => {
+    try {
+      await account.client?.signOut()
+      notify('Vous êtes déconnecté.', 'success')
+    } catch {
+      notify('La déconnexion a échoué. Réessayez.')
+    }
   }
 
   const navigate = (view: AppView) => {
@@ -447,7 +476,11 @@ export function App({ aiService = demoAiService }: AppProps) {
       case 'settings':
         return (
           <SettingsView
+            key={settingsVisit}
             preferences={preferences}
+            account={accountView}
+            onSignIn={() => setAccountDialogOpen(true)}
+            onSignOut={() => void signOut()}
             engine={{ label: aiService.label, isDemonstration: aiService.isDemonstration, offersLiteModel: aiService.offersLiteModel }}
             conversationCount={conversation.conversations.length}
             onChange={updatePreferences}
@@ -514,6 +547,9 @@ export function App({ aiService = demoAiService }: AppProps) {
         onRenameConversation={conversation.rename}
         onToggleFavorite={conversation.toggleFavorite}
         onPrintConversation={printConversation}
+        account={accountView}
+        onSignIn={() => { setDrawerOpen(false); setAccountDialogOpen(true) }}
+        onOpenAccount={openAccountSettings}
       />
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header
@@ -524,12 +560,27 @@ export function App({ aiService = demoAiService }: AppProps) {
           onToggleSidebar={toggleSidebar}
           onModelTierChange={(modelTier) => updatePreferences({ modelTier })}
           onOpenSettings={() => navigate('settings')}
+          account={accountView}
+          onSignIn={() => setAccountDialogOpen(true)}
+          onOpenAccount={openAccountSettings}
         />
         <div className="content-scroll"><div className="content-frame"><Suspense fallback={<div className="page-loading" aria-busy="true" />}>{renderView()}</Suspense></div></div>
         {activeView === 'chat' && !isEmptyChat && (
           <div className="composer-zone">{composer}</div>
         )}
       </main>
+      {accountDialogOpen && account.client && (
+        <Suspense fallback={null}>
+          <AccountDialog
+            client={account.client}
+            onClose={() => setAccountDialogOpen(false)}
+            onSignedIn={() => {
+              setAccountDialogOpen(false)
+              notify('Vous êtes connecté.', 'success')
+            }}
+          />
+        </Suspense>
+      )}
       {reportedMessage && (
         <Suspense fallback={null}>
         <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} initialPassage={reportedPassage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />

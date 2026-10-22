@@ -85,6 +85,7 @@ Navigateur ──/api/chat──▶ serveur Gilli (server/) ──▶ API Gemini
 
 | Variable | Rôle |
 | --- | --- |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | Comptes (Supabase Auth) : adresse du projet et clé **publique**. Une clé secrète (service_role) est refusée au démarrage. Absentes : pas de comptes. |
 | `AI_PROVIDER` | Fournisseur d’IA (défaut : `gemini`). Une valeur inconnue empêche le démarrage. |
 | `GEMINI_API_KEY` | Clé de l’API Gemini. Absente : mode démonstration. |
 | `GEMINI_MODEL` | Modèle standard (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
@@ -110,7 +111,8 @@ Le schéma est dans `supabase/migrations/` : profils, entreprises et membres (pr
 
 - **Sécurité :** chaque table a des règles RLS (un commerçant ne voit et ne modifie que les données de ses entreprises) et des droits SQL limités par colonne. La quantité en stock, les ventes et les mouvements ne s’écrivent qu’à travers des fonctions contrôlées ; la consommation IA et les abonnements, que par le serveur.
 - **Tests :** `supabase/tests/` applique les migrations à une vraie base PostgreSQL en mémoire (PGlite), avec une simulation de ce que fournit Supabase (rôles, `auth.uid()`, droits par défaut), et vérifie l’isolement entre commerçants. Ils tournent avec `pnpm test` et dans la CI.
-- **Pas encore branché :** l’application n’utilise pas encore la base ; la connexion (e-mail, puis Google) arrive avec le projet Supabase de développement.
+- **Comptes :** connexion sans mot de passe par un code reçu par e-mail (Supabase Auth, bibliothèque chargée après l’affichage). Le navigateur se connecte à Supabase avec la clé publique ; le serveur vérifie chaque jeton auprès de Supabase (`/api/me`, base des futures adresses Business). Le chatbot reste utilisable sans compte. Connexion Google : à venir.
+- **Pas encore branché :** les données Business ne sont pas encore lues ni écrites par l’application.
 
 ## Routes
 

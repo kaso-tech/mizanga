@@ -5,6 +5,7 @@ import { act } from 'react'
 import { AiServiceError, type AiService } from '../domain/services'
 import { App } from './App'
 import { createBackup } from './conversationStorage'
+import { AuthError, type AccountUser, type AuthClient } from '../services/authService'
 
 const instantService: AiService = {
   isDemonstration: true,
@@ -330,5 +331,50 @@ describe('App', () => {
     renderApp()
     expect(screen.queryByRole('combobox', { name: 'Modèle' })).not.toBeInTheDocument()
     expect(screen.getByText('Démonstration', { selector: '.model-badge' })).toBeInTheDocument()
+  })
+
+  it('connecte un utilisateur avec un code reçu par e-mail, puis le déconnecte', async () => {
+    let user: AccountUser | null = null
+    const listeners = new Set<(user: AccountUser | null) => void>()
+    const sent: string[] = []
+    const client: AuthClient = {
+      getUser: async () => user,
+      onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
+      sendCode: async (email) => { sent.push(email) },
+      verifyCode: async (email, code) => {
+        if (code !== '123456') throw new AuthError('Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.')
+        user = { id: 'u1', email }
+        listeners.forEach((listener) => listener(user))
+      },
+      signOut: async () => { user = null; listeners.forEach((listener) => listener(null)) },
+      accessToken: async () => (user ? 'jeton' : null),
+    }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={instantService} authConfig={{ supabaseUrl: 'https://projet.supabase.co', publishableKey: 'sb_publishable_test' }} createAuthClient={async () => client} />)
+
+    // L’en-tête et le menu latéral proposent tous deux la connexion, une fois la session lue.
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Se connecter' })).toHaveLength(2))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Se connecter' })[1])
+    const dialog = await screen.findByRole('dialog', { name: 'Se connecter à Gilli' })
+    await userEvent.type(within(dialog).getByLabelText('Adresse e-mail'), 'awa@example.bf{Enter}')
+    expect(sent).toEqual(['awa@example.bf'])
+    const codeField = await within(dialog).findByLabelText('Code reçu par e-mail')
+    await userEvent.type(codeField, '000000{Enter}')
+    expect(await within(dialog).findByText(/Code incorrect ou expiré/)).toBeInTheDocument()
+    await userEvent.clear(codeField)
+    await userEvent.type(codeField, '123 456{Enter}')
+
+    expect(await screen.findByText('Vous êtes connecté.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Se connecter à Gilli' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Compte : awa@example.bf' }))
+    expect(await screen.findByText('awa@example.bf', { selector: '.setting-label' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }))
+    expect(await screen.findByText('Vous êtes déconnecté.')).toBeInTheDocument()
+    expect(screen.getByText('Invité')).toBeInTheDocument()
+  })
+
+  it('laisse la connexion indisponible quand les comptes ne sont pas configurés', () => {
+    renderApp()
+    expect(screen.getByRole('button', { name: 'Connexion (bientôt disponible)' })).toBeDisabled()
   })
 })

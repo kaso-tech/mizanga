@@ -1,4 +1,5 @@
 import { ChevronDown, PanelLeft, Settings, UserRound } from 'lucide-react'
+import { accountInitial, type AccountView } from '../app/accountView'
 import type { ModelTier } from '../domain/types'
 
 interface HeaderProps {
@@ -10,6 +11,9 @@ interface HeaderProps {
   onToggleSidebar: () => void
   onModelTierChange: (modelTier: ModelTier) => void
   onOpenSettings: () => void
+  account: AccountView
+  onSignIn: () => void
+  onOpenAccount: () => void
 }
 
 const modelLabels: Record<ModelTier, string> = {
@@ -25,6 +29,9 @@ export function Header({
   onToggleSidebar,
   onModelTierChange,
   onOpenSettings,
+  account,
+  onSignIn,
+  onOpenAccount,
 }: HeaderProps) {
   return (
     <header className="topbar">
@@ -57,9 +64,22 @@ export function Header({
         <button className="icon-button" type="button" aria-label="Paramètres" title="Paramètres" onClick={onOpenSettings}>
           <Settings size={20} />
         </button>
-        <button className="icon-button" type="button" disabled aria-label="Connexion (bientôt disponible)" title="Connexion — bientôt disponible">
-          <UserRound size={20} />
-        </button>
+        {account.status === 'signedIn' ? (
+          <button className="account-chip" type="button" aria-label={`Compte : ${account.email ?? 'connecté'}`} title={account.email ?? 'Compte'} onClick={onOpenAccount}>
+            {accountInitial(account.email)}
+          </button>
+        ) : (
+          <button
+            className="icon-button"
+            type="button"
+            disabled={account.status !== 'signedOut'}
+            aria-label={account.status === 'unavailable' ? 'Connexion (bientôt disponible)' : 'Se connecter'}
+            title={account.status === 'unavailable' ? 'Connexion — bientôt disponible' : 'Se connecter'}
+            onClick={onSignIn}
+          >
+            <UserRound size={20} />
+          </button>
+        )}
       </div>
     </header>
   )

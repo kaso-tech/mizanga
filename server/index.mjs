@@ -1,5 +1,5 @@
 // Serveur de production : sert le site compilé (dist/) et l’API /api/*.
-// Usage : `pnpm build && pnpm start` (variables : PORT, AI_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_PASSWORD).
+// Usage : `pnpm build && pnpm start` (variables : PORT, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, AI_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_PASSWORD).
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { brotliCompress, constants as zlibConstants, gzip } from 'node:zlib'
 import { MIN_ADMIN_PASSWORD_LENGTH } from './admin.mjs'
+import { readAuthConfig } from './auth/supabase-auth.mjs'
 import { readBuildInfo } from './build-info.mjs'
 import { createApiHandler } from './chat-handler.mjs'
 
@@ -102,6 +103,8 @@ const api = createApiHandler({
   adminPassword: process.env.ADMIN_PASSWORD || undefined,
   apiBase: process.env.GEMINI_API_BASE || undefined,
   version: readBuildInfo(distDir) ?? undefined,
+  // Configuration invalide (clé secrète, adresse incorrecte) : le serveur refuse de démarrer.
+  auth: readAuthConfig(process.env),
 })
 
 createServer((req, res) => {

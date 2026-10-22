@@ -1,5 +1,6 @@
 import { Download, Info, LogIn, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { accountInitial, type AccountView } from '../app/accountView'
 import { Brand } from './Brand'
 import { downloadConversation } from '../app/exportConversation'
 import type { AppView, Conversation } from '../domain/types'
@@ -19,6 +20,9 @@ interface SidebarProps {
   onRenameConversation: (conversationId: string, title: string) => void
   onToggleFavorite: (conversationId: string) => void
   onPrintConversation: (conversationId: string) => void
+  account: AccountView
+  onSignIn: () => void
+  onOpenAccount: () => void
 }
 
 export function Sidebar({
@@ -35,6 +39,9 @@ export function Sidebar({
   onRenameConversation,
   onToggleFavorite,
   onPrintConversation,
+  account,
+  onSignIn,
+  onOpenAccount,
 }: SidebarProps) {
   const [query, setQuery] = useState('')
   const [onlyFavorites, setOnlyFavorites] = useState(false)
@@ -121,10 +128,17 @@ export function Sidebar({
           <button type="button" className={`nav-item ${activeView === 'about' ? 'is-active' : ''}`} onClick={() => onNavigate('about')}>
             <Info size={16} aria-hidden="true" /> À propos du projet
           </button>
-          <button type="button" className="nav-item" disabled>
-            <LogIn size={16} aria-hidden="true" /> Connexion
-            <span className="soon-badge">Bientôt</span>
-          </button>
+          {account.status === 'signedIn' ? (
+            <button type="button" className="nav-item account-nav" onClick={onOpenAccount}>
+              <span className="account-chip is-small" aria-hidden="true">{accountInitial(account.email)}</span>
+              <span className="account-nav-email">{account.email ?? 'Mon compte'}</span>
+            </button>
+          ) : (
+            <button type="button" className="nav-item" disabled={account.status !== 'signedOut'} onClick={onSignIn}>
+              <LogIn size={16} aria-hidden="true" /> {account.status === 'unavailable' ? 'Connexion' : 'Se connecter'}
+              {account.status === 'unavailable' && <span className="soon-badge">Bientôt</span>}
+            </button>
+          )}
         </div>
       </aside>
     </>

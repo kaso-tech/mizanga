@@ -1,5 +1,6 @@
 import { AudioLines, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, UserRound, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
+import { accountInitial, type AccountView } from '../app/accountView'
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
 import { MAX_PROMPT_TITLE_CHARS, MAX_SAVED_PROMPTS, type SavedPrompt } from '../app/savedPrompts'
 import { isSpeechSupported, listVoices, speak, speechRates, subscribeVoices } from '../app/speech'
@@ -240,6 +241,9 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
 
 interface SettingsViewProps {
   preferences: LinguisticPreferences
+  account: AccountView
+  onSignIn: () => void
+  onSignOut: () => void
   engine: { label: string; isDemonstration: boolean; offersLiteModel?: boolean }
   conversationCount: number
   onChange: (changes: Partial<LinguisticPreferences>) => void
@@ -252,7 +256,7 @@ interface SettingsViewProps {
   onDeletePrompt: (id: string) => void
 }
 
-export function SettingsView({ preferences, engine, conversationCount, onChange, onResetPreferences, onClearConversations, onExportConversations, onImportConversations, savedPrompts, onAddPrompt, onDeletePrompt }: SettingsViewProps) {
+export function SettingsView({ preferences, account, onSignIn, onSignOut, engine, conversationCount, onChange, onResetPreferences, onClearConversations, onExportConversations, onImportConversations, savedPrompts, onAddPrompt, onDeletePrompt }: SettingsViewProps) {
   const importInputRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection)
   const [confirmingClear, setConfirmingClear] = useState(false)
@@ -464,12 +468,16 @@ export function SettingsView({ preferences, engine, conversationCount, onChange,
           {activeSection === 'compte' && (
             <div className="setting-group">
               <div className="account-card">
-                <span className="account-avatar" aria-hidden="true"><UserRound size={20} /></span>
+                {account.status === 'signedIn'
+                  ? <span className="account-chip" aria-hidden="true">{accountInitial(account.email)}</span>
+                  : <span className="account-avatar" aria-hidden="true"><UserRound size={20} /></span>}
                 <div className="setting-text">
-                  <p className="setting-label">Invité</p>
-                  <p className="setting-description">Non connecté</p>
+                  <p className="setting-label">{account.status === 'signedIn' ? (account.email ?? 'Compte connecté') : 'Invité'}</p>
+                  <p className="setting-description">{account.status === 'signedIn' ? 'Connecté' : account.status === 'loading' ? 'Vérification…' : 'Non connecté'}</p>
                 </div>
-                <button type="button" className="secondary-button" disabled>Se connecter</button>
+                {account.status === 'signedIn'
+                  ? <button type="button" className="secondary-button" onClick={onSignOut}>Se déconnecter</button>
+                  : <button type="button" className="secondary-button" disabled={account.status !== 'signedOut'} onClick={onSignIn}>Se connecter</button>}
               </div>
               <SettingRow label="Synchronisation" description={<span className="soon-badge">Bientôt</span>}>
                 <SoonSwitch label="Synchronisation" />

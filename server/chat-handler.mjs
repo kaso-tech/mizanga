@@ -1,6 +1,7 @@
 import { createAdminAuth } from './admin.mjs'
 import { UpstreamError } from './ai/errors.mjs'
 import { createAiProvider } from './ai/provider.mjs'
+import { bearerToken, createTokenVerifier } from './auth/supabase-auth.mjs'
 import { buildReferenceText, createReferenceLoader, MAX_REFERENCE_CHARS } from './moore-reference.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
@@ -128,10 +129,12 @@ const clientOf = (req) => req.socket.remoteAddress || 'inconnu'
  * `referenceDir` : dossier de la référence du mooré (par défaut server/knowledge/moore).
  * `adminPassword` : mot de passe de la console d’administration (/admin) ; absent, la console est fermée.
  * `version` : version déployée (server/build-info.mjs), annoncée par /api/health.
- * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, rateLimit?: { windowMs: number, maxRequests: number } }} config
+ * `auth` : configuration publique de Supabase Auth (server/auth/supabase-auth.mjs) ; absente, pas de comptes.
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, rateLimit?: { windowMs: number, maxRequests: number } }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, rateLimit } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, rateLimit } = {}) {
+  const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const ai = provider ?? createAiProvider({ provider: aiProvider, apiKey, model, liteModel, apiBase })
   const limit = createRateLimiter(rateLimit)
   const loadReference = createReferenceLoader(referenceDir)
@@ -194,7 +197,23 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
     if (path === '/api/health' && req.method === 'GET') {
       // Public : seulement ce dont l’interface a besoin. Les noms des modèles et l’état de la
       // référence du mooré sont réservés à la console d’administration.
-      return sendJson(res, 200, { engine: ai.configured ? ai.name : 'demo', liteModel: Boolean(ai.configured && ai.models.lite), ...(version ? { version } : {}) })
+      return sendJson(res, 200, {
+        engine: ai.configured ? ai.name : 'demo',
+        liteModel: Boolean(ai.configured && ai.models.lite),
+        ...(version ? { version } : {}),
+        // Adresse et clé publique de Supabase : faites pour le navigateur (la sécurité repose sur la RLS).
+        ...(auth ? { auth: { supabaseUrl: auth.supabaseUrl, publishableKey: auth.publishableKey } } : {}),
+      })
+    }
+    if (path === '/api/me' && req.method === 'GET') {
+      // Compte de l’utilisateur, vérifié auprès de Supabase : base de toutes les futures adresses Business.
+      if (!verify) return sendJson(res, 503, { error: 'Les comptes ne sont pas configurés sur ce serveur.' })
+      try {
+        const user = await verify(bearerToken(req))
+        return user ? sendJson(res, 200, { user }) : sendJson(res, 401, { error: 'Connexion requise.' })
+      } catch (error) {
+        return sendJson(res, 503, { error: /** @type {Error} */ (error).message })
+      }
     }
     if (path.startsWith('/api/admin/')) return handleAdmin(req, res, path)
     if (path !== '/api/chat' && path !== '/api/title') {

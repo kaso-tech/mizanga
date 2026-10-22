@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useModalFocus } from '../app/useModalFocus'
 import { errorTypeLabels } from '../data/content'
 import type { ChatMessage, LinguisticErrorType, LinguisticFeedback } from '../domain/types'
 
@@ -10,46 +11,11 @@ interface FeedbackDialogProps {
   onSubmit: (feedback: LinguisticFeedback) => void
 }
 
-const focusableSelector = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
-
 /** Le parent remonte ce composant (clé) à chaque ouverture : le formulaire repart toujours vide. */
 export function FeedbackDialog({ message, initialPassage = '', onClose, onSubmit }: FeedbackDialogProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const firstFieldRef = useRef<HTMLInputElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
-
-  useEffect(() => {
-    if (!message) return
-    const returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    firstFieldRef.current?.focus()
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCloseRef.current()
-        return
-      }
-      if (event.key !== 'Tab' || !dialogRef.current) return
-      // Garde le focus dans la fenêtre modale.
-      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector))
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && (document.activeElement === first || !dialogRef.current.contains(document.activeElement))) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      if (returnFocusTo?.isConnected) returnFocusTo.focus()
-    }
-  }, [message])
+  useModalFocus(dialogRef, firstFieldRef, onClose, Boolean(message))
 
   const [selectedPassage, setSelectedPassage] = useState(initialPassage)
   const [errorType, setErrorType] = useState<LinguisticErrorType | null>(null)

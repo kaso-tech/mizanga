@@ -1,5 +1,6 @@
 import { AiServiceError, type AiChunk, type AiService, type SourceReference } from '../domain/services'
 import type { ChatMessage } from '../domain/types'
+import type { AuthConfig } from './authService'
 import { demoAiService } from './demoAiService'
 
 /**
@@ -141,7 +142,7 @@ export function createRemoteAiService({ label, offersLiteModel = false, endpoint
  */
 const engineStorageKey = 'gilli.engine.v1'
 
-type Health = { engine?: string; liteModel?: boolean }
+type Health = { engine?: string; liteModel?: boolean; auth?: { supabaseUrl?: unknown; publishableKey?: unknown } }
 
 const serviceFor = (health: Health) => (
   health.engine && health.engine !== 'demo'
@@ -150,27 +151,46 @@ const serviceFor = (health: Health) => (
     : demoAiService
 )
 
-export async function detectAiService({ timeoutMs = 2500 } = {}): Promise<AiService> {
+/** Ce que le serveur annonce : le moteur d’IA et, si les comptes sont configurés, l’accès à Supabase Auth. */
+export interface ServerSetup {
+  aiService: AiService
+  authConfig?: AuthConfig
+}
+
+const authConfigFrom = (health: Health): AuthConfig | undefined => {
+  const auth = health.auth
+  return auth && typeof auth.supabaseUrl === 'string' && /^https?:\/\//.test(auth.supabaseUrl) && typeof auth.publishableKey === 'string' && auth.publishableKey
+    ? { supabaseUrl: auth.supabaseUrl, publishableKey: auth.publishableKey }
+    : undefined
+}
+
+export async function detectServer({ timeoutMs = 2500 } = {}): Promise<ServerSetup> {
   try {
     const response = await fetch('/api/health', { signal: AbortSignal.timeout(timeoutMs) })
     const health = (await response.json()) as Health
-    if (!response.ok) return demoAiService
+    if (!response.ok) return { aiService: demoAiService }
+    const authConfig = authConfigFrom(health)
     try {
-      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, liteModel: health.liteModel === true }))
+      localStorage.setItem(engineStorageKey, JSON.stringify({ engine: health.engine, liteModel: health.liteModel === true, ...(authConfig ? { auth: authConfig } : {}) }))
     } catch {
       // Stockage indisponible : la détection se refera au prochain lancement.
     }
-    return serviceFor(health)
+    return { aiService: serviceFor(health), authConfig }
   } catch {
     // Application installée lancée hors connexion : on garde le dernier moteur connu, l’interface
     // affichera « hors connexion » au lieu de basculer à tort en démonstration.
     if (!navigator.onLine) {
       try {
-        return serviceFor(JSON.parse(localStorage.getItem(engineStorageKey) ?? '{}') as Health)
+        const health = JSON.parse(localStorage.getItem(engineStorageKey) ?? '{}') as Health
+        return { aiService: serviceFor(health), authConfig: authConfigFrom(health) }
       } catch {
-        return demoAiService
+        return { aiService: demoAiService }
       }
     }
-    return demoAiService
+    return { aiService: demoAiService }
   }
+}
+
+export async function detectAiService(options: { timeoutMs?: number } = {}): Promise<AiService> {
+  return (await detectServer(options)).aiService
 }
