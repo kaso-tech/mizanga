@@ -1,0 +1,153 @@
+// Accès aux données Business dans Supabase (API REST PostgREST), toujours avec le jeton de l’utilisateur :
+// les règles RLS et les fonctions contrôlées de la base s’appliquent comme s’il interrogeait lui-même.
+import { BusinessError } from './validate.mjs'
+
+/**
+ * @typedef {{ token: string, userId: string }} BusinessSession
+ * @typedef {{ id: string, name: string, currency: string, countryCode: string, timezone: string, role: 'owner' | 'staff' }} Business
+ * @typedef {{ id: string, name: string, unit: string, sku: string | null, quantity: number, purchasePrice: number, salePrice: number, alertThreshold: number, archived: boolean, updatedAt: string }} Product
+ * @typedef {{ id: string, kind: string, quantityDelta: number, unitCost: number | null, note: string | null, createdAt: string, createdBy: string }} StockMovement
+ *
+ * @typedef {object} BusinessStore
+ * @property {(session: BusinessSession) => Promise<Business[]>} listBusinesses
+ * @property {(session: BusinessSession, input: { name: string, currency: string, countryCode: string }) => Promise<Business>} createBusiness
+ * @property {(session: BusinessSession, businessId: string, options: { includeArchived: boolean }) => Promise<Product[]>} listProducts
+ * @property {(session: BusinessSession, businessId: string, input: ReturnType<typeof import('./validate.mjs').validateProductInput>) => Promise<Product>} createProduct
+ * @property {(session: BusinessSession, businessId: string, productId: string, changes: Record<string, unknown>) => Promise<Product>} updateProduct
+ * @property {(session: BusinessSession, businessId: string, productId: string) => Promise<StockMovement[]>} listMovements
+ * @property {(session: BusinessSession, businessId: string, productId: string, input: ReturnType<typeof import('./validate.mjs').validateMovementInput>) => Promise<StockMovement>} recordMovement
+ */
+
+export const PRODUCT_COLUMNS = 'id,name,unit,sku,quantity,purchase_price,sale_price,alert_threshold,archived,updated_at'
+export const MOVEMENT_COLUMNS = 'id,kind,quantity_delta,unit_cost,note,created_at,created_by'
+
+/** @param {any} row @returns {Product} */
+export const toProduct = (row) => ({
+  id: row.id,
+  name: row.name,
+  unit: row.unit,
+  sku: row.sku ?? null,
+  quantity: Number(row.quantity),
+  purchasePrice: Number(row.purchase_price),
+  salePrice: Number(row.sale_price),
+  alertThreshold: Number(row.alert_threshold),
+  archived: row.archived === true,
+  updatedAt: new Date(row.updated_at).toISOString(),
+})
+
+/** @param {any} row @returns {StockMovement} */
+export const toMovement = (row) => ({
+  id: row.id,
+  kind: row.kind,
+  quantityDelta: Number(row.quantity_delta),
+  unitCost: row.unit_cost === null || row.unit_cost === undefined ? null : Number(row.unit_cost),
+  note: row.note ?? null,
+  createdAt: new Date(row.created_at).toISOString(),
+  createdBy: row.created_by,
+})
+
+/** @param {any} row @param {'owner' | 'staff'} role @returns {Business} */
+export const toBusiness = (row, role) => ({ id: row.id, name: row.name, currency: row.currency, countryCode: row.country_code, timezone: row.timezone, role })
+
+/**
+ * Traduit une erreur de la base (codes GL… des fonctions contrôlées, droits refusés, contrôles) en erreur
+ * présentable. Le message des fonctions contrôlées est écrit en français pour l’utilisateur.
+ * @param {number} httpStatus @param {{ code?: string, message?: string } | null} body
+ */
+export function toBusinessError(httpStatus, body) {
+  const code = body?.code ?? ''
+  const message = body?.message ?? ''
+  if (code === 'GL403') return new BusinessError(403, message || 'Accès refusé.')
+  if (code === 'GL409' || code === 'GL410') return new BusinessError(409, message)
+  if (code === 'GL422') return new BusinessError(422, message)
+  if (code === '42501' || httpStatus === 403) return new BusinessError(403, 'Accès refusé.')
+  if (code === '23514' || code === '23502' || code === '22P02') return new BusinessError(422, 'Une des valeurs saisies est invalide.')
+  if (code === 'PGRST301' || code === 'PGRST303' || httpStatus === 401) return new BusinessError(401, 'Votre session a expiré : reconnectez-vous.')
+  return new BusinessError(502, 'La base de données est momentanément indisponible. Réessayez.')
+}
+
+/**
+ * @param {{ supabaseUrl: string, publishableKey: string }} config
+ * @param {{ fetchImpl?: typeof fetch }} [options]
+ * @returns {BusinessStore}
+ */
+export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { fetchImpl = fetch } = {}) {
+  /** @param {BusinessSession} session @param {string} method @param {string} path @param {unknown} [body] @param {boolean} [representation] */
+  const request = async (session, method, path, body, representation = false) => {
+    let response
+    try {
+      response = await fetchImpl(`${supabaseUrl}/rest/v1/${path}`, {
+        method,
+        headers: {
+          apikey: publishableKey,
+          Authorization: `Bearer ${session.token}`,
+          'Content-Type': 'application/json',
+          ...(representation ? { Prefer: 'return=representation' } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
+      })
+    } catch {
+      throw new BusinessError(503, 'La base de données est injoignable. Réessayez.')
+    }
+    const text = await response.text()
+    /** @type {any} */
+    let data = null
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch {
+      data = null
+    }
+    if (!response.ok) throw toBusinessError(response.status, data)
+    return data
+  }
+  const id = (/** @type {string} */ value) => encodeURIComponent(value)
+
+  return {
+    async listBusinesses(session) {
+      const rows = await request(session, 'GET', `business_members?select=role,business:businesses(id,name,currency,country_code,timezone)&user_id=eq.${id(session.userId)}`)
+      return rows.filter((/** @type {any} */ row) => row.business).map((/** @type {any} */ row) => toBusiness(row.business, row.role))
+    },
+    async createBusiness(session, input) {
+      const [row] = await request(session, 'POST', 'businesses?select=id,name,currency,country_code,timezone', { name: input.name, currency: input.currency, country_code: input.countryCode }, true)
+      return toBusiness(row, 'owner')
+    },
+    async listProducts(session, businessId, { includeArchived }) {
+      const rows = await request(session, 'GET', `products?select=${PRODUCT_COLUMNS}&business_id=eq.${id(businessId)}${includeArchived ? '' : '&archived=eq.false'}&order=name.asc`)
+      return rows.map(toProduct)
+    },
+    async createProduct(session, businessId, input) {
+      const row = await request(session, 'POST', 'rpc/create_product', {
+        p_business_id: businessId,
+        p_name: input.name,
+        p_unit: input.unit,
+        p_purchase_price: input.purchasePrice,
+        p_sale_price: input.salePrice,
+        p_alert_threshold: input.alertThreshold,
+        p_initial_quantity: input.initialQuantity,
+        p_sku: input.sku,
+      })
+      return toProduct(row)
+    },
+    async updateProduct(session, businessId, productId, changes) {
+      const rows = await request(session, 'PATCH', `products?select=${PRODUCT_COLUMNS}&id=eq.${id(productId)}&business_id=eq.${id(businessId)}`, changes, true)
+      if (!rows?.length) throw new BusinessError(404, 'Produit introuvable.')
+      return toProduct(rows[0])
+    },
+    async listMovements(session, businessId, productId) {
+      const rows = await request(session, 'GET', `stock_movements?select=${MOVEMENT_COLUMNS}&business_id=eq.${id(businessId)}&product_id=eq.${id(productId)}&order=created_at.desc&limit=100`)
+      return rows.map(toMovement)
+    },
+    async recordMovement(session, businessId, productId, input) {
+      const row = await request(session, 'POST', 'rpc/record_stock_movement', {
+        p_business_id: businessId,
+        p_product_id: productId,
+        p_kind: input.kind,
+        p_quantity: input.quantity,
+        p_unit_cost: input.unitCost,
+        p_note: input.note,
+      })
+      return toMovement(row)
+    },
+  }
+}

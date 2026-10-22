@@ -1,0 +1,105 @@
+// @vitest-environment node
+// Adresses /api/business/* de bout en bout : serveur de Gilli → base PostgreSQL (PGlite) avec RLS et fonctions.
+import { createServer } from 'node:http'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createApiHandler } from '../../server/chat-handler.mjs'
+import { createTestDatabase, createUser } from './database.mjs'
+import { createPgliteBusinessStore } from './pglite-store.mjs'
+
+/** @type {import('node:http').Server} */
+let server
+let base = ''
+/** @type {Record<string, { id: string, email: string }>} */
+const tokens = {}
+
+beforeAll(async () => {
+  const db = await createTestDatabase()
+  tokens['jeton-alice'] = { id: await createUser(db, 'alice@example.test'), email: 'alice@example.test' }
+  tokens['jeton-bob'] = { id: await createUser(db, 'bob@example.test'), email: 'bob@example.test' }
+  const handler = createApiHandler({ verifyToken: async (token) => tokens[token] ?? null, businessStore: createPgliteBusinessStore(db) })
+  server = createServer((req, res) => void handler(req, res))
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(undefined)))
+  base = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`
+}, 60_000)
+afterAll(() => server.close())
+
+/** @param {string} token @param {string} method @param {string} path @param {unknown} [body] */
+async function call(token, method, path, body) {
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return { status: response.status, body: /** @type {any} */ (await response.json()) }
+}
+
+describe('espace Business : produits et stocks', () => {
+  /** @type {string} */
+  let shop
+  /** @type {string} */
+  let rice
+
+  it('exige une connexion valide', async () => {
+    expect((await call('', 'GET', '/api/business')).status).toBe(401)
+    expect((await call('jeton-inconnu', 'GET', '/api/business')).status).toBe(401)
+  })
+
+  it('crée l’entreprise du commerçant, avec XOF et le Burkina Faso par défaut', async () => {
+    expect((await call('jeton-alice', 'GET', '/api/business')).body).toEqual({ businesses: [] })
+    const created = await call('jeton-alice', 'POST', '/api/business', { name: '  Boutique Awa ' })
+    expect(created.status).toBe(201)
+    expect(created.body.business).toMatchObject({ name: 'Boutique Awa', currency: 'XOF', countryCode: 'BF', timezone: 'Africa/Ouagadougou', role: 'owner' })
+    shop = created.body.business.id
+    expect((await call('jeton-alice', 'GET', '/api/business')).body.businesses).toHaveLength(1)
+    expect((await call('jeton-alice', 'POST', '/api/business', { name: '' })).status).toBe(422)
+  })
+
+  it('crée un produit avec son stock initial, et refuse les données invalides', async () => {
+    const created = await call('jeton-alice', 'POST', `/api/business/${shop}/products`, { name: 'Riz 25 kg', unit: 'sac', purchasePrice: 15000, salePrice: 17500, alertThreshold: 3, initialQuantity: 10 })
+    expect(created.status).toBe(201)
+    expect(created.body.product).toMatchObject({ name: 'Riz 25 kg', unit: 'sac', quantity: 10, purchasePrice: 15000, salePrice: 17500, alertThreshold: 3, archived: false })
+    rice = created.body.product.id
+    expect((await call('jeton-alice', 'POST', `/api/business/${shop}/products`, { name: 'X', salePrice: 12.5 })).body).toEqual({ error: 'Le prix de vente doit être un montant entier positif.' })
+    expect((await call('jeton-alice', 'POST', `/api/business/${shop}/products`, { name: 'X', initialQuantity: 1.2345 })).status).toBe(422)
+  })
+
+  it('enregistre les mouvements et refuse un stock négatif', async () => {
+    const purchase = await call('jeton-alice', 'POST', `/api/business/${shop}/products/${rice}/movements`, { kind: 'purchase', quantity: 5, unitCost: 14500, note: 'Grossiste' })
+    expect(purchase.status).toBe(201)
+    expect(purchase.body.movement).toMatchObject({ kind: 'purchase', quantityDelta: 5, unitCost: 14500, note: 'Grossiste' })
+    await call('jeton-alice', 'POST', `/api/business/${shop}/products/${rice}/movements`, { kind: 'loss', quantity: 1 })
+    const tooMuch = await call('jeton-alice', 'POST', `/api/business/${shop}/products/${rice}/movements`, { kind: 'loss', quantity: 100 })
+    expect(tooMuch).toEqual({ status: 409, body: { error: 'Stock insuffisant : il reste 14 sac.' } })
+    expect((await call('jeton-alice', 'POST', `/api/business/${shop}/products/${rice}/movements`, { kind: 'sale', quantity: 1 })).status).toBe(422)
+
+    const { body } = await call('jeton-alice', 'GET', `/api/business/${shop}/products`)
+    expect(body.products[0].quantity).toBe(14)
+    const history = await call('jeton-alice', 'GET', `/api/business/${shop}/products/${rice}/movements`)
+    expect(history.body.movements.map((/** @type {any} */ movement) => [movement.kind, movement.quantityDelta])).toEqual([['loss', -1], ['purchase', 5], ['initial', 10]])
+  })
+
+  it('modifie et archive un produit sans jamais toucher au stock', async () => {
+    const updated = await call('jeton-alice', 'PATCH', `/api/business/${shop}/products/${rice}`, { salePrice: 18000, alertThreshold: 5, quantity: 999 })
+    expect(updated.body.product).toMatchObject({ salePrice: 18000, alertThreshold: 5, quantity: 14 })
+    await call('jeton-alice', 'PATCH', `/api/business/${shop}/products/${rice}`, { archived: true })
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products`)).body.products).toEqual([])
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products?archived=1`)).body.products).toHaveLength(1)
+    expect((await call('jeton-alice', 'POST', `/api/business/${shop}/products/${rice}/movements`, { kind: 'purchase', quantity: 1 })).body).toEqual({ error: 'Ce produit est archivé.' })
+    await call('jeton-alice', 'PATCH', `/api/business/${shop}/products/${rice}`, { archived: false })
+  })
+
+  it('isole les commerçants : Bob ne voit ni ne modifie rien chez Alice', async () => {
+    expect((await call('jeton-bob', 'GET', '/api/business')).body).toEqual({ businesses: [] })
+    expect((await call('jeton-bob', 'GET', `/api/business/${shop}/products`)).body).toEqual({ products: [] })
+    expect((await call('jeton-bob', 'GET', `/api/business/${shop}/products/${rice}/movements`)).body).toEqual({ movements: [] })
+    expect((await call('jeton-bob', 'POST', `/api/business/${shop}/products`, { name: 'Intrus' })).status).toBe(403)
+    expect((await call('jeton-bob', 'PATCH', `/api/business/${shop}/products/${rice}`, { salePrice: 1 })).status).toBe(404)
+    expect((await call('jeton-bob', 'POST', `/api/business/${shop}/products/${rice}/movements`, { kind: 'loss', quantity: 1 })).status).toBe(403)
+    expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products`)).body.products[0]).toMatchObject({ salePrice: 18000, quantity: 14 })
+  })
+
+  it('refuse les adresses mal formées', async () => {
+    expect((await call('jeton-alice', 'GET', '/api/business/pas-un-uuid/products')).status).toBe(404)
+    expect((await call('jeton-alice', 'DELETE', `/api/business/${shop}/products`)).status).toBe(404)
+  })
+})

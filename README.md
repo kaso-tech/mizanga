@@ -112,7 +112,9 @@ Le schéma est dans `supabase/migrations/` : profils, entreprises et membres (pr
 - **Sécurité :** chaque table a des règles RLS (un commerçant ne voit et ne modifie que les données de ses entreprises) et des droits SQL limités par colonne. La quantité en stock, les ventes et les mouvements ne s’écrivent qu’à travers des fonctions contrôlées ; la consommation IA et les abonnements, que par le serveur.
 - **Tests :** `supabase/tests/` applique les migrations à une vraie base PostgreSQL en mémoire (PGlite), avec une simulation de ce que fournit Supabase (rôles, `auth.uid()`, droits par défaut), et vérifie l’isolement entre commerçants. Ils tournent avec `pnpm test` et dans la CI.
 - **Comptes :** connexion sans mot de passe par un code reçu par e-mail (Supabase Auth, bibliothèque chargée après l’affichage). Le navigateur se connecte à Supabase avec la clé publique ; le serveur vérifie chaque jeton auprès de Supabase (`/api/me`, base des futures adresses Business). Le chatbot reste utilisable sans compte. Connexion Google : à venir.
-- **Pas encore branché :** les données Business ne sont pas encore lues ni écrites par l’application.
+- **Espace Business** (`/business`, compte requis) : création du commerce (pays de la zone UEMOA, francs CFA), produits (prix d’achat et de vente, unité, seuil d’alerte, stock initial), mouvements de stock (achat, retour client, perte, inventaire), historique par produit, alertes « Stock bas » et « Rupture », valeur du stock au prix d’achat. La quantité ne change que par les fonctions SQL `create_product` et `record_stock_movement` (journal, stock jamais négatif) ; le serveur (`server/business/`) vérifie le compte et interroge Supabase avec le jeton de l’utilisateur.
+- **Migrations à appliquer dans Supabase, dans l’ordre :** `20261021120000_business_schema.sql`, puis `20261022100000_products_stock.sql`.
+- **À venir :** ventes, dépenses et calculs (étape 4), assistant Business (étape 5).
 
 ## Routes
 

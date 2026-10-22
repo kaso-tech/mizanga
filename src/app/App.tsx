@@ -24,6 +24,7 @@ const SettingsView = lazy(() => import('../components/SettingsView').then((modul
 const AdminView = lazy(() => import('../components/AdminView').then((module) => ({ default: module.AdminView })))
 const AboutView = lazy(() => import('../components/AboutView').then((module) => ({ default: module.AboutView })))
 const CollectionView = lazy(() => import('../components/CollectionView').then((module) => ({ default: module.CollectionView })))
+const BusinessView = lazy(() => import('../components/business/BusinessView').then((module) => ({ default: module.BusinessView })))
 const AccountDialog = lazy(() => import('../components/AccountDialog').then((module) => ({ default: module.AccountDialog })))
 const FeedbackDialog = lazy(() => import('../components/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })))
 
@@ -34,6 +35,7 @@ const routeByView: Record<AppView, string> = {
   settings: '/parametres',
   about: '/a-propos',
   admin: '/admin',
+  business: '/business',
 }
 
 /** Anciennes adresses conservées pour les liens existants. */
@@ -46,6 +48,7 @@ const titleByView: Record<AppView, string> = {
   settings: 'Paramètres',
   about: 'À propos',
   admin: 'Administration',
+  business: 'Espace Business',
 }
 
 const themeColorByTheme: Record<'light' | 'dark', string> = {
@@ -508,6 +511,8 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
             onImportConversations={(file) => void importConversations(file)}
           />
         )
+      case 'business':
+        return <BusinessView account={accountView} client={account.client} onSignIn={() => setAccountDialogOpen(true)} onNotify={notify} />
       case 'admin':
         return <AdminView aiService={aiService} preferences={preferences} onNotify={notify} />
       case 'about':

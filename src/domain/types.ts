@@ -1,4 +1,4 @@
-export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about' | 'admin'
+export type AppView = 'chat' | 'history' | 'favorites' | 'settings' | 'about' | 'admin' | 'business'
 
 /** « system » suit le réglage clair/sombre de l’appareil. */
 export type ThemePreference = 'light' | 'dark' | 'system'
