@@ -203,6 +203,68 @@ export function validateAssistantInput(body) {
 }
 
 /**
+ * Déroulé commun des assistants de l’Espace Business (Commerce, Élevage). Répond en NDJSON :
+ * `{ context, quota }`, puis `{ text }` fragment par fragment, puis les fiches d’action à confirmer
+ * (`{ proposals }`), puis `{ done, quota }` (ou `{ error }` si le moteur échoue). Chaque question est
+ * comptée dans la limite du jour et sa consommation enregistrée.
+ * @param {{ store: import('./supabase-store.mjs').BusinessStore, ai: import('../ai/provider.mjs').AiProvider, pricing: import('../ai/pricing.mjs').AiPricing }} deps
+ * @param {{
+ *   res: import('node:http').ServerResponse,
+ *   session: import('./supabase-store.mjs').BusinessSession,
+ *   businessId: string,
+ *   messages: ReturnType<typeof validateAssistantInput>['messages'],
+ *   label: string,
+ *   prepare: () => Promise<{ context: unknown, instructions: string, functions: import('../ai/provider.mjs').AiFunction[], toProposals: (calls: Array<{ name: string, args: Record<string, unknown> }>) => unknown[] }>,
+ * }} request
+ */
+export async function streamAssistantAnswer({ store, ai, pricing }, { res, session, businessId, messages, label, prepare }) {
+  const requestId = await store.beginAiRequest(session, businessId)
+  const controller = new AbortController()
+  res.on('close', () => controller.abort())
+  let textSent = false
+  /** @type {{ inputTokens: number, outputTokens: number }} */
+  let usage = { inputTokens: 0, outputTokens: 0 }
+  /** @param {'completed' | 'failed'} status */
+  const finish = (status) => store.finishAiRequest(session, requestId, {
+    status, provider: ai.name, model: ai.models.standard, ...usage, costMicroUsd: estimateCostMicroUsd(usage, pricing),
+  }).catch((error) => console.error('[gilli] Consommation IA non enregistrée :', error))
+
+  let started = false
+  try {
+    const { context, instructions, functions, toProposals: buildProposals } = await prepare()
+    const quota = await store.aiQuota(session, businessId)
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
+    started = true
+    res.write(`${JSON.stringify({ context, quota })}\n`)
+    /** @type {Array<{ name: string, args: Record<string, unknown> }>} */
+    const calls = []
+    for await (const event of ai.streamReply({ messages, preferences: {}, instructions, webSearch: false, functions, tier: 'standard', signal: controller.signal })) {
+      if ('usage' in event) usage = event.usage
+      else if ('functionCall' in event) calls.push(event.functionCall)
+      else if ('text' in event) {
+        textSent = true
+        res.write(`${JSON.stringify({ text: event.text })}\n`)
+      }
+    }
+    const proposals = buildProposals(calls)
+    if (proposals.length > 0) {
+      textSent = true
+      res.write(`${JSON.stringify({ proposals })}\n`)
+    }
+    await finish('completed')
+    res.end(`${JSON.stringify({ done: true, quota: await store.aiQuota(session, businessId).catch(() => quota) })}\n`)
+  } catch (error) {
+    // Une réponse interrompue après le début compte (le moteur a travaillé) ; sinon la question est rendue.
+    await finish(textSent ? 'completed' : 'failed')
+    if (controller.signal.aborted) return
+    if (!started) throw error
+    const message = error instanceof UpstreamError || error instanceof BusinessError ? error.message : 'Le moteur est momentanément indisponible. Réessayez plus tard.'
+    if (!(error instanceof UpstreamError || error instanceof BusinessError)) console.error(`[gilli] Erreur de l’assistant ${label} :`, error)
+    res.end(`${JSON.stringify({ error: message })}\n`)
+  }
+}
+
+/**
  * @param {{
  *   store: import('./supabase-store.mjs').BusinessStore,
  *   ai: import('../ai/provider.mjs').AiProvider,
@@ -232,52 +294,18 @@ export function createAssistant({ store, ai, loadReference = () => ({ text: '' }
       const { messages } = validateAssistantInput(body)
       if (!ai.configured) throw new BusinessError(503, 'L’assistant n’est pas disponible : aucun moteur d’IA n’est configuré sur ce serveur.')
       const business = await findBusiness(session, businessId)
-      const requestId = await store.beginAiRequest(session, businessId)
-
-      const controller = new AbortController()
-      res.on('close', () => controller.abort())
-      let textSent = false
-      /** @type {{ inputTokens: number, outputTokens: number }} */
-      let usage = { inputTokens: 0, outputTokens: 0 }
-      /** @param {'completed' | 'failed'} status */
-      const finish = (status) => store.finishAiRequest(session, requestId, {
-        status, provider: ai.name, model: ai.models.standard, ...usage, costMicroUsd: estimateCostMicroUsd(usage, pricing),
-      }).catch((error) => console.error('[gilli] Consommation IA non enregistrée :', error))
-
-      let started = false
-      try {
-        const { context, products, sales } = await buildBusinessContext(store, session, business, now())
-        const instructions = buildAssistantInstructions(formatBusinessContext(context), loadReference().text)
-        const quota = await store.aiQuota(session, businessId)
-        res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' })
-        started = true
-        res.write(`${JSON.stringify({ context, quota })}\n`)
-        /** @type {Array<{ name: string, args: Record<string, unknown> }>} */
-        const calls = []
-        for await (const event of ai.streamReply({ messages, preferences: {}, instructions, webSearch: false, functions: ASSISTANT_FUNCTIONS, tier: 'standard', signal: controller.signal })) {
-          if ('usage' in event) usage = event.usage
-          else if ('functionCall' in event) calls.push(event.functionCall)
-          else if ('text' in event) {
-            textSent = true
-            res.write(`${JSON.stringify({ text: event.text })}\n`)
+      await streamAssistantAnswer({ store, ai, pricing }, {
+        res, session, businessId, messages, label: 'Business',
+        prepare: async () => {
+          const { context, products, sales } = await buildBusinessContext(store, session, business, now())
+          return {
+            context,
+            instructions: buildAssistantInstructions(formatBusinessContext(context), loadReference().text),
+            functions: ASSISTANT_FUNCTIONS,
+            toProposals: (calls) => toProposals(calls, { products, sales, today: context.business.today }, randomUUID),
           }
-        }
-        const proposals = toProposals(calls, { products, sales, today: context.business.today }, randomUUID)
-        if (proposals.length > 0) {
-          textSent = true
-          res.write(`${JSON.stringify({ proposals })}\n`)
-        }
-        await finish('completed')
-        res.end(`${JSON.stringify({ done: true, quota: await store.aiQuota(session, businessId).catch(() => quota) })}\n`)
-      } catch (error) {
-        // Une réponse interrompue après le début compte (le moteur a travaillé) ; sinon la question est rendue.
-        await finish(textSent ? 'completed' : 'failed')
-        if (controller.signal.aborted) return
-        if (!started) throw error
-        const message = error instanceof UpstreamError || error instanceof BusinessError ? error.message : 'Le moteur est momentanément indisponible. Réessayez plus tard.'
-        if (!(error instanceof UpstreamError || error instanceof BusinessError)) console.error('[gilli] Erreur de l’assistant Business :', error)
-        res.end(`${JSON.stringify({ error: message })}\n`)
-      }
+        },
+      })
     },
   }
 }

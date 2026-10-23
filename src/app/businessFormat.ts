@@ -6,6 +6,9 @@ export function formatAmount(amount: number, currency = 'XOF') {
   return new Intl.NumberFormat('fr', { style: 'currency', currency, maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(amount)
 }
 
+/** Devise telle qu’écrite à côté d’un champ de montant : « F CFA » pour XOF. */
+export const currencyLabel = (currency: string) => (currency === 'XOF' ? 'F CFA' : currency)
+
 /** « 2,5 », « 10 » : trois décimales au plus. */
 export const formatQuantity = (quantity: number) => quantity.toLocaleString('fr', { maximumFractionDigits: 3 })
 

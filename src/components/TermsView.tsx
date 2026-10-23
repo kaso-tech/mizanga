@@ -69,6 +69,7 @@ export function TermsView() {
       <section>
         <h2>9. Assistant d’intelligence artificielle</h2>
         <p>Les réponses de l’assistant peuvent contenir des erreurs. Les résultats et conseils de l’Espace Business sont des estimations à partir des données saisies : ils ne constituent ni un résultat comptable ou fiscal certifié, ni un avis juridique.</p>
+        <p>Pour l’élevage, l’assistant ne remplace pas un vétérinaire : il ne donne ni dose, ni traitement, ni diagnostic. En cas d’animaux malades ou de mortalité inhabituelle, consultez un vétérinaire ou le service vétérinaire de votre zone.</p>
       </section>
 
       <section>

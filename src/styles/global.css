@@ -1187,3 +1187,18 @@ button.account-chip:hover { opacity: .9; }
 .business-upcoming { display: grid; justify-items: center; gap: 8px; text-align: center; }
 .business-upcoming h2 { margin: 0; font-size: 18px; }
 .business-upcoming p { margin: 0; max-width: 520px; color: var(--muted-foreground); }
+
+/* Onglet Élevage. Les conteneurs d’activité ne créent pas de boîte : leurs éléments gardent l’espacement de la page. */
+.livestock-view { display: contents; }
+.business-module > *, .livestock-view > * { margin-top: 16px; }
+.radio-field { display: grid; gap: 2px; margin: 0; padding: 0; border: 0; }
+.panel-subtitle { margin: 8px 0 0; font-size: 15px; font-weight: 600; }
+.table-sub { display: block; color: var(--muted-foreground); font-size: 12px; font-weight: 400; }
+.herd-animals summary { cursor: pointer; color: var(--muted-foreground); font-size: 14px; }
+.herd-animals ul { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.herd-card.is-archived, .journal-card.is-cancelled { opacity: .7; }
+.journal-card.is-cancelled .product-name { text-decoration: line-through; }
+.health-card.is-late { border-color: color-mix(in oklab, var(--destructive, #b42318) 45%, var(--border)); }
+.admin-stat.is-warning .admin-stat-value { color: var(--destructive, #b42318); }
+.vet-notice { flex: 1 1 260px; margin: 0; }
+.listing-badge.is-withdrawn { color: var(--muted-foreground); }

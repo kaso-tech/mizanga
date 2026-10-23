@@ -11,6 +11,7 @@ import { createApiHandler } from '../server/chat-handler.mjs'
 import { createTestDatabase } from '../supabase/tests/database.mjs'
 import { createPgliteMarketplace } from '../supabase/tests/pglite-marketplace.mjs'
 import { createPgliteBusinessStore } from '../supabase/tests/pglite-store.mjs'
+import { createPgliteLivestockStore } from '../supabase/tests/pglite-livestock.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const appPort = Number(process.env.E2E_PORT ?? 4173)
@@ -89,6 +90,13 @@ createServer(async (req, res) => {
   const today = instructions.split('\n').find((/** @type {string} */ line) => line.startsWith('- Aujourd’hui')) ?? 'Bonjour, je suis Gilli.'
   res.writeHead(200, { 'Content-Type': 'text/event-stream' })
   const lastParts = payload.contents?.at(-1)?.parts ?? []
+  // Assistant Élevage : « J’ai perdu 2 poulets… » → fiche de mortalité pour le premier lot de volailles.
+  if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('J’ai perdu'))) {
+    const herd = /^- (.+?) : Volailles,/m.exec(instructions)?.[1] ?? 'Poulets'
+    const call = { functionCall: { name: 'proposer_evenement_elevage', args: { lot: herd, type: 'mortalite', nombre: 2, cause: 'inconnue' } } }
+    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Voici la fiche à vérifier. Si d’autres poulets meurent, contactez un vétérinaire.' }, call] } }], usageMetadata: { promptTokenCount: 1600, candidatesTokenCount: 25 } })}\n\n`)
+    return void res.end()
+  }
   // « Vends 2 Savon, et 1500 de transport » : fiches de vente et de dépense.
   if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('Vends'))) {
     const calls = [
@@ -120,6 +128,7 @@ const handler = createApiHandler({
     return email ? ensureUser(email) : null
   },
   businessStore: createPgliteBusinessStore(db),
+  livestockStore: createPgliteLivestockStore(db),
   marketplace,
   moderationKey: MODERATION_KEY,
   adminPassword: ADMIN_PASSWORD,

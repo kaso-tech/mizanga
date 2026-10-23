@@ -19,6 +19,7 @@ import { ProductDialog } from './ProductDialog'
 import { ResultsPanel } from './ResultsPanel'
 import { SalesPanel } from './SalesPanel'
 import { SubscriptionDialog } from './SubscriptionDialog'
+import { LivestockView } from '../livestock/LivestockView'
 
 /** Pays de la zone UEMOA (franc CFA, XOF) proposés à la création ; d’autres pays suivront. */
 const countries: Array<{ code: string; name: string }> = [
@@ -41,10 +42,7 @@ const modules: Array<{ id: BusinessModule; label: string; icon: LucideIcon }> = 
   { id: 'agriculture', label: 'Agriculture', icon: Sprout },
 ]
 
-const upcoming: Record<Exclude<BusinessModule, 'commerce'>, string> = {
-  elevage: 'Suivi des troupeaux et des lots (volailles, moutons et chèvres, bovins, porcs) : naissances, achats, ventes, mortalité, alimentation, vaccins et traitements avec rappels, résultats par lot et un assistant dédié.',
-  agriculture: 'Suivi des parcelles et des cultures, des travaux, des intrants et des récoltes, avec un assistant dédié.',
-}
+const upcomingAgriculture = 'Suivi des parcelles et des cultures, des travaux, des intrants et des récoltes, avec un assistant dédié.'
 
 type Tab = 'products' | 'sales' | 'expenses' | 'results' | 'assistant'
 
@@ -126,6 +124,8 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
   const [onlyLow, setOnlyLow] = useState(false)
   const [dialog, setDialog] = useState<DialogState>(null)
   const [module, setModule] = useState<BusinessModule>(openConversation?.module ?? 'commerce')
+  const [elevageVisited, setElevageVisited] = useState(false)
+  useEffect(() => { if (module === 'elevage') setElevageVisited(true) }, [module])
   const [tab, setTab] = useState<Tab>(openConversation?.module === 'commerce' ? 'assistant' : 'products')
   const [preset, setPreset] = useState<PeriodPreset>('today')
   // Marketplace (propriétaire seulement) : vitrine et annonces ; undefined tant que non chargées.
@@ -222,11 +222,25 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
           ))}
         </div>
       )}
-      {business && module !== 'commerce' && (
+      {business && module === 'agriculture' && (
         <div className="settings-section business-upcoming">
-          {module === 'elevage' ? <PawPrint size={28} aria-hidden="true" /> : <Sprout size={28} aria-hidden="true" />}
-          <h2>{module === 'elevage' ? 'Élevage' : 'Agriculture'} : bientôt disponible</h2>
-          <p>{upcoming[module]}</p>
+          <Sprout size={28} aria-hidden="true" />
+          <h2>Agriculture : bientôt disponible</h2>
+          <p>{upcomingAgriculture}</p>
+        </div>
+      )}
+      {/* Monté dès la première visite puis gardé : la conversation de l’assistant Élevage reste. */}
+      {business && api && (module === 'elevage' || elevageVisited) && (
+        <div className="business-module" hidden={module !== 'elevage'}>
+          <LivestockView
+            api={api.livestock}
+            business={business}
+            onNotify={onNotify}
+            conversations={conversations}
+            openRequest={openConversation?.module === 'elevage' ? openConversation : undefined}
+            onConversationSaved={onConversationSaved}
+            onConversationOpened={onConversationOpened}
+          />
         </div>
       )}
       <div className="business-module" hidden={Boolean(business) && module !== 'commerce'}>
@@ -270,7 +284,6 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
             onDataChanged={() => loadProducts(business.id)}
             onNotify={onNotify}
             conversations={conversations}
-            kind="commerce"
             openRequest={openConversation?.module === 'commerce' ? openConversation : undefined}
             onConversationSaved={onConversationSaved}
             onConversationOpened={onConversationOpened}

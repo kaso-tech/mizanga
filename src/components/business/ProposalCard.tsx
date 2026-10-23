@@ -1,7 +1,7 @@
 import { Ban, Check, PackagePlus, Receipt, Repeat, ShoppingCart, X } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { localDay } from '../../app/businessPeriods'
-import { formatAmount, formatQuantity, parseAmount, parseQuantity } from '../../app/businessFormat'
+import { currencyLabel, formatAmount, formatQuantity, parseAmount, parseQuantity } from '../../app/businessFormat'
 import { expenseCategories } from '../../app/expenseCategories'
 import type { AssistantProposal, Business, BusinessApi, MovementInput, Product, SaleInput } from '../../services/businessApi'
 
@@ -24,7 +24,7 @@ interface CardProps<P extends AssistantProposal> {
 }
 
 /** Cadre commun : titre, état, champs (verrouillés une fois la fiche traitée), erreur et boutons. */
-function ProposalFrame({ title, icon, status, result, confirmLabel = 'Confirmer et enregistrer', blocked, onSubmit, onDismiss, children }: {
+export function ProposalFrame({ title, icon, status, result, confirmLabel = 'Confirmer et enregistrer', blocked, onSubmit, onDismiss, children }: {
   title: string
   icon: ReactNode
   status: ProposalStatus
@@ -68,7 +68,6 @@ function ProposalFrame({ title, icon, status, result, confirmLabel = 'Confirmer 
   )
 }
 
-const currencyLabel = (currency: string) => (currency === 'XOF' ? 'F CFA' : currency)
 
 function ProductProposalCard({ proposal, status, result, api, business, onConfirm, onDismiss }: CardProps<Extract<AssistantProposal, { action: 'create_product' }>>) {
   const values = proposal.values

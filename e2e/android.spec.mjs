@@ -266,6 +266,116 @@ test('console d’administration : menu latéral propre, sans les conversations'
   await expect(page.getByRole('textbox', { name: 'Votre message' })).toBeVisible()
 })
 
+test('élevage : lots, journal, santé, résultats et assistant, au franc près', async ({ page }, info) => {
+  await signInAndCreateShop(page, emailFor(info), 'Ferme Awa')
+  await page.getByRole('tablist', { name: 'Activités' }).getByRole('tab', { name: 'Élevage' }).tap()
+  await expect(page.getByRole('tab', { name: 'Lots' })).toHaveAttribute('aria-selected', 'true')
+
+  // Lot de poulets (en groupe) et troupeau de bovins (un par un).
+  await page.getByRole('button', { name: 'Nouveau lot' }).tap()
+  let dialog = page.getByRole('dialog', { name: 'Nouveau lot' })
+  await dialog.getByLabel('Nom du lot').fill('Poulets bande 1')
+  await dialog.getByRole('combobox', { name: /^Espèce/ }).selectOption('poultry')
+  await dialog.getByLabel('Effectif de départ').fill('200')
+  await expectFitsScreen(page, 'nouveau lot')
+  await dialog.getByRole('button', { name: 'Créer le lot' }).tap()
+  await expect(dialog).toBeHidden()
+  const poultry = page.locator('.herd-card', { hasText: 'Poulets bande 1' })
+  await expect(poultry).toContainText('200 animaux')
+
+  await page.getByRole('button', { name: 'Nouveau lot' }).tap()
+  dialog = page.getByRole('dialog', { name: 'Nouveau lot' })
+  await dialog.getByLabel('Nom du lot').fill('Bovins')
+  await dialog.getByRole('combobox', { name: /^Espèce/ }).selectOption('cattle')
+  await expect(dialog.getByRole('radio', { name: /Un par un/ })).toBeChecked()
+  await dialog.getByRole('button', { name: 'Créer le lot' }).tap()
+  await expect(dialog).toBeHidden()
+
+  /** @param {string} herd @param {string} kind @param {Record<string, string>} fields */
+  const record = async (herd, kind, fields) => {
+    await page.getByRole('button', { name: `Événement pour ${herd}` }).tap()
+    const form = page.getByRole('dialog', { name: 'Nouvel événement' })
+    await form.getByRole('combobox', { name: /^Événement/ }).selectOption(kind)
+    for (const [label, value] of Object.entries(fields)) {
+      const input = form.getByLabel(new RegExp(`^${label}`))
+      if (await input.evaluate((element) => element.tagName === 'SELECT')) await input.selectOption(value)
+      else await input.fill(value)
+    }
+    await form.getByRole('button', { name: 'Enregistrer' }).tap()
+    await expect(form).toBeHidden()
+  }
+  await record('Poulets bande 1', 'death', { 'Nombre d’animaux': '4', 'Cause': 'Chaleur' })
+  await record('Poulets bande 1', 'feed', { 'Coût de l’aliment': '45 000' })
+  await record('Poulets bande 1', 'sale', { 'Nombre d’animaux': '50', 'Montant de la vente': '150000' })
+  await expect(poultry).toContainText('146 animaux')
+  await record('Bovins', 'purchase', { 'Numéro de l’animal': 'BF-001', 'Sexe': 'female', 'Prix d’achat total': '350000' })
+  await expect(page.locator('.herd-card', { hasText: 'Bovins' })).toContainText('1 animal')
+  await expectFitsScreen(page, 'lots')
+
+  // Santé : rappel en retard, puis fait avec son coût.
+  await page.getByRole('tab', { name: 'Santé' }).tap()
+  await page.getByRole('button', { name: 'Nouveau soin' }).tap()
+  dialog = page.getByRole('dialog', { name: 'Nouveau soin' })
+  await dialog.getByRole('combobox', { name: /^Lot/ }).selectOption({ label: 'Poulets bande 1' })
+  await dialog.getByLabel('Vaccin, traitement ou motif').fill('Newcastle')
+  await dialog.getByLabel('Date prévue').fill(new Date(Date.now() - 86_400_000).toISOString().slice(0, 10))
+  await dialog.getByRole('button', { name: 'Enregistrer le soin' }).tap()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('list', { name: 'Soins en retard' })).toContainText('En retard de 1 jour')
+  await expectFitsScreen(page, 'santé')
+  await page.getByRole('button', { name: 'Marquer comme fait : Newcastle (Poulets bande 1)' }).tap()
+  dialog = page.getByRole('dialog', { name: 'Soin fait : Newcastle' })
+  await dialog.getByLabel(/Coût/).fill('6000')
+  await dialog.getByRole('button', { name: 'Marquer comme fait' }).tap()
+  await expect(page.getByRole('list', { name: 'Soins faits' })).toContainText('6 000')
+
+  // Résultats des 30 derniers jours : 4 morts sur 201 animaux (2 %), coûts 45 000 + 6 000 + 350 000.
+  await page.getByRole('tab', { name: 'Résultats' }).tap()
+  const results = page.locator('.results-grid')
+  await expect(results).toContainText('Marge estimée')
+  expect(plain(await results.textContent())).toContain('Mortalité (4 morts)2 %')
+  expect(plain(await results.textContent())).toContain('Coûts401 000 F CFA')
+  expect(plain(await results.textContent())).toContain('Ventes d’animaux150 000 F CFA')
+  expect(plain(await results.textContent())).toContain('Marge estimée-251 000 F CFA')
+  await expectFitsScreen(page, 'résultats de l’élevage')
+
+  // Journal : le propriétaire annule la mortalité, l’effectif revient.
+  await page.getByRole('tab', { name: 'Journal' }).tap()
+  const journal = page.getByRole('list', { name: 'Journal de l’élevage' })
+  await expect(journal).toContainText('Mortalité · 4')
+  await page.getByRole('button', { name: /^Annuler : Mortalité/ }).tap()
+  await page.getByRole('dialog', { name: 'Annuler l’événement' }).getByRole('button', { name: 'Annuler l’événement' }).tap()
+  await expect(journal.locator('.journal-card.is-cancelled')).toContainText('Mortalité · 4')
+  await page.getByRole('tab', { name: 'Lots' }).tap()
+  await expect(poultry).toContainText('150 animaux')
+
+  // Assistant : une phrase prépare une fiche de mortalité, enregistrée après confirmation.
+  await page.getByRole('tab', { name: 'Assistant' }).tap()
+  await page.getByRole('textbox', { name: 'Votre question' }).fill('J’ai perdu 2 poulets ce matin')
+  await page.getByRole('button', { name: 'Envoyer' }).tap()
+  const card = page.getByRole('form', { name: 'Fiche à vérifier : Mortalité' })
+  await expect(card.getByRole('combobox', { name: /^Lot/ })).toHaveValue(/.+/)
+  await expect(card.getByLabel('Nombre d’animaux')).toHaveValue('2')
+  await expect(page.getByText(/contactez un vétérinaire/).first()).toBeVisible()
+  await expectFitsScreen(page, 'assistant Élevage')
+  await card.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
+  await expect(card).toContainText('Mortalité de 2 enregistrée dans « Poulets bande 1 ».')
+  await page.getByRole('tab', { name: 'Lots' }).tap()
+  await expect(poultry).toContainText('148 animaux')
+
+  // La conversation est dans le menu, avec l’icône de l’élevage.
+  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  const row = page.getByRole('navigation', { name: 'Conversations de cette session' }).getByRole('button', { name: 'Élevage : J’ai perdu 2 poulets ce matin' })
+  await expect(row).toBeVisible()
+  // Rouverte après rechargement : l’onglet Élevage › Assistant affiche la conversation et sa fiche.
+  await page.reload()
+  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  await row.tap()
+  await expect(page.getByRole('tab', { name: 'Assistant' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('article', { name: 'Votre message' })).toContainText('J’ai perdu 2 poulets ce matin')
+  await expect(page.getByRole('form', { name: 'Fiche à vérifier : Mortalité' })).toContainText('Enregistré')
+})
+
 /** Publie un produit sur la marketplace (vitrine créée au besoin) ; renvoie le badge d’état affiché. @param {import('@playwright/test').Page} page @param {string} productName @param {string} title */
 async function publishListing(page, productName, title, withPhoto = true) {
   await page.getByRole('button', { name: `Publier sur la marketplace : ${productName}` }).tap()

@@ -163,7 +163,8 @@ describe('espace Business', () => {
     expect(await screen.findByRole('tab', { name: 'Produits' })).toBeVisible()
 
     await userEvent.click(within(activities).getByRole('tab', { name: 'Élevage' }))
-    expect(screen.getByRole('heading', { name: 'Élevage : bientôt disponible' })).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: 'Sections de l’élevage' })).toBeVisible()
+    expect(screen.getByRole('tab', { name: 'Lots' })).toBeVisible()
     expect(screen.queryByRole('tab', { name: 'Produits' })).not.toBeInTheDocument()
     await userEvent.click(within(activities).getByRole('tab', { name: 'Agriculture' }))
     expect(screen.getByRole('heading', { name: 'Agriculture : bientôt disponible' })).toBeInTheDocument()

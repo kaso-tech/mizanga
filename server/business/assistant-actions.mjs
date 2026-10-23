@@ -110,7 +110,9 @@ export const normalizeName = (name) => name.normalize('NFD').replace(/\p{M}/gu, 
 /**
  * Retrouve le produit désigné par le modèle : nom identique, sinon un seul produit qui le contient
  * (ou qu’il contient). Ambigu ou introuvable : null, et l’utilisateur choisit dans la fiche.
- * @param {string} name @param {Array<{ id: string, name: string }>} products
+ * @template {{ id: string, name: string }} T
+ * @param {string} name @param {T[]} products
+ * @returns {T | null}
  */
 export function matchProduct(name, products) {
   // Comparaison sans espaces : « 25kg » et « 25 kg » désignent le même produit.

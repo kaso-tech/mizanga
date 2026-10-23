@@ -154,13 +154,12 @@ export function toBusinessError(httpStatus, body) {
 }
 
 /**
- * @param {{ supabaseUrl: string, publishableKey: string }} config
- * @param {{ fetchImpl?: typeof fetch }} [options]
- * @returns {BusinessStore}
+ * Requête à l’API REST de Supabase avec le jeton de l’utilisateur ; les erreurs deviennent des BusinessError.
+ * @param {{ supabaseUrl: string, publishableKey: string }} config @param {typeof fetch} fetchImpl
  */
-export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { fetchImpl = fetch } = {}) {
+export function createSupabaseRequest({ supabaseUrl, publishableKey }, fetchImpl = fetch) {
   /** @param {BusinessSession} session @param {string} method @param {string} path @param {unknown} [body] @param {boolean | string} [representation] */
-  const request = async (session, method, path, body, representation = false) => {
+  return async (session, method, path, body, representation = false) => {
     let response
     try {
       response = await fetchImpl(`${supabaseUrl}/rest/v1/${path}`, {
@@ -188,6 +187,15 @@ export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { f
     if (!response.ok) throw toBusinessError(response.status, data)
     return data
   }
+}
+
+/**
+ * @param {{ supabaseUrl: string, publishableKey: string }} config
+ * @param {{ fetchImpl?: typeof fetch }} [options]
+ * @returns {BusinessStore}
+ */
+export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { fetchImpl = fetch } = {}) {
+  const request = createSupabaseRequest({ supabaseUrl, publishableKey }, fetchImpl)
   const id = (/** @type {string} */ value) => encodeURIComponent(value)
 
   return {

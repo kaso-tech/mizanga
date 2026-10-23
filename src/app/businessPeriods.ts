@@ -3,7 +3,7 @@ import type { Period } from '../services/businessApi'
 // Périodes proposées dans l’espace Business, calculées dans le fuseau horaire du commerce
 // (un « aujourd’hui » à Ouagadougou n’est pas forcément celui du téléphone).
 
-export type PeriodPreset = 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth'
+export type PeriodPreset = 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth' | 'last30' | 'last90' | 'thisYear'
 
 export const periodLabels: Record<PeriodPreset, string> = {
   today: 'Aujourd’hui',
@@ -11,7 +11,15 @@ export const periodLabels: Record<PeriodPreset, string> = {
   last7: '7 derniers jours',
   thisMonth: 'Ce mois-ci',
   lastMonth: 'Mois dernier',
+  last30: '30 derniers jours',
+  last90: '90 derniers jours',
+  thisYear: 'Cette année',
 }
+
+/** Périodes de l’onglet Commerce. */
+export const commercePresets: PeriodPreset[] = ['today', 'yesterday', 'last7', 'thisMonth', 'lastMonth']
+/** Périodes de l’onglet Élevage : un lot se suit sur plusieurs semaines ou mois. */
+export const livestockPresets: PeriodPreset[] = ['last30', 'last90', 'thisMonth', 'lastMonth', 'thisYear']
 
 /** Jour du calendrier (AAAA-MM-JJ) d’un instant dans un fuseau horaire. */
 export function localDay(timeZone: string, now = new Date()) {
@@ -36,6 +44,9 @@ export function periodFor(preset: PeriodPreset, timeZone: string, now = new Date
       const lastMonthEnd = shift(monthStart, -1)
       return { start: `${lastMonthEnd.slice(0, 7)}-01`, end: lastMonthEnd }
     }
+    case 'last30': return { start: shift(today, -29), end: today }
+    case 'last90': return { start: shift(today, -89), end: today }
+    case 'thisYear': return { start: `${today.slice(0, 4)}-01-01`, end: today }
   }
 }
 

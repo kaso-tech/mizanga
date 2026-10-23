@@ -1,4 +1,5 @@
 // Appels à l’espace Business du serveur de Gilli, avec le jeton de connexion de l’utilisateur.
+import { createLivestockApi } from './livestockApi'
 
 export interface Business {
   id: string
@@ -208,11 +209,14 @@ export type AssistantProposal =
   | { id: string; action: 'expense'; values: { amount: number | null; category: string; description: string | null; spentOn: string | null } }
   | { id: string; action: 'cancel_sale'; values: { saleId: string | null; reference: string; sale: { soldAt: string; totalAmount: number; status: string; items: Array<{ productName: string; quantity: number; unit: string }> } | null; reason: string | null } }
 
-export type AssistantEvent =
-  | { context: AssistantContext; quota: AiQuota }
+/** Événements diffusés par un assistant de l’Espace Business (chiffres reçus, texte, fiches, fin). */
+export type AssistantStreamEvent<Context, Proposal> =
+  | { context: Context; quota: AiQuota }
   | { text: string }
-  | { proposals: AssistantProposal[] }
+  | { proposals: Proposal[] }
   | { done: true; quota: AiQuota }
+
+export type AssistantEvent = AssistantStreamEvent<AssistantContext, AssistantProposal>
 
 /** Erreur dont le message peut être montré tel quel à l’utilisateur. */
 export class BusinessApiError extends Error {
@@ -247,6 +251,34 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     if (!response.ok || !data) throw new BusinessApiError(data?.error ?? 'Une erreur est survenue. Réessayez.', response.status)
     return data
   }
+  /** Question à un assistant (Commerce ou Élevage) ; la réponse NDJSON arrive par fragments. */
+  const stream = async <Event extends object>(path: string, messages: AssistantMessage[], onEvent: (event: Event) => void, signal?: AbortSignal) => {
+    const response = await send('POST', path, { messages }, signal)
+    if (!response.ok || !response.body) {
+      const data = (await response.json().catch(() => null)) as { error?: string } | null
+      throw new BusinessApiError(data?.error ?? 'L’assistant n’a pas pu répondre. Réessayez.', response.status)
+    }
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+    let buffer = ''
+    let finished = false
+    const handle = (line: string) => {
+      if (!line.trim()) return
+      const event = JSON.parse(line) as Event | { error: string }
+      if ('error' in event) throw new BusinessApiError(event.error, 502)
+      if ('done' in event) finished = true
+      onEvent(event)
+    }
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += value
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      lines.forEach(handle)
+    }
+    handle(buffer)
+    if (!finished) throw new BusinessApiError('La réponse a été interrompue. Réessayez.', 502)
+  }
 
   return {
     listBusinesses: async () => (await request<{ businesses: Business[] }>('GET', '')).businesses,
@@ -275,32 +307,10 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     subscription: async (businessId: string) => (await request<{ subscription: Subscription }>('GET', `/${businessId}/subscription`)).subscription,
     assistantQuota: async (businessId: string) => (await request<{ quota: AiQuota }>('GET', `/${businessId}/assistant`)).quota,
     /** Pose une question à l’assistant ; la réponse arrive par fragments (`onEvent`). */
-    askAssistant: async (businessId: string, messages: AssistantMessage[], onEvent: (event: AssistantEvent) => void, signal?: AbortSignal) => {
-      const response = await send('POST', `/${businessId}/assistant`, { messages }, signal)
-      if (!response.ok || !response.body) {
-        const data = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new BusinessApiError(data?.error ?? 'L’assistant n’a pas pu répondre. Réessayez.', response.status)
-      }
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
-      let buffer = ''
-      let finished = false
-      const handle = (line: string) => {
-        if (!line.trim()) return
-        const event = JSON.parse(line) as AssistantEvent | { error: string }
-        if ('error' in event) throw new BusinessApiError(event.error, 502)
-        if ('done' in event) finished = true
-        onEvent(event)
-      }
-      for (;;) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += value
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        lines.forEach(handle)
-      }
-      handle(buffer)
-      if (!finished) throw new BusinessApiError('La réponse a été interrompue. Réessayez.', 502)
-    },
+    askAssistant: (businessId: string, messages: AssistantMessage[], onEvent: (event: AssistantEvent) => void, signal?: AbortSignal) => (
+      stream(`/${businessId}/assistant`, messages, onEvent, signal)
+    ),
+    /** Onglet Élevage : lots, journal, santé, résultats et assistant. */
+    livestock: createLivestockApi(request, stream),
   }
 }
