@@ -1,11 +1,13 @@
-import { Flag, LoaderCircle, LockKeyhole, LogOut } from 'lucide-react'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { ArrowLeft, Eye, EyeOff, Flag, LoaderCircle, LockKeyhole, LogOut, Menu, RefreshCw, ShieldCheck, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useBackToClose } from '../app/useBackToClose'
+import { BrandMark } from './Brand'
 import type { AiService } from '../domain/services'
 import type { LinguisticPreferences } from '../domain/types'
 import { formatResetTime } from '../services/remoteAiService'
 import { EvaluationView } from './EvaluationView'
 import { ModerationPanel } from './marketplace/ModerationPanel'
-import { adminSections as sections, type AdminSectionId as SectionId } from '../app/adminSections'
+import { adminSectionFromHash, adminSections as sections, type AdminSectionId as SectionId } from '../app/adminSections'
 
 interface Overview {
   version: { version: string; commit: string; builtAt: string } | null
@@ -24,14 +26,17 @@ interface Overview {
   }
 }
 
-type Session = { configured: boolean; authenticated: boolean }
+type Session = { configured: boolean; authenticated: boolean; email?: string }
 
 async function readJson<T>(response: Response): Promise<T | null> {
   return (await response.json().catch(() => null)) as T | null
 }
 
+/** Page de connexion de la console : adresse e-mail et mot de passe, rien d’autre n’est visible. */
 function LoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -40,7 +45,7 @@ function LoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
     setIsSubmitting(true)
     setError('')
     try {
-      const response = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
+      const response = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), password }) })
       const body = await readJson<{ error?: string; retryAt?: string }>(response)
       if (response.ok) {
         setPassword('')
@@ -57,15 +62,24 @@ function LoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
   }
 
   return (
-    <form className="admin-login settings-section" onSubmit={(event) => void submit(event)}>
-      <h2><LockKeyhole size={18} aria-hidden="true" /> Connexion administrateur</h2>
-      <p className="evaluation-help">Réservé à l’équipe Gilli.</p>
+    <form className="admin-auth-card" onSubmit={(event) => void submit(event)} aria-labelledby="admin-login-title">
+      <h1 id="admin-login-title">Connexion</h1>
+      <p className="admin-auth-help">Accès réservé à l’équipe Gilli.</p>
+      <div className="field">
+        <label className="field-label" htmlFor="admin-email">Adresse e-mail</label>
+        <input id="admin-email" type="email" inputMode="email" autoComplete="username" autoFocus value={email} onChange={(event) => setEmail(event.target.value)} />
+      </div>
       <div className="field">
         <label className="field-label" htmlFor="admin-password">Mot de passe</label>
-        <input id="admin-password" type="password" autoComplete="current-password" autoFocus value={password} onChange={(event) => setPassword(event.target.value)} />
+        <div className="password-field">
+          <input id="admin-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <button type="button" className="icon-button" aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
       </div>
       {error && <p className="message-error" role="alert">{error}</p>}
-      <button type="submit" className="primary-button" disabled={!password || isSubmitting}>
+      <button type="submit" className="primary-button is-block" disabled={!email.trim() || !password || isSubmitting}>
         {isSubmitting ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : null} Se connecter
       </button>
     </form>
@@ -165,18 +179,74 @@ interface AdminViewProps {
   aiService: AiService
   preferences: LinguisticPreferences
   onNotify: (message: string) => void
-  /** Section affichée (choisie aussi depuis le menu latéral de la console). */
-  section?: SectionId
-  onSectionChange?: (section: SectionId) => void
+  /** Quitte la console pour l’application des utilisateurs. */
+  onExit: () => void
 }
 
-/** Console d’administration : protégée côté serveur, invisible des utilisateurs. */
-export function AdminView({ aiService, preferences, onNotify, section, onSectionChange }: AdminViewProps) {
+/** Écran d’accueil de la console (non connecté, fermée ou serveur injoignable) : une carte centrée. */
+function AuthScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="admin-auth">
+      <div className="admin-auth-brand">
+        <BrandMark />
+        <span>Gilli <strong>Administration</strong></span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** Menu de la console : ses sections, l’administrateur connecté et la déconnexion. */
+function ConsoleNav({ active, email, onSelect, onLogout, onExit }: { active: SectionId; email?: string; onSelect: (section: SectionId) => void; onLogout: () => void; onExit: () => void }) {
+  return (
+    <>
+      <div className="admin-nav-brand"><BrandMark /><span>Gilli <strong>Administration</strong></span></div>
+      <nav className="admin-nav" aria-label="Sections de la console">
+        {sections.map(({ id, label, icon: Icon }) => (
+          <button key={id} type="button" className={`admin-nav-item ${active === id ? 'is-active' : ''}`} aria-current={active === id ? 'page' : undefined} onClick={() => onSelect(id)}>
+            <Icon size={16} aria-hidden="true" /> {label}
+          </button>
+        ))}
+      </nav>
+      <div className="admin-nav-foot">
+        {email && <p className="admin-nav-user" title={email}><ShieldCheck size={14} aria-hidden="true" /> <span>{email}</span></p>}
+        <button type="button" className="admin-nav-item" onClick={onLogout}><LogOut size={16} aria-hidden="true" /> Se déconnecter</button>
+        <button type="button" className="admin-nav-item" onClick={onExit}><ArrowLeft size={16} aria-hidden="true" /> Ouvrir Gilli</button>
+      </div>
+    </>
+  )
+}
+
+/** Menu de la console sur téléphone : tiroir fermé par le bouton « retour » d’Android ou Échap. */
+function ConsoleDrawer({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  useBackToClose(onClose)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    closeRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+  return (
+    <>
+      <div className="admin-drawer-backdrop" onClick={onClose} aria-hidden="true" />
+      <aside className="admin-sidebar is-drawer" aria-label="Menu de la console">
+        <button ref={closeRef} type="button" className="icon-button admin-drawer-close" aria-label="Fermer le menu" onClick={onClose}><X size={20} /></button>
+        {children}
+      </aside>
+    </>
+  )
+}
+
+/**
+ * Console d’administration : application distincte de celle des utilisateurs (ni leur menu, ni leur en-tête).
+ * Avant connexion, seule la page de connexion est visible ; la protection est assurée par le serveur.
+ */
+export function AdminView({ aiService, preferences, onNotify, onExit }: AdminViewProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [overview, setOverview] = useState<Overview | null>(null)
-  const [ownSection, setOwnSection] = useState<SectionId>('apercu')
-  const activeSection = section ?? ownSection
-  const setActiveSection = (next: SectionId) => (onSectionChange ? onSectionChange(next) : setOwnSection(next))
+  const [activeSection, setActiveSection] = useState<SectionId>(() => adminSectionFromHash(window.location.hash))
+  const [menuOpen, setMenuOpen] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   const refresh = useCallback(async () => {
@@ -207,59 +277,80 @@ export function AdminView({ aiService, preferences, onNotify, section, onSection
   const logout = async () => {
     await fetch('/api/admin/logout', { method: 'POST' }).catch(() => null)
     setOverview(null)
-    setSession((current) => (current ? { ...current, authenticated: false } : current))
+    setMenuOpen(false)
+    setSession((current) => (current ? { ...current, authenticated: false, email: undefined } : current))
     onNotify('Vous êtes déconnecté de la console.')
   }
 
+  // Adresse de la section (/admin#moderation). Choisie depuis le menu du téléphone, elle s’écrit une fois
+  // le menu fermé : sa fermeture retire d’abord l’entrée d’historique ajoutée pour le bouton « retour ».
+  const pendingHash = useRef<SectionId | null>(null)
+  useEffect(() => {
+    const writePending = () => {
+      if (!pendingHash.current) return
+      window.history.replaceState(window.history.state, '', `/admin#${pendingHash.current}`)
+      pendingHash.current = null
+    }
+    window.addEventListener('popstate', writePending)
+    return () => window.removeEventListener('popstate', writePending)
+  }, [])
+  const selectSection = (section: SectionId) => {
+    setActiveSection(section)
+    if (!menuOpen) {
+      window.history.replaceState(window.history.state, '', `/admin#${section}`)
+      return
+    }
+    pendingHash.current = section
+    setMenuOpen(false)
+  }
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+
+  if (session === null) return <AuthScreen><div className="page-loading" aria-busy="true" /></AuthScreen>
+  if (!session.authenticated) {
+    return (
+      <AuthScreen>
+        {loadError ? (
+          <div className="admin-auth-card"><p className="message-error" role="alert">{loadError}</p><button type="button" className="secondary-button is-block" onClick={() => void refresh()}><RefreshCw size={14} aria-hidden="true" /> Réessayer</button></div>
+        ) : !session.configured ? (
+          <div className="admin-auth-card">
+            <h1><LockKeyhole size={18} aria-hidden="true" /> Console fermée</h1>
+            <p className="admin-auth-help">Définissez les secrets <code>ADMIN_EMAIL</code> et <code>ADMIN_PASSWORD</code> (12 caractères au moins) dans l’environnement du serveur, puis redémarrez-le.</p>
+          </div>
+        ) : (
+          <LoginForm onLoggedIn={() => void refresh()} />
+        )}
+        <button type="button" className="text-button admin-auth-exit" onClick={onExit}><ArrowLeft size={14} aria-hidden="true" /> Retour à Gilli</button>
+      </AuthScreen>
+    )
+  }
+
   const current = sections.find((section) => section.id === activeSection) ?? sections[0]
+  const nav = <ConsoleNav active={current.id} email={session.email} onSelect={selectSection} onLogout={() => void logout()} onExit={onExit} />
 
   return (
-    <div className="settings-page admin-page">
-      <header className="settings-header admin-header">
-        <h1>Console d’administration</h1>
-        {session?.authenticated && (
-          <button type="button" className="secondary-button" onClick={() => void logout()}><LogOut size={14} aria-hidden="true" /> Se déconnecter</button>
-        )}
-      </header>
-
-      {session === null && <div className="page-loading" aria-busy="true" />}
-      {loadError && <p className="message-error" role="alert">{loadError}</p>}
-      {session && !session.configured && !loadError && (
-        <p className="settings-callout">
-          <LockKeyhole size={16} aria-hidden="true" />
-          <span>La console est fermée : définissez le secret <code>ADMIN_PASSWORD</code> (12 caractères au moins) dans l’environnement du serveur, puis redémarrez-le.</span>
-        </p>
-      )}
-      {session?.configured && !session.authenticated && <LoginForm onLoggedIn={() => void refresh()} />}
-
-      {session?.authenticated && (
-        <div className="settings-layout">
-          <div className="settings-nav" role="tablist" aria-label="Sections de la console" aria-orientation="vertical">
-            {sections.map(({ id, label, icon: Icon }) => (
-              <button key={id} type="button" role="tab" id={`admin-tab-${id}`} aria-selected={activeSection === id} aria-controls={`admin-panel-${id}`} className={activeSection === id ? 'is-active' : ''} onClick={() => setActiveSection(id)}>
-                <Icon size={16} aria-hidden="true" />
-                {label}
-              </button>
-            ))}
-          </div>
-          <section className="settings-panel" role="tabpanel" id={`admin-panel-${current.id}`} aria-labelledby={`admin-tab-${current.id}`}>
-            <div className="panel-heading">
-              <h2>{current.label}</h2>
-            </div>
-            {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && activeSection !== 'moderation' && <div className="page-loading" aria-busy="true" />}
-            {activeSection === 'moderation' && <ModerationPanel onNotify={onNotify} />}
-            {overview && activeSection === 'apercu' && <EnginePanel overview={overview} />}
-            {overview && activeSection === 'reference' && <ReferencePanel reference={overview.reference} />}
-            {activeSection === 'evaluation' && <EvaluationView aiService={aiService} preferences={preferences} onNotify={onNotify} />}
-            {activeSection === 'signalements' && (
-              <p className="settings-callout">
-                <Flag size={16} aria-hidden="true" />
-                <span>À venir. Les signalements sont aujourd’hui préparés sur l’appareil de l’utilisateur sans être envoyés : leur relecture ici demandera d’abord un stockage sur le serveur (base de données).</span>
-              </p>
-            )}
-          </section>
-        </div>
-      )}
+    <div className="admin-console">
+      <aside className="admin-sidebar" aria-label="Menu de la console">{nav}</aside>
+      {menuOpen && <ConsoleDrawer onClose={closeMenu}>{nav}</ConsoleDrawer>}
+      <div className="admin-main">
+        <header className="admin-topbar">
+          <button type="button" className="icon-button admin-menu-button" aria-label="Ouvrir le menu de la console" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={20} /></button>
+          <h1>{current.label}</h1>
+          {overview?.version && <span className="admin-version">v{overview.version.version} · {overview.version.commit}</span>}
+        </header>
+        <main className="admin-content" id={`admin-panel-${current.id}`}>
+          {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && activeSection !== 'moderation' && <div className="page-loading" aria-busy="true" />}
+          {activeSection === 'moderation' && <ModerationPanel onNotify={onNotify} />}
+          {overview && activeSection === 'apercu' && <EnginePanel overview={overview} />}
+          {overview && activeSection === 'reference' && <ReferencePanel reference={overview.reference} />}
+          {activeSection === 'evaluation' && <EvaluationView aiService={aiService} preferences={preferences} onNotify={onNotify} />}
+          {activeSection === 'signalements' && (
+            <p className="settings-callout">
+              <Flag size={16} aria-hidden="true" />
+              <span>À venir. Les signalements sont aujourd’hui préparés sur l’appareil de l’utilisateur sans être envoyés : leur relecture ici demandera d’abord un stockage sur le serveur (base de données).</span>
+            </p>
+          )}
+        </main>
+      </div>
     </div>
   )
 }

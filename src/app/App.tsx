@@ -11,7 +11,6 @@ import type { BusinessModule } from '../components/business/BusinessView'
 import type { AuthClientFactory, AuthConfig } from '../services/authService'
 import { createConversationsApi } from '../services/conversationsApi'
 import { BusinessApiError } from '../services/businessApi'
-import { adminSectionFromHash, type AdminSectionId } from './adminSections'
 import { useAccountConversations } from './useAccountConversations'
 import { demoAiService } from '../services/demoAiService'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS, MAX_MESSAGE_CHARS } from '../services/remoteAiService'
@@ -186,7 +185,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   })
   const [businessOpen, setBusinessOpen] = useState<{ id: string | null; nonce: number; module: BusinessModule }>()
   const [activeBusinessConversationId, setActiveBusinessConversationId] = useState<string | null>(null)
-  const [adminSection, setAdminSection] = useState<AdminSectionId>(() => adminSectionFromHash(window.location.hash))
   const [draft, setDraft] = useState('')
   const [draftAttachments, setDraftAttachments] = useState<Attachment[]>([])
   const [isPreparingFiles, setIsPreparingFiles] = useState(false)
@@ -412,10 +410,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
       .catch(accountConversationError)
   }
 
-  const changeAdminSection = (section: AdminSectionId) => {
-    setAdminSection(section)
-    window.history.replaceState({}, '', `${routeByView.admin}#${section}`)
-  }
 
   const sendMessage = (content: string) => {
     if (content.length > MAX_MESSAGE_CHARS) {
@@ -587,8 +581,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
             onConversationOpened={setActiveBusinessConversationId}
           />
         )
-      case 'admin':
-        return <AdminView aiService={aiService} preferences={preferences} onNotify={notify} section={adminSection} onSectionChange={changeAdminSection} />
       case 'about':
         return <AboutView engineLabel={aiService.label} isDemonstration={aiService.isDemonstration} />
       default:
@@ -615,6 +607,25 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
           />
         )
     }
+  }
+
+  // Zone live permanente : les lecteurs d’écran n’annoncent pas toujours une région créée avec son contenu.
+  const toastRegion = (
+    <div className="toast-region" role="status" aria-live="polite">
+      {toast && <div className="toast">{toast.tone === 'success' ? <CheckCircle2 size={18} aria-hidden="true" /> : <Info size={18} aria-hidden="true" />}<p>{toast.message}</p><button type="button" aria-label="Fermer la notification" onClick={() => setToast(undefined)}><X size={16} /></button></div>}
+    </div>
+  )
+
+  // Console d’administration : application à part, sans le menu ni l’en-tête des utilisateurs.
+  if (activeView === 'admin') {
+    return (
+      <>
+        <Suspense fallback={<div className="page-loading" aria-busy="true" />}>
+          <AdminView aiService={aiService} preferences={preferences} onNotify={notify} onExit={() => navigate('chat')} />
+        </Suspense>
+        {toastRegion}
+      </>
+    )
   }
 
   return (
@@ -645,8 +656,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
           if (summary) accountConversations.updateBusinessConversation(id, { favorite: !summary.favorite }).catch(accountConversationError)
         }}
         onRemoveAccountConversation={removeAccountConversation}
-        adminSection={adminSection}
-        onAdminSection={changeAdminSection}
       />
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header
@@ -683,10 +692,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
         <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} initialPassage={reportedPassage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
         </Suspense>
       )}
-      {/* Zone live permanente : les lecteurs d’écran n’annoncent pas toujours une région créée avec son contenu. */}
-      <div className="toast-region" role="status" aria-live="polite">
-        {toast && <div className="toast">{toast.tone === 'success' ? <CheckCircle2 size={18} aria-hidden="true" /> : <Info size={18} aria-hidden="true" />}<p>{toast.message}</p><button type="button" aria-label="Fermer la notification" onClick={() => setToast(undefined)}><X size={16} /></button></div>}
-      </div>
+      {toastRegion}
     </div>
   )
 }

@@ -91,6 +91,7 @@ Navigateur ──/api/chat──▶ serveur Gilli (server/) ──▶ API Gemini
 | `GEMINI_API_KEY` | Clé de l’API Gemini. Absente : mode démonstration. |
 | `GEMINI_MODEL` | Modèle standard (défaut : `gemini-flash-latest`, alias du Flash le plus récent). |
 | `GEMINI_LITE_MODEL` | Modèle économe, proposé au choix et utilisé pour les titres (défaut : `gemini-flash-lite-latest`). |
+| `ADMIN_EMAIL` | Adresse e-mail de connexion à la console d’administration. Absente : console fermée. |
 | `ADMIN_PASSWORD` | Mot de passe de la console d’administration (12 caractères au moins). Absent : console fermée. |
 | `PORT` | Port du serveur de production (défaut : 3000). |
 

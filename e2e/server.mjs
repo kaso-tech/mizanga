@@ -27,6 +27,7 @@ const MODERATION_KEY = 'cle-de-moderation-des-tests-de-bout-en-bout'
 await db.query('select public.set_moderation_key($1)', [MODERATION_KEY])
 const marketplace = createPgliteMarketplace(db, { photoBaseUrl: '/photos' })
 /** Mot de passe de la console d’administration pendant les tests. */
+export const ADMIN_EMAIL = 'admin@gilli.test'
 export const ADMIN_PASSWORD = 'mot-de-passe-admin-e2e'
 /** Identifiant stable d’un compte de test, dérivé de son adresse. @param {string} email */
 const userIdOf = (email) => {
@@ -140,6 +141,7 @@ const handler = createApiHandler({
   agricultureStore: createPgliteAgricultureStore(db),
   marketplace,
   moderationKey: MODERATION_KEY,
+  adminEmail: ADMIN_EMAIL,
   adminPassword: ADMIN_PASSWORD,
   // Pas de limite par visiteur gênante pendant les tests (tous les navigateurs partagent 127.0.0.1).
   rateLimit: { windowMs: 60_000, maxRequests: 1000 },

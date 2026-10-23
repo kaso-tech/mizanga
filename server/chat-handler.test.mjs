@@ -48,10 +48,11 @@ async function startApi(config) {
 /** @param {unknown} body @param {Record<string, string>} [extraHeaders] */
 const post = (/** @type {string} */ base, body, extraHeaders = {}) => fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: JSON.stringify(body) })
 
+const adminEmail = 'admin@gilli.test'
 const adminPassword = 'mot-de-passe-de-test'
 /** Connexion à la console ; renvoie le cookie de session. @param {string} base */
-async function adminLogin(base, password = adminPassword) {
-  const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
+async function adminLogin(base, password = adminPassword, email = adminEmail) {
+  const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
   return (response.headers.get('set-cookie') ?? '').split(';')[0]
 }
 
@@ -136,11 +137,11 @@ describe('API Gilli', () => {
 
   it('garde le détail d’un refus de Gemini pour la console d’administration, sans le montrer à l’utilisateur', async () => {
     upstreamReply = { status: 429, events: [], body: { error: { code: 429, message: 'You exceeded your current quota.', details: [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', quotaValue: '20' }] }] } } }
-    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, adminPassword })
+    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, adminEmail, adminPassword })
     const response = await post(base, validBody)
     const body = /** @type {Record<string, unknown>} */ (await response.json())
     expect(JSON.stringify(body)).not.toContain('FreeTier')
-    const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) })
     const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0]
     const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
     expect(overview.engineErrors).toEqual([{ at: expect.any(String), feature: 'chat (modèle standard)', model: 'gemini-flash-latest', httpStatus: 429, quotas: ['GenerateRequestsPerDayPerProjectPerModel-FreeTier (limite 20)'], message: 'You exceeded your current quota.' }])
@@ -247,7 +248,7 @@ describe('API Gilli', () => {
       writeFileSync(join(referenceDir, 'fiche.md'), '## Orthographe\nRègle de test validée.')
       writeFileSync(join(referenceDir, 'lexique.csv'), 'statut;francais;moore;valide_par\nvalidé;eau;mot-test;AB\nbrouillon;pain;mot-brouillon;')
       upstreamReply = { status: 200, events: [textEvent('ok')] }
-      const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, referenceDir, adminPassword })
+      const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, referenceDir, adminEmail, adminPassword })
       const cookie = await adminLogin(base)
       const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
       expect(overview.reference).toMatchObject({ examples: 0, entries: 1, counts: { draft: 1 }, problems: [] })
@@ -263,8 +264,8 @@ describe('API Gilli', () => {
     }
   })
 
-  it('ferme la console sans mot de passe configuré (ou trop court)', async () => {
-    for (const config of [{}, { adminPassword: 'court' }]) {
+  it('ferme la console sans adresse e-mail ou mot de passe configurés (ou invalides)', async () => {
+    for (const config of [{}, { adminEmail, adminPassword: 'court' }, { adminPassword }, { adminEmail: 'pas-une-adresse', adminPassword }]) {
       const base = await startApi(config)
       expect(await (await fetch(`${base}/api/admin/session`)).json()).toEqual({ configured: false, authenticated: false })
       const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'court' }) })
@@ -273,24 +274,24 @@ describe('API Gilli', () => {
   })
 
   it('ouvre une session administrateur protégée et la ferme', async () => {
-    const base = await startApi({ adminPassword })
+    const base = await startApi({ adminEmail, adminPassword })
     expect((await fetch(`${base}/api/admin/overview`)).status).toBe(401)
 
-    const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https' }, body: JSON.stringify({ password: adminPassword }) })
+    const response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https' }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) })
     expect(response.status).toBe(200)
     const setCookie = response.headers.get('set-cookie') ?? ''
     expect(setCookie).toContain('HttpOnly')
     // En HTTPS (aperçu Manus dans un cadre) : SameSite=None, accepté par les navigateurs grâce à Secure.
     expect(setCookie).toContain('SameSite=None; Secure')
     // En HTTP (développement local) : SameSite=Lax, car SameSite=None sans Secure serait refusé.
-    const overHttp = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    const overHttp = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) })
     expect(overHttp.headers.get('set-cookie')).toContain('SameSite=Lax')
     expect(overHttp.headers.get('set-cookie')).not.toContain('Secure')
     expect(setCookie).toContain('Secure')
     expect(setCookie).toContain('Path=/api')
     const cookie = setCookie.split(';')[0]
 
-    expect(await (await fetch(`${base}/api/admin/session`, { headers: { cookie } })).json()).toEqual({ configured: true, authenticated: true })
+    expect(await (await fetch(`${base}/api/admin/session`, { headers: { cookie } })).json()).toEqual({ configured: true, authenticated: true, email: adminEmail })
     const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
     expect(overview.engine).toEqual({ provider: 'gemini', configured: false, model: 'gemini-flash-latest', liteModel: 'gemini-flash-lite-latest' })
     expect(overview.engineErrors).toEqual([])
@@ -303,11 +304,22 @@ describe('API Gilli', () => {
     expect(logout.headers.get('set-cookie')).toContain('Max-Age=0')
   })
 
+  it('demande la bonne adresse e-mail en plus du mot de passe, sans dire lequel est faux', async () => {
+    const base = await startApi({ adminEmail, adminPassword })
+    const wrongEmail = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'autre@gilli.test', password: adminPassword }) })
+    expect(wrongEmail.status).toBe(401)
+    expect(await wrongEmail.json()).toEqual({ error: 'Adresse e-mail ou mot de passe incorrect.' })
+    const noEmail = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPassword }) })
+    expect(noEmail.status).toBe(401)
+    // L’adresse ne tient pas compte des majuscules ni des espaces autour.
+    expect(await adminLogin(base, adminPassword, '  Admin@Gilli.TEST ')).toMatch(/^gilli_admin=/)
+  })
+
   it('refuse un mauvais mot de passe et bloque après plusieurs essais', async () => {
-    const base = await startApi({ adminPassword })
+    const base = await startApi({ adminEmail, adminPassword })
     // Changer X-Forwarded-For à chaque essai ne contourne pas le blocage.
     let forwarded = 0
-    const attempt = () => fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `198.51.100.${++forwarded}` }, body: JSON.stringify({ password: 'mauvais-mot-de-passe' }) })
+    const attempt = () => fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `198.51.100.${++forwarded}` }, body: JSON.stringify({ email: adminEmail, password: 'mauvais-mot-de-passe' }) })
     for (let index = 0; index < 5; index++) expect((await attempt()).status).toBe(401)
     const blocked = await attempt()
     expect(blocked.status).toBe(429)
@@ -318,7 +330,7 @@ describe('API Gilli', () => {
 
   it('n’applique pas la limite par visiteur aux administrateurs connectés', async () => {
     upstreamReply = { status: 200, events: [textEvent('ok')] }
-    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, adminPassword, rateLimit: { windowMs: 60_000, maxRequests: 1 } })
+    const base = await startApi({ apiKey: 'cle', apiBase: geminiBase, adminEmail, adminPassword, rateLimit: { windowMs: 60_000, maxRequests: 1 } })
     expect((await post(base, validBody)).status).toBe(200)
     expect((await post(base, validBody)).status).toBe(429)
     const cookie = await adminLogin(base)

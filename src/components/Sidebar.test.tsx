@@ -14,7 +14,6 @@ function renderSidebar(activeView: AppView = 'chat') {
     onSelectAccountConversation: vi.fn(),
     onRemoveAccountConversation: vi.fn(),
     onToggleAccountFavorite: vi.fn(),
-    onAdminSection: vi.fn(),
   }
   render(
     <Sidebar
@@ -33,7 +32,6 @@ function renderSidebar(activeView: AppView = 'chat') {
       onSignIn={() => {}}
       onOpenAccount={() => {}}
       accountConversations={[assistant, herd]}
-      adminSection="moderation"
       {...handlers}
     />,
   )
@@ -59,17 +57,5 @@ describe('menu latéral', () => {
     // Le filtre Favoris s’applique aussi aux conversations d’assistant.
     await userEvent.click(screen.getByRole('button', { name: 'Favoris' }))
     expect(within(list).getAllByRole('button', { name: /^(Généraliste|Commerce|Élevage) : / }).map((button) => button.textContent)).toEqual(['Élevage : Vaccins des poules'])
-  })
-
-  it('affiche dans la console d’administration ses propres sections, sans les conversations', async () => {
-    const handlers = renderSidebar('admin')
-    const sidebar = screen.getByRole('complementary', { name: 'Navigation de la console' })
-    expect(within(sidebar).queryByText('Photosynthèse')).not.toBeInTheDocument()
-    expect(within(sidebar).queryByRole('button', { name: /Espace Business/ })).not.toBeInTheDocument()
-    expect(within(sidebar).getByRole('button', { name: 'Modération marketplace' })).toHaveAttribute('aria-current', 'page')
-    await userEvent.click(within(sidebar).getByRole('button', { name: 'Référence du mooré' }))
-    expect(handlers.onAdminSection).toHaveBeenCalledWith('reference')
-    await userEvent.click(within(sidebar).getByRole('button', { name: 'Retour à Gilli' }))
-    expect(handlers.onNavigate).toHaveBeenCalledWith('chat')
   })
 })

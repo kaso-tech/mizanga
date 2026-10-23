@@ -1,4 +1,5 @@
-// Console d’administration : connexion par mot de passe (secret ADMIN_PASSWORD du serveur) et
+// Console d’administration : connexion par adresse e-mail et mot de passe (secrets ADMIN_EMAIL et
+// ADMIN_PASSWORD du serveur) et
 // session signée dans un cookie inaccessible aux scripts de la page. Rien de cela n’atteint le navigateur
 // des utilisateurs : la vérification se fait ici, à chaque appel d’une adresse /api/admin/*.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
@@ -9,6 +10,9 @@ const SESSION_MS = 8 * 60 * 60 * 1000
 const LOGIN_ATTEMPTS = { windowMs: 15 * 60 * 1000, maxAttempts: 5 }
 
 const sha256 = (/** @type {string} */ value) => createHash('sha256').update(value).digest()
+/** Adresse e-mail comparable (casse et espaces ignorés). @param {unknown} value */
+export const normalizeEmail = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '')
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Valeur d’un cookie de la requête. @param {import('node:http').IncomingMessage} req @param {string} name */
 function readCookie(req, name) {
@@ -36,13 +40,15 @@ const isSameSiteRequest = (req) => {
 const isHttps = (req) => String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https' || Boolean(/** @type {any} */ (req.socket).encrypted)
 
 /**
- * @param {{ password?: string, now?: () => number }} [options]
+ * @param {{ email?: string, password?: string, now?: () => number }} [options]
  */
-export function createAdminAuth({ password, now = Date.now } = {}) {
-  const configured = typeof password === 'string' && password.length >= MIN_ADMIN_PASSWORD_LENGTH
-  // Clé de signature dérivée du mot de passe : en changer invalide toutes les sessions ouvertes.
-  const signingKey = configured ? createHmac('sha256', 'gilli-admin-session').update(password).digest() : randomBytes(32)
-  const expectedDigest = configured ? sha256(password) : randomBytes(32)
+export function createAdminAuth({ email, password, now = Date.now } = {}) {
+  const adminEmail = normalizeEmail(email)
+  const configured = EMAIL_PATTERN.test(adminEmail) && typeof password === 'string' && password.length >= MIN_ADMIN_PASSWORD_LENGTH
+  // Clé de signature dérivée de l’adresse et du mot de passe : en changer invalide toutes les sessions ouvertes.
+  const signingKey = configured ? createHmac('sha256', 'gilli-admin-session').update(`${adminEmail}\n${password}`).digest() : randomBytes(32)
+  const expectedPassword = configured ? sha256(/** @type {string} */ (password)) : randomBytes(32)
+  const expectedEmail = configured ? sha256(adminEmail) : randomBytes(32)
   /** @type {Map<string, number[]>} */
   const attempts = new Map()
 
@@ -62,8 +68,8 @@ export function createAdminAuth({ password, now = Date.now } = {}) {
   }
 
   /**
-   * Vérifie le mot de passe. Renvoie `blockedUntil` quand trop d’essais ont échoué récemment.
-   * @param {string} client @param {unknown} candidate
+   * Vérifie l’adresse et le mot de passe. Renvoie `blockedUntil` quand trop d’essais ont échoué récemment.
+   * @param {string} client @param {{ email?: unknown, password?: unknown }} candidate
    * @returns {{ ok: true, cookie: string } | { ok: false, blockedUntil?: Date }}
    */
   const login = (client, candidate) => {
@@ -73,8 +79,11 @@ export function createAdminAuth({ password, now = Date.now } = {}) {
       attempts.set(client, recent)
       return { ok: false, blockedUntil: new Date(recent[0] + LOGIN_ATTEMPTS.windowMs) }
     }
-    // Comparaison à temps constant sur les empreintes : la durée ne révèle rien du mot de passe.
-    const valid = configured && typeof candidate === 'string' && timingSafeEqual(sha256(candidate), expectedDigest)
+    // Comparaisons à temps constant sur les empreintes, toutes deux faites : la durée ne révèle ni
+    // l’adresse ni le mot de passe, et la réponse ne dit pas lequel des deux est faux.
+    const emailMatches = timingSafeEqual(sha256(normalizeEmail(candidate.email)), expectedEmail)
+    const passwordMatches = typeof candidate.password === 'string' && timingSafeEqual(sha256(candidate.password), expectedPassword)
+    const valid = configured && emailMatches && passwordMatches
     if (!valid) {
       recent.push(current)
       attempts.set(client, recent)
@@ -97,5 +106,5 @@ export function createAdminAuth({ password, now = Date.now } = {}) {
     `Max-Age=${value ? SESSION_MS / 1000 : 0}`,
   ].join('; ')
 
-  return { configured, isAuthenticated, login, cookieHeader }
+  return { configured, email: configured ? adminEmail : null, isAuthenticated, login, cookieHeader }
 }

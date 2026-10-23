@@ -55,7 +55,7 @@ beforeAll(async () => {
   tokens['jeton-alice'] = { id: await createUser(db, 'alice@example.test'), email: 'alice@example.test' }
   tokens['jeton-bob'] = { id: await createUser(db, 'bob@example.test'), email: 'bob@example.test' }
   market = createPgliteMarketplace(db)
-  const common = { provider, verifyToken: async (/** @type {string} */ token) => tokens[token] ?? null, businessStore: createPgliteBusinessStore(db), marketplace: market, adminPassword: ADMIN_PASSWORD }
+  const common = { provider, verifyToken: async (/** @type {string} */ token) => tokens[token] ?? null, businessStore: createPgliteBusinessStore(db), marketplace: market, adminEmail: 'admin@gilli.test', adminPassword: ADMIN_PASSWORD }
   base = await start({ ...common, moderationKey: KEY })
   baseWithoutKey = await start(common)
 }, 60_000)
@@ -78,7 +78,7 @@ const publish = (productId, changes = {}, root = base) => call('jeton-alice', 'P
   attributes: { marque: 'Tecno', ram_go: 8, stockage_go: 256, inconnu: 'ignoré', reseau: '6G' }, newPhotos: [{ mimeType: 'image/png', data: PNG }], ...changes,
 }, root)
 const adminCookie = async () => {
-  const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: ADMIN_PASSWORD }) })
+  const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@gilli.test', password: ADMIN_PASSWORD }) })
   return (login.headers.get('set-cookie') ?? '').split(';')[0]
 }
 

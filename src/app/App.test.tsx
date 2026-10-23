@@ -276,14 +276,15 @@ describe('App', () => {
     try {
       renderApp('/evaluation')
       expect(window.location.pathname).toBe('/admin')
-      expect(await screen.findByText(/La console est fermée/)).toBeInTheDocument()
-      expect(screen.queryByRole('tab', { name: 'Évaluation' })).not.toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Console fermée' })).toBeInTheDocument()
+      expect(screen.getByText('ADMIN_EMAIL')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Évaluation' })).not.toBeInTheDocument()
     } finally {
       vi.unstubAllGlobals()
     }
   })
 
-  it('ouvre la console après connexion et donne accès à l’évaluation', async () => {
+  it('console : page de connexion seule (e-mail et mot de passe), puis son propre menu, sans l’interface des utilisateurs', async () => {
     let authenticated = false
     const overview = {
       version: { version: '0.1.0', commit: 'abc1234', builtAt: '2026-10-21T00:00:00.000Z' },
@@ -292,26 +293,52 @@ describe('App', () => {
     }
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/admin/login') {
-        const { password } = JSON.parse(String(init?.body)) as { password: string }
-        if (password !== 'bon-mot-de-passe') return Response.json({ error: 'Mot de passe incorrect.' }, { status: 401 })
+        const { email, password } = JSON.parse(String(init?.body)) as { email: string; password: string }
+        if (email !== 'admin@gilli.test' || password !== 'bon-mot-de-passe') return Response.json({ error: 'Adresse e-mail ou mot de passe incorrect.' }, { status: 401 })
         authenticated = true
         return Response.json({ authenticated: true })
       }
-      if (url === '/api/admin/session') return Response.json({ configured: true, authenticated })
+      if (url === '/api/admin/session') return Response.json({ configured: true, authenticated, ...(authenticated ? { email: 'admin@gilli.test' } : {}) })
       if (url === '/api/admin/overview') return authenticated ? Response.json(overview) : Response.json({}, { status: 401 })
+      if (url === '/api/admin/logout') {
+        authenticated = false
+        return Response.json({ authenticated: false })
+      }
       return Response.json({}, { status: 404 })
     })
     vi.stubGlobal('fetch', fetchMock)
     try {
       renderApp('/admin')
-      const password = await screen.findByLabelText('Mot de passe')
-      await userEvent.type(password, 'mauvais{Enter}')
-      expect(await screen.findByText('Mot de passe incorrect.')).toBeInTheDocument()
-      await userEvent.clear(password)
-      await userEvent.type(password, 'bon-mot-de-passe{Enter}')
+      const email = await screen.findByLabelText('Adresse e-mail')
+      // Avant connexion : ni sections de la console, ni menu ou en-tête des utilisateurs.
+      expect(screen.queryByRole('navigation', { name: 'Sections de la console' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('complementary', { name: 'Navigation principale' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Ouvrir le menu' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Votre message' })).not.toBeInTheDocument()
+
+      await userEvent.type(email, 'admin@gilli.test')
+      await userEvent.type(screen.getByLabelText('Mot de passe'), 'mauvais{Enter}')
+      expect(await screen.findByText('Adresse e-mail ou mot de passe incorrect.')).toBeInTheDocument()
+      await userEvent.clear(screen.getByLabelText('Mot de passe'))
+      await userEvent.type(screen.getByLabelText('Mot de passe'), 'bon-mot-de-passe{Enter}')
       expect(await screen.findByText('modele-standard')).toBeInTheDocument()
-      await userEvent.click(screen.getByRole('tab', { name: 'Évaluation' }))
+
+      // Connecté : une seule navigation (le menu de la console), le titre de la section en haut.
+      const nav = screen.getByRole('navigation', { name: 'Sections de la console' })
+      expect(screen.getAllByRole('navigation', { name: 'Sections de la console' })).toHaveLength(1)
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+      expect(screen.queryByRole('complementary', { name: 'Navigation principale' })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: 'Moteur' })).toBeInTheDocument()
+      expect(screen.getByText('admin@gilli.test')).toBeInTheDocument()
+      await userEvent.click(within(nav).getByRole('button', { name: 'Évaluation' }))
+      expect(screen.getByRole('heading', { level: 1, name: 'Évaluation' })).toBeInTheDocument()
       expect(screen.getByRole('heading', { name: '1. Préparer les questions' })).toBeInTheDocument()
+      expect(window.location.hash).toBe('#evaluation')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }))
+      expect(await screen.findByLabelText('Adresse e-mail')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Retour à Gilli' }))
+      expect(await screen.findByRole('textbox', { name: 'Votre message' })).toBeInTheDocument()
     } finally {
       vi.unstubAllGlobals()
     }

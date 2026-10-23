@@ -1,5 +1,5 @@
 // Serveur de production : sert le site compilé (dist/) et l’API /api/*.
-// Usage : `pnpm build && pnpm start` (variables : PORT, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, AI_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_PASSWORD).
+// Usage : `pnpm build && pnpm start` (variables : PORT, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, AI_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_LITE_MODEL, ADMIN_EMAIL, ADMIN_PASSWORD).
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -103,6 +103,7 @@ const api = createApiHandler({
   moderationKey: process.env.MODERATION_KEY || undefined,
   model: process.env.GEMINI_MODEL || undefined,
   liteModel: process.env.GEMINI_LITE_MODEL || undefined,
+  adminEmail: process.env.ADMIN_EMAIL || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,
   apiBase: process.env.GEMINI_API_BASE || undefined,
   version: readBuildInfo(distDir) ?? undefined,
@@ -124,6 +125,7 @@ createServer((req, res) => {
 }).listen(port, () => {
   console.log(`[gilli] http://localhost:${port} — moteur : ${process.env.GEMINI_API_KEY ? `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})` : 'démonstration (GEMINI_API_KEY absente)'}`)
   const adminPassword = process.env.ADMIN_PASSWORD ?? ''
+  if (!process.env.ADMIN_EMAIL) console.log('[gilli] Console d’administration fermée (ADMIN_EMAIL absent).')
   if (!adminPassword) console.log('[gilli] Console d’administration fermée (ADMIN_PASSWORD absent).')
   else if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) console.warn(`[gilli] ADMIN_PASSWORD trop court (${MIN_ADMIN_PASSWORD_LENGTH} caractères au moins) : console fermée.`)
 })

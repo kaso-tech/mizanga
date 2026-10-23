@@ -178,7 +178,7 @@ function monitorProvider(ai, onError) {
  * est créé à partir de `aiProvider` (défaut « gemini »), `apiKey`, `model`, `liteModel` (modèle économe,
  * proposé au choix et utilisé pour les titres) et `apiBase`.
  * `referenceDir` : dossier de la référence du mooré (par défaut server/knowledge/moore).
- * `adminPassword` : mot de passe de la console d’administration (/admin) ; absent, la console est fermée.
+ * `adminEmail` et `adminPassword` : identifiants de la console d’administration (/admin) ; absents, la console est fermée.
  * `version` : version déployée (server/build-info.mjs), annoncée par /api/health.
  * `auth` : configuration publique de Supabase Auth (server/auth/supabase-auth.mjs) ; absente, pas de comptes.
  * `businessStore` : accès aux données Business (par défaut Supabase, avec le jeton de l’utilisateur).
@@ -187,10 +187,10 @@ function monitorProvider(ai, onError) {
  * `aiPricing` : prix du moteur pour le coût estimé de l’assistant Business (server/ai/pricing.mjs), 0 par défaut.
  * `marketplace` : données et photos de la marketplace (par défaut Supabase) ; `moderationKey` : clé de
  * modération (MODERATION_KEY), sans laquelle les annonces attendent une décision de l’administration.
- * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, livestockStore?: import('./livestock/store.mjs').LivestockStore, agricultureStore?: import('./agriculture/store.mjs').AgricultureStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string }} config
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminEmail?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, livestockStore?: import('./livestock/store.mjs').LivestockStore, agricultureStore?: import('./agriculture/store.mjs').AgricultureStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, livestockStore, agricultureStore, rateLimit, aiPricing, marketplace, moderationKey } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminEmail, adminPassword, version, auth, verifyToken, businessStore, livestockStore, agricultureStore, rateLimit, aiPricing, marketplace, moderationKey } = {}) {
   const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const store = businessStore ?? (auth ? createSupabaseBusinessStore(auth) : null)
   /** Derniers refus du moteur (quota, clé…), pour la console d’administration ; jamais montrés aux utilisateurs. */
@@ -229,7 +229,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
     const token = bearerToken(req)
     return token ? `compte:${createHash('sha256').update(token).digest('hex').slice(0, 32)}` : `adresse:${clientOf(req)}`
   }
-  const admin = createAdminAuth({ password: adminPassword })
+  const admin = createAdminAuth({ email: adminEmail, password: adminPassword })
 
   /**
    * Console d’administration : session, connexion, déconnexion et vue d’ensemble (réservée).
@@ -237,23 +237,24 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
    */
   const handleAdmin = async (req, res, path) => {
     if (path === '/api/admin/session' && req.method === 'GET') {
-      return sendJson(res, 200, { configured: admin.configured, authenticated: admin.isAuthenticated(req) })
+      const authenticated = admin.isAuthenticated(req)
+      return sendJson(res, 200, { configured: admin.configured, authenticated, ...(authenticated ? { email: admin.email } : {}) })
     }
     if (path === '/api/admin/login' && req.method === 'POST') {
-      if (!admin.configured) return sendJson(res, 503, { error: 'La console n’est pas configurée : définissez le secret ADMIN_PASSWORD sur le serveur.' })
+      if (!admin.configured) return sendJson(res, 503, { error: 'La console n’est pas configurée : définissez les secrets ADMIN_EMAIL et ADMIN_PASSWORD sur le serveur.' })
       let body
       try {
         body = await readJson(req)
       } catch {
         return sendJson(res, 400, { error: 'Requête invalide.' })
       }
-      const result = admin.login(clientOf(req), body?.password)
+      const result = admin.login(clientOf(req), { email: body?.email, password: body?.password })
       if (result.ok) {
         res.setHeader('Set-Cookie', admin.cookieHeader(req, result.cookie))
         return sendJson(res, 200, { authenticated: true })
       }
       if (result.blockedUntil) return sendJson(res, 429, errorBody('Trop d’essais incorrects.', result.blockedUntil))
-      return sendJson(res, 401, { error: 'Mot de passe incorrect.' })
+      return sendJson(res, 401, { error: 'Adresse e-mail ou mot de passe incorrect.' })
     }
     if (path === '/api/admin/logout' && req.method === 'POST') {
       res.setHeader('Set-Cookie', admin.cookieHeader(req, null))

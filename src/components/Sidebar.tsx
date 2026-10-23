@@ -1,7 +1,6 @@
-import { ArrowLeft, Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, PawPrint, Pencil, Printer, Search, Settings, ShieldCheck, ShoppingBag, Sprout, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
+import { Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, PawPrint, Pencil, Printer, Search, Settings, ShoppingBag, Sprout, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { accountInitial, type AccountView } from '../app/accountView'
-import { adminSections, type AdminSectionId } from '../app/adminSections'
 import { Brand } from './Brand'
 import { downloadConversation } from '../app/exportConversation'
 import type { AppView, Conversation, ConversationKind, ConversationSummary } from '../domain/types'
@@ -44,13 +43,6 @@ interface SidebarProps {
   onRenameAccountConversation?: (id: string, title: string) => void
   onToggleAccountFavorite?: (id: string) => void
   onRemoveAccountConversation?: (id: string) => void
-  /** Console d’administration : section affichée. */
-  adminSection?: AdminSectionId
-  onAdminSection?: (section: AdminSectionId) => void
-}
-
-export function Sidebar(props: SidebarProps) {
-  return props.activeView === 'admin' ? <AdminSidebar {...props} /> : <UserSidebar {...props} />
 }
 
 /** Tiroir mobile : focus sur « Fermer » à l’ouverture, Échap pour fermer, retour du focus à la fermeture. */
@@ -74,39 +66,7 @@ function useDrawerFocus(isOpen: boolean, onClose: () => void) {
   return closeButtonRef
 }
 
-/** Menu latéral de la console d’administration : ses sections, et le retour à Gilli. */
-function AdminSidebar({ isOpen, onClose, onNavigate, adminSection = 'apercu', onAdminSection }: SidebarProps) {
-  const closeButtonRef = useDrawerFocus(isOpen, onClose)
-  return (
-    <>
-      <div className={`drawer-backdrop ${isOpen ? 'is-visible' : ''}`} onClick={onClose} aria-hidden="true" />
-      <aside className={`sidebar is-admin ${isOpen ? 'is-open' : ''}`} aria-label="Navigation de la console">
-        <div className="weave-band sidebar-band" aria-hidden="true" />
-        <div className="sidebar-top">
-          <Brand />
-          <button ref={closeButtonRef} className="icon-button close-drawer" type="button" aria-label="Fermer le menu" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
-        <p className="admin-sidebar-label"><ShieldCheck size={16} aria-hidden="true" /> Console d’administration</p>
-        <nav className="admin-sidebar-nav" aria-label="Sections de la console">
-          {adminSections.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" className={`nav-item ${adminSection === id ? 'is-active' : ''}`} aria-current={adminSection === id ? 'page' : undefined} onClick={() => { onAdminSection?.(id); onClose() }}>
-              <Icon size={16} aria-hidden="true" /> {label}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          <button type="button" className="nav-item" onClick={() => onNavigate('chat')}>
-            <ArrowLeft size={16} aria-hidden="true" /> Retour à Gilli
-          </button>
-        </div>
-      </aside>
-    </>
-  )
-}
-
-function UserSidebar({
+export function Sidebar({
   activeView,
   conversations,
   activeConversationId,

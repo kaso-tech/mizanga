@@ -249,20 +249,56 @@ test('conversations : celles de l’assistant Commerce et du chatbot restent sur
   await other.close()
 })
 
-test('console d’administration : menu latéral propre, sans les conversations', async ({ page }) => {
+/** Connexion à la console (adresse e-mail et mot de passe) ; ouvre la section demandée par son menu. @param {import('@playwright/test').Page} page @param {string} [section] */
+async function adminSignIn(page, section) {
   await page.goto('/admin')
-  await page.getByLabel(/Mot de passe/).fill('mot-de-passe-admin-e2e')
+  await page.getByLabel('Adresse e-mail').fill('admin@gilli.test')
+  await page.getByLabel('Mot de passe', { exact: true }).fill('mot-de-passe-admin-e2e')
   await page.keyboard.press('Enter')
-  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
-  const menu = page.getByRole('complementary', { name: 'Navigation de la console' })
-  await expect(menu.getByRole('button', { name: 'Modération marketplace' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Moteur' })).toBeVisible()
+  if (!section) return
+  await page.getByRole('button', { name: 'Ouvrir le menu de la console' }).tap()
+  await page.getByRole('complementary', { name: 'Menu de la console' }).getByRole('button', { name: section }).tap()
+  await expect(page.getByRole('heading', { level: 1, name: section })).toBeVisible()
+}
+
+test('console d’administration : application à part, connexion par e-mail et mot de passe, une seule navigation', async ({ page }) => {
+  await page.goto('/admin')
+  // Avant connexion : seule la page de connexion, sans aucun menu (ni celui de la console, ni celui des utilisateurs).
+  await expect(page.getByRole('heading', { level: 1, name: 'Connexion' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Ouvrir le menu/ })).toHaveCount(0)
+  await expect(page.getByRole('navigation')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Modération marketplace' })).toHaveCount(0)
+  await expectFitsScreen(page, 'connexion à la console')
+  await page.getByLabel('Adresse e-mail').fill('intrus@gilli.test')
+  await page.getByLabel('Mot de passe', { exact: true }).fill('mot-de-passe-admin-e2e')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('alert')).toHaveText('Adresse e-mail ou mot de passe incorrect.')
+
+  await adminSignIn(page)
+  // Connecté : la barre du haut de la console (pas l’en-tête des utilisateurs), sans onglets en double.
+  await expect(page.getByRole('tablist')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Votre message' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Ouvrir le menu de la console' }).tap()
+  const menu = page.getByRole('complementary', { name: 'Menu de la console' })
+  await expect(menu).toContainText('admin@gilli.test')
   await expect(menu.getByRole('button', { name: 'Nouvelle conversation' })).toHaveCount(0)
   await expectFitsScreen(page, 'menu de la console')
   await menu.getByRole('button', { name: 'Modération marketplace' }).tap()
-  await expect(page.getByRole('heading', { level: 2, name: 'Modération marketplace' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Modération marketplace' })).toBeVisible()
+  await expect(menu).toBeHidden()
   expect(new URL(page.url()).hash).toBe('#moderation')
-  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
-  await menu.getByRole('button', { name: 'Retour à Gilli' }).tap()
+  await expectFitsScreen(page, 'console')
+  // Le bouton « retour » d’Android ferme le menu sans quitter la console.
+  await page.getByRole('button', { name: 'Ouvrir le menu de la console' }).tap()
+  await page.goBack()
+  await expect(menu).toBeHidden()
+  await expect(page.getByRole('heading', { level: 1, name: 'Modération marketplace' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Ouvrir le menu de la console' }).tap()
+  await menu.getByRole('button', { name: 'Se déconnecter' }).tap()
+  await expect(page.getByRole('heading', { level: 1, name: 'Connexion' })).toBeVisible()
+  await page.getByRole('button', { name: 'Retour à Gilli' }).tap()
   await expect(page.getByRole('textbox', { name: 'Votre message' })).toBeVisible()
 })
 
@@ -538,10 +574,7 @@ test('marketplace : un article interdit part en vérification et l’administrat
   await expect(badge).toHaveText('En vérification')
 
   const admin = await browser.newPage({ ...info.project.use })
-  await admin.goto('/admin')
-  await admin.getByLabel(/Mot de passe/).fill('mot-de-passe-admin-e2e')
-  await admin.keyboard.press('Enter')
-  await admin.getByRole('tab', { name: 'Modération marketplace' }).tap()
+  await adminSignIn(admin, 'Modération marketplace')
   const item = admin.locator('.moderation-card', { hasText: `Pistolet automatique ${info.project.name}` })
   await expect(item).toContainText('« pistolet »')
   await expectFitsScreen(admin, 'console de modération')
