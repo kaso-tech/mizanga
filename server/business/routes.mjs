@@ -17,10 +17,11 @@ import { BusinessError, isUuid, validateBusinessInput, validateCancelInput, vali
  *   assistant?: ReturnType<typeof import('./assistant.mjs').createAssistant> | null,
  *   marketplace?: ReturnType<typeof import('../marketplace/routes.mjs').createMarketplaceRoutes> | null,
  *   livestock?: ReturnType<typeof import('../livestock/routes.mjs').createLivestockRoutes> | null,
+ *   agriculture?: ReturnType<typeof import('../agriculture/routes.mjs').createAgricultureRoutes> | null,
  * }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, path: string) => Promise<void>}
  */
-export function createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant = null, marketplace = null, livestock = null }) {
+export function createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant = null, marketplace = null, livestock = null, agriculture = null }) {
   return async (req, res, path) => {
     try {
       const token = bearerToken(req)
@@ -34,6 +35,8 @@ export function createBusinessRoutes({ store, verify, bearerToken, readJson, sen
       if (businessId !== undefined && !isUuid(businessId)) throw new BusinessError(404, 'Entreprise introuvable.')
       // Onglet Élevage : ses propres adresses (lots, journal, santé, résultats, assistant).
       if (collection === 'livestock' && livestock) return await livestock(req, res, session, businessId, segments.slice(3))
+      // Onglet Agriculture : parcelles, cultures, journal, travaux prévus, résultats, assistant.
+      if (collection === 'agriculture' && agriculture) return await agriculture(req, res, session, businessId, segments.slice(3))
       if (productId !== undefined && !isUuid(productId)) throw new BusinessError(404, 'Élément introuvable.')
       const method = req.method ?? 'GET'
       const period = () => validatePeriod(new URL(req.url ?? '/', 'http://localhost').searchParams)

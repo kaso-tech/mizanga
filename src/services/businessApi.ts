@@ -1,4 +1,5 @@
 // Appels à l’espace Business du serveur de Gilli, avec le jeton de connexion de l’utilisateur.
+import { createAgricultureApi } from './agricultureApi'
 import { createLivestockApi } from './livestockApi'
 
 export interface Business {
@@ -312,5 +313,7 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     ),
     /** Onglet Élevage : lots, journal, santé, résultats et assistant. */
     livestock: createLivestockApi(request, stream),
+    /** Onglet Agriculture : parcelles, cultures, journal, travaux prévus, résultats et assistant. */
+    agriculture: createAgricultureApi(request, stream),
   }
 }

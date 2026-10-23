@@ -12,6 +12,7 @@ import { createTestDatabase } from '../supabase/tests/database.mjs'
 import { createPgliteMarketplace } from '../supabase/tests/pglite-marketplace.mjs'
 import { createPgliteBusinessStore } from '../supabase/tests/pglite-store.mjs'
 import { createPgliteLivestockStore } from '../supabase/tests/pglite-livestock.mjs'
+import { createPgliteAgricultureStore } from '../supabase/tests/pglite-agriculture.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const appPort = Number(process.env.E2E_PORT ?? 4173)
@@ -97,6 +98,13 @@ createServer(async (req, res) => {
     res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Voici la fiche à vérifier. Si d’autres poulets meurent, contactez un vétérinaire.' }, call] } }], usageMetadata: { promptTokenCount: 1600, candidatesTokenCount: 25 } })}\n\n`)
     return void res.end()
   }
+  // Assistant Agriculture : « J’ai vendu 2 sacs… » → fiche de vente pour la première culture listée.
+  if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('J’ai vendu'))) {
+    const crop = /^- (.+? — .+?) : saison/m.exec(instructions)?.[1] ?? 'Maïs'
+    const call = { functionCall: { name: 'proposer_operation_agricole', args: { culture: crop, type: 'vente', quantite: 2, unite: 'sac', poids_unite_kg: 100, montant: 50000 } } }
+    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Voici la fiche de vente à vérifier.' }, call] } }], usageMetadata: { promptTokenCount: 1600, candidatesTokenCount: 25 } })}\n\n`)
+    return void res.end()
+  }
   // « Vends 2 Savon, et 1500 de transport » : fiches de vente et de dépense.
   if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('Vends'))) {
     const calls = [
@@ -129,6 +137,7 @@ const handler = createApiHandler({
   },
   businessStore: createPgliteBusinessStore(db),
   livestockStore: createPgliteLivestockStore(db),
+  agricultureStore: createPgliteAgricultureStore(db),
   marketplace,
   moderationKey: MODERATION_KEY,
   adminPassword: ADMIN_PASSWORD,

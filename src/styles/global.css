@@ -1202,3 +1202,11 @@ button.account-chip:hover { opacity: .9; }
 .admin-stat.is-warning .admin-stat-value { color: var(--destructive, #b42318); }
 .vet-notice { flex: 1 1 260px; margin: 0; }
 .listing-badge.is-withdrawn { color: var(--muted-foreground); }
+
+/* Onglet Agriculture : cultures listées dans leur parcelle. */
+.crop-list { display: grid; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }
+.crop-row { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--muted); }
+.crop-row.is-closed { opacity: .75; }
+.crop-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 14px; }
+.crop-main > span:not([class]) { color: var(--muted-foreground); }
+.crop-figures { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted-foreground); font-size: 13px; }

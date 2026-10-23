@@ -6,6 +6,9 @@ import { bearerToken, createTokenVerifier } from './auth/supabase-auth.mjs'
 import { createAssistant } from './business/assistant.mjs'
 import { createBusinessRoutes } from './business/routes.mjs'
 import { createConversationRoutes } from './conversations/routes.mjs'
+import { createAgricultureAssistant } from './agriculture/assistant.mjs'
+import { createAgricultureRoutes } from './agriculture/routes.mjs'
+import { createSupabaseAgricultureStore } from './agriculture/store.mjs'
 import { createLivestockAssistant } from './livestock/assistant.mjs'
 import { createLivestockRoutes } from './livestock/routes.mjs'
 import { createSupabaseLivestockStore } from './livestock/store.mjs'
@@ -180,13 +183,14 @@ function monitorProvider(ai, onError) {
  * `auth` : configuration publique de Supabase Auth (server/auth/supabase-auth.mjs) ; absente, pas de comptes.
  * `businessStore` : accès aux données Business (par défaut Supabase, avec le jeton de l’utilisateur).
  * `livestockStore` : données de l’onglet Élevage (par défaut Supabase, avec le jeton de l’utilisateur).
+ * `agricultureStore` : données de l’onglet Agriculture (par défaut Supabase, avec le jeton de l’utilisateur).
  * `aiPricing` : prix du moteur pour le coût estimé de l’assistant Business (server/ai/pricing.mjs), 0 par défaut.
  * `marketplace` : données et photos de la marketplace (par défaut Supabase) ; `moderationKey` : clé de
  * modération (MODERATION_KEY), sans laquelle les annonces attendent une décision de l’administration.
- * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, livestockStore?: import('./livestock/store.mjs').LivestockStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string }} config
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, livestockStore?: import('./livestock/store.mjs').LivestockStore, agricultureStore?: import('./agriculture/store.mjs').AgricultureStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, livestockStore, rateLimit, aiPricing, marketplace, moderationKey } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminPassword, version, auth, verifyToken, businessStore, livestockStore, agricultureStore, rateLimit, aiPricing, marketplace, moderationKey } = {}) {
   const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const store = businessStore ?? (auth ? createSupabaseBusinessStore(auth) : null)
   /** Derniers refus du moteur (quota, clé…), pour la console d’administration ; jamais montrés aux utilisateurs. */
@@ -208,7 +212,9 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
   const marketRoutes = market ? createMarketplaceRoutes({ ...market, moderate: createListingModerator({ ai }), moderationKey: moderationKey || null, readJson, sendJson }) : null
   const livestock = livestockStore ?? (auth ? createSupabaseLivestockStore(auth) : null)
   const livestockRoutes = store && livestock ? createLivestockRoutes({ livestock, readJson, sendJson, assistant: createLivestockAssistant({ store, livestock, ai, loadReference, pricing: aiPricing }) }) : null
-  const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant, marketplace: marketRoutes, livestock: livestockRoutes }) : null
+  const agriculture = agricultureStore ?? (auth ? createSupabaseAgricultureStore(auth) : null)
+  const agricultureRoutes = store && agriculture ? createAgricultureRoutes({ agriculture, readJson, sendJson, assistant: createAgricultureAssistant({ store, agriculture, ai, loadReference, pricing: aiPricing }) }) : null
+  const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant, marketplace: marketRoutes, livestock: livestockRoutes, agriculture: agricultureRoutes }) : null
   const handleConversations = verify && store ? createConversationRoutes({ store, verify, bearerToken, readJson, sendJson }) : null
   // Marketplace publique : lecture large (une adresse IP peut regrouper de nombreux abonnés mobiles),
   // signalements limités (10 par heure et par adresse).
