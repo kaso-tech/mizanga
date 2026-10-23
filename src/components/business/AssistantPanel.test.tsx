@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBusinessApi, type AssistantContext, type Business, type Product } from '../../services/businessApi'
+import { createConversationsApi } from '../../services/conversationsApi'
 import { AssistantPanel } from './AssistantPanel'
 
 const business: Business = { id: 'b1', name: 'Boutique Awa', currency: 'XOF', countryCode: 'BF', timezone: 'Africa/Ouagadougou', role: 'owner' }
@@ -237,5 +238,54 @@ describe('assistant Business (présenté comme le chatbot)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('aucun moteur d’IA n’est configuré')
     expect(screen.getByRole('article', { name: 'Votre message' })).toHaveTextContent('Mon stock ?')
     expect(screen.getByRole('button', { name: /Réessayer/ })).toBeInTheDocument()
+  })
+
+  it('enregistre la conversation sur le compte avec ses fiches, puis la rouvre depuis le menu latéral', async () => {
+    const saved = new Map<string, Record<string, unknown>>()
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (url === '/api/business/b1/assistant' && method === 'GET') return Response.json({ quota: { used: 0, limit: 50, resetsAt } })
+      if (url === '/api/business/b1/assistant') {
+        return ndjson([
+          { context, quota: { used: 1, limit: 50, resetsAt } },
+          { proposals: [{ id: 'f1', action: 'expense', values: { amount: 2500, category: 'Transport', description: 'Taxi-moto', spentOn: null } }] },
+          { done: true, quota: { used: 1, limit: 50, resetsAt } },
+        ])
+      }
+      const id = decodeURIComponent(url.replace('/api/conversations/', ''))
+      if (method === 'PUT') {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+        saved.set(id, { ...saved.get(id), ...body, id })
+        return Response.json({ conversation: { id, kind: body.kind, businessId: body.businessId, title: saved.get(id)?.title ?? null, favorite: false, createdAt: body.createdAt, updatedAt: body.updatedAt } })
+      }
+      if (method === 'GET' && saved.has(id)) return Response.json({ conversation: saved.get(id) })
+      return Response.json({ error: 'Introuvable.' }, { status: 404 })
+    }))
+    const conversations = createConversationsApi(async () => 'jeton')
+    const onConversationSaved = vi.fn()
+    const view = render(<AssistantPanel api={createBusinessApi(async () => 'jeton')} business={business} products={products} onDataChanged={async () => {}} onNotify={() => {}} conversations={conversations} onConversationSaved={onConversationSaved} />)
+    expect(await screen.findByText(/conversation enregistrée sur votre compte/)).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre question' }), 'J’ai payé 2500 de taxi-moto')
+    await userEvent.click(screen.getByRole('button', { name: 'Envoyer' }))
+    const card = await screen.findByRole('form', { name: 'Fiche à vérifier : Dépense' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Ignorer' }))
+
+    await waitFor(() => expect(onConversationSaved).toHaveBeenCalled())
+    await waitFor(() => {
+      const [stored] = [...saved.values()] as Array<{ messages: Array<{ proposals?: Array<{ status: string }> }> }>
+      expect(stored.messages[1].proposals?.[0].status).toBe('dismissed')
+    })
+    const [stored] = [...saved.values()] as Array<{ id: string; messages: Array<{ context: AssistantContext }> }>
+    expect(stored).toMatchObject({ kind: 'commerce', businessId: 'b1', title: 'J’ai payé 2500 de taxi-moto' })
+    expect(stored.id).toMatch(/^commerce-/)
+    expect(stored.messages[1].context.business.name).toBe('Boutique Awa')
+    expect(onConversationSaved.mock.calls.at(-1)?.[0]).toMatchObject({ id: stored.id, kind: 'commerce' })
+    view.unmount()
+
+    // Rouverte depuis le menu latéral : messages, fiche ignorée et chiffres utilisés reviennent.
+    render(<AssistantPanel api={createBusinessApi(async () => 'jeton')} business={business} products={products} onDataChanged={async () => {}} onNotify={() => {}} conversations={conversations} openRequest={{ id: stored.id, nonce: 1 }} />)
+    expect(await screen.findByRole('article', { name: 'Votre message' })).toHaveTextContent('J’ai payé 2500 de taxi-moto')
+    expect(screen.getByText('Ignoré')).toBeInTheDocument()
+    expect(screen.getByText('Chiffres utilisés par l’assistant')).toBeInTheDocument()
   })
 })

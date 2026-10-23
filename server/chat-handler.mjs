@@ -5,6 +5,7 @@ import { createAiProvider } from './ai/provider.mjs'
 import { bearerToken, createTokenVerifier } from './auth/supabase-auth.mjs'
 import { createAssistant } from './business/assistant.mjs'
 import { createBusinessRoutes } from './business/routes.mjs'
+import { createConversationRoutes } from './conversations/routes.mjs'
 import { createSupabaseBusinessStore } from './business/supabase-store.mjs'
 import { createListingModerator } from './marketplace/moderation.mjs'
 import { createMarketplaceRoutes } from './marketplace/routes.mjs'
@@ -202,6 +203,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
   const market = marketplace ?? (auth ? createSupabaseMarketplace(auth) : null)
   const marketRoutes = market ? createMarketplaceRoutes({ ...market, moderate: createListingModerator({ ai }), moderationKey: moderationKey || null, readJson, sendJson }) : null
   const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant, marketplace: marketRoutes }) : null
+  const handleConversations = verify && store ? createConversationRoutes({ store, verify, bearerToken, readJson, sendJson }) : null
   // Marketplace publique : lecture large (une adresse IP peut regrouper de nombreux abonnés mobiles),
   // signalements limités (10 par heure et par adresse).
   const marketLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 300 })
@@ -292,6 +294,13 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       const blocked = businessAddressLimit(clientOf(req)) ?? businessLimit(businessClient(req))
       if (blocked) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blocked))
       return handleBusiness(req, res, path)
+    }
+    // Conversations enregistrées sur le compte : même limite par compte que l’Espace Business.
+    if (path === '/api/conversations' || path.startsWith('/api/conversations/')) {
+      if (!handleConversations) return sendJson(res, 503, { error: 'Les comptes ne sont pas configurés sur ce serveur.' })
+      const blocked = businessAddressLimit(clientOf(req)) ?? businessLimit(businessClient(req))
+      if (blocked) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blocked))
+      return handleConversations(req, res, path)
     }
     if (path.startsWith('/api/marketplace/')) {
       if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })

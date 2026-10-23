@@ -81,12 +81,28 @@ export type ReplyVersion = Pick<ChatMessage, 'content' | 'createdAt' | 'language
 
 export type MessageRating = 'positive' | 'negative' | 'correct'
 
-/** Prévu pour la persistance future ; aucune conversation n’est stockée en phase 1. */
+/** Espace d’une conversation : chatbot généraliste ou assistant d’un onglet de l’Espace Business. */
+export type ConversationKind = 'general' | 'commerce' | 'elevage' | 'agriculture'
+
+/** Conversation du chatbot généraliste (enregistrée sur l’appareil, et sur le compte une fois connecté). */
 export interface Conversation {
   id: string
   title?: string
   favorite?: boolean
   messages: ChatMessage[]
+  createdAt: string
+  updatedAt: string
+  /** Compte sur lequel la conversation est enregistrée (absent : seulement sur cet appareil). */
+  accountId?: string
+}
+
+/** Conversation enregistrée sur le compte, sans ses messages (liste du menu latéral). */
+export interface ConversationSummary {
+  id: string
+  kind: ConversationKind
+  businessId: string | null
+  title: string | null
+  favorite: boolean
   createdAt: string
   updatedAt: string
 }

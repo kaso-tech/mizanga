@@ -46,7 +46,7 @@ describe('App', () => {
     expect(await screen.findByText('Réponse de test')).toBeInTheDocument()
     expect(screen.getByText('Démonstration — aucune IA réelle')).toBeInTheDocument()
     const sidebar = screen.getByRole('complementary', { name: 'Navigation principale' })
-    expect(within(sidebar).getByRole('button', { name: 'Explique la photosynthèse' })).toBeInTheDocument()
+    expect(within(sidebar).getByRole('button', { name: 'Généraliste : Explique la photosynthèse' })).toBeInTheDocument()
   })
 
   it('exige un type d’erreur et une correction avant de préparer un signalement', async () => {

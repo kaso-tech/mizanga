@@ -63,6 +63,7 @@ export function TermsView() {
       <section>
         <h2>8. Données personnelles</h2>
         <p>Le nom de la vitrine, la ville et les numéros de contact du vendeur sont publics, afin que les clients puissent le joindre. Les données de gestion du commerce (ventes, dépenses, stock, noms des clients) restent privées et ne sont visibles que par les membres du commerce. Les photos jointes à l’assistant ne sont pas conservées.</p>
+        <p>Une fois connecté, vos conversations (chatbot et assistants de l’Espace Business) sont enregistrées sur votre compte pour que vous les retrouviez sur vos appareils ; elles ne sont visibles que par vous et vous pouvez les supprimer à tout moment. Le contenu des fichiers joints n’est pas enregistré. L’enregistrement des conversations du chatbot peut être désactivé dans les paramètres.</p>
       </section>
 
       <section>

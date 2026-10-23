@@ -1,13 +1,18 @@
 import { CheckCircle2, Info, X } from 'lucide-react'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { ChatView } from '../components/ChatView'
 import { Composer } from '../components/Composer'
 import { Header } from '../components/Header'
 import { Sidebar } from '../components/Sidebar'
 import type { AiService } from '../domain/services'
 import { responseLanguageLabels } from '../data/content'
-import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
+import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type ConversationSummary, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
+import type { BusinessModule } from '../components/business/BusinessView'
 import type { AuthClientFactory, AuthConfig } from '../services/authService'
+import { createConversationsApi } from '../services/conversationsApi'
+import { BusinessApiError } from '../services/businessApi'
+import { adminSectionFromHash, type AdminSectionId } from './adminSections'
+import { useAccountConversations } from './useAccountConversations'
 import { demoAiService } from '../services/demoAiService'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS, MAX_MESSAGE_CHARS } from '../services/remoteAiService'
 import { prepareAttachments } from './attachments'
@@ -167,6 +172,21 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
       notify('L’historique n’a pas pu être enregistré sur cet appareil (stockage plein ou indisponible). Les conversations restent disponibles jusqu’à la fermeture de la page.')
     },
   })
+  // Conversations enregistrées sur le compte (chatbot et assistants de l’Espace Business).
+  const accountClient = account.client
+  const conversationsApi = useMemo(() => (accountClient ? createConversationsApi(() => accountClient.accessToken()) : null), [accountClient])
+  const accountConversations = useAccountConversations({
+    api: account.status === 'signedIn' ? conversationsApi : null,
+    userId: account.status === 'signedIn' ? account.user?.id ?? null : null,
+    isSignedOut: account.status === 'signedOut',
+    saveEnabled: preferences.saveConversations,
+    conversations: conversation.conversations,
+    isGenerating: conversation.isGenerating,
+    applyAccountSync: conversation.applyAccountSync,
+  })
+  const [businessOpen, setBusinessOpen] = useState<{ id: string | null; nonce: number; module: BusinessModule }>()
+  const [activeBusinessConversationId, setActiveBusinessConversationId] = useState<string | null>(null)
+  const [adminSection, setAdminSection] = useState<AdminSectionId>(() => adminSectionFromHash(window.location.hash))
   const [draft, setDraft] = useState('')
   const [draftAttachments, setDraftAttachments] = useState<Attachment[]>([])
   const [isPreparingFiles, setIsPreparingFiles] = useState(false)
@@ -370,6 +390,33 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
     navigate('chat')
   }
 
+  /** Conversation d’un assistant Business : ouverte dans son onglet de l’Espace Business. */
+  const selectAccountConversation = (summary: ConversationSummary) => {
+    if (summary.kind === 'general') return
+    setBusinessOpen((current) => ({ id: summary.id, nonce: (current?.nonce ?? 0) + 1, module: summary.kind as BusinessModule }))
+    setActiveBusinessConversationId(summary.id)
+    navigate('business')
+  }
+  const accountConversationError = (error: unknown) => notify(error instanceof BusinessApiError ? error.userMessage : 'L’opération a échoué. Réessayez.')
+  const removeAccountConversation = (id: string) => {
+    const summary = accountConversations.businessConversations.find((item) => item.id === id)
+    accountConversations.removeBusinessConversation(id)
+      .then(() => {
+        notify('Conversation supprimée.', 'success')
+        // Conversation affichée : l’assistant repart sur une nouvelle conversation.
+        if (id === activeBusinessConversationId && summary && summary.kind !== 'general') {
+          setBusinessOpen((current) => ({ id: null, nonce: (current?.nonce ?? 0) + 1, module: summary.kind as BusinessModule }))
+          setActiveBusinessConversationId(null)
+        }
+      })
+      .catch(accountConversationError)
+  }
+
+  const changeAdminSection = (section: AdminSectionId) => {
+    setAdminSection(section)
+    window.history.replaceState({}, '', `${routeByView.admin}#${section}`)
+  }
+
   const sendMessage = (content: string) => {
     if (content.length > MAX_MESSAGE_CHARS) {
       notify(`Message trop long (${content.length.toLocaleString('fr')} caractères). La limite est de ${MAX_MESSAGE_CHARS.toLocaleString('fr')} : découpez-le en plusieurs messages.`)
@@ -528,9 +575,20 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
       case 'terms':
         return <TermsView />
       case 'business':
-        return <BusinessView account={accountView} client={account.client} onSignIn={() => setAccountDialogOpen(true)} onNotify={notify} />
+        return (
+          <BusinessView
+            account={accountView}
+            client={account.client}
+            onSignIn={() => setAccountDialogOpen(true)}
+            onNotify={notify}
+            conversations={account.status === 'signedIn' ? conversationsApi : null}
+            openConversation={businessOpen}
+            onConversationSaved={accountConversations.upsertBusinessConversation}
+            onConversationOpened={setActiveBusinessConversationId}
+          />
+        )
       case 'admin':
-        return <AdminView aiService={aiService} preferences={preferences} onNotify={notify} />
+        return <AdminView aiService={aiService} preferences={preferences} onNotify={notify} section={adminSection} onSectionChange={changeAdminSection} />
       case 'about':
         return <AboutView engineLabel={aiService.label} isDemonstration={aiService.isDemonstration} />
       default:
@@ -578,6 +636,17 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
         account={accountView}
         onSignIn={() => { setDrawerOpen(false); setAccountDialogOpen(true) }}
         onOpenAccount={openAccountSettings}
+        accountConversations={accountConversations.businessConversations}
+        activeAccountConversationId={activeBusinessConversationId ?? undefined}
+        onSelectAccountConversation={selectAccountConversation}
+        onRenameAccountConversation={(id, title) => { if (title.trim()) accountConversations.updateBusinessConversation(id, { title: title.trim().slice(0, 80) }).catch(accountConversationError) }}
+        onToggleAccountFavorite={(id) => {
+          const summary = accountConversations.businessConversations.find((item) => item.id === id)
+          if (summary) accountConversations.updateBusinessConversation(id, { favorite: !summary.favorite }).catch(accountConversationError)
+        }}
+        onRemoveAccountConversation={removeAccountConversation}
+        adminSection={adminSection}
+        onAdminSection={changeAdminSection}
       />
       <main className={`main-area ${isEmptyChat ? 'is-empty-chat' : ''}`}>
         <Header

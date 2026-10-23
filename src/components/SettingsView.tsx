@@ -410,9 +410,11 @@ export function SettingsView({ preferences, account, onSignIn, onSignOut, engine
             <>
               <div className="setting-group">
                 <SettingRow
-                  label="Enregistrer les conversations sur cet appareil"
+                  label="Enregistrer les conversations"
                   htmlFor="setting-save-conversations"
-                  description={preferences.saveConversations ? 'À désactiver sur un appareil partagé.' : 'L’historique disparaît à la fermeture de la page.'}
+                  description={preferences.saveConversations
+                    ? `Sur cet appareil${account.status === 'signedIn' ? ' et sur votre compte (retrouvées sur vos autres appareils)' : ', et sur votre compte une fois connecté'}. À désactiver sur un appareil partagé.`
+                    : 'L’historique disparaît à la fermeture de la page.'}
                 >
                   <Switch id="setting-save-conversations" checked={preferences.saveConversations} onChange={(saveConversations) => onChange({ saveConversations })} />
                 </SettingRow>
@@ -449,7 +451,7 @@ export function SettingsView({ preferences, account, onSignIn, onSignOut, engine
               </div>
 
               <div className="danger-zone">
-                <SettingRow label="Supprimer toutes les conversations" description="Action définitive.">
+                <SettingRow label="Supprimer toutes les conversations" description={account.status === 'signedIn' ? 'Conversations du chatbot, sur cet appareil et sur votre compte. Action définitive.' : 'Action définitive.'}>
                   {confirmingClear ? (
                     <span className="confirm-actions">
                       <button type="button" className="secondary-button" onClick={() => setConfirmingClear(false)}>Annuler</button>

@@ -1,20 +1,11 @@
-import { BookOpenCheck, ClipboardCheck, Cpu, Flag, LoaderCircle, LockKeyhole, LogOut, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { Flag, LoaderCircle, LockKeyhole, LogOut } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { AiService } from '../domain/services'
 import type { LinguisticPreferences } from '../domain/types'
 import { formatResetTime } from '../services/remoteAiService'
 import { EvaluationView } from './EvaluationView'
 import { ModerationPanel } from './marketplace/ModerationPanel'
-
-type SectionId = 'apercu' | 'moderation' | 'reference' | 'evaluation' | 'signalements'
-
-const sections: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
-  { id: 'apercu', label: 'Moteur', icon: Cpu },
-  { id: 'moderation', label: 'Modération marketplace', icon: ShieldCheck },
-  { id: 'reference', label: 'Référence du mooré', icon: BookOpenCheck },
-  { id: 'evaluation', label: 'Évaluation', icon: ClipboardCheck },
-  { id: 'signalements', label: 'Signalements', icon: Flag },
-]
+import { adminSections as sections, type AdminSectionId as SectionId } from '../app/adminSections'
 
 interface Overview {
   version: { version: string; commit: string; builtAt: string } | null
@@ -174,13 +165,18 @@ interface AdminViewProps {
   aiService: AiService
   preferences: LinguisticPreferences
   onNotify: (message: string) => void
+  /** Section affichée (choisie aussi depuis le menu latéral de la console). */
+  section?: SectionId
+  onSectionChange?: (section: SectionId) => void
 }
 
 /** Console d’administration : protégée côté serveur, invisible des utilisateurs. */
-export function AdminView({ aiService, preferences, onNotify }: AdminViewProps) {
+export function AdminView({ aiService, preferences, onNotify, section, onSectionChange }: AdminViewProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [overview, setOverview] = useState<Overview | null>(null)
-  const [activeSection, setActiveSection] = useState<SectionId>('apercu')
+  const [ownSection, setOwnSection] = useState<SectionId>('apercu')
+  const activeSection = section ?? ownSection
+  const setActiveSection = (next: SectionId) => (onSectionChange ? onSectionChange(next) : setOwnSection(next))
   const [loadError, setLoadError] = useState('')
 
   const refresh = useCallback(async () => {

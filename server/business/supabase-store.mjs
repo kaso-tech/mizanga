@@ -1,6 +1,21 @@
 // Accès aux données Business dans Supabase (API REST PostgREST), toujours avec le jeton de l’utilisateur :
 // les règles RLS et les fonctions contrôlées de la base s’appliquent comme s’il interrogeait lui-même.
 import { BusinessError } from './validate.mjs'
+import { toConversationSummary, toStoredConversation } from '../conversations/routes.mjs'
+
+export const CONVERSATION_COLUMNS = 'id,kind,business_id,title,favorite,created_at,updated_at'
+
+/** Colonnes absentes (titre, favori) : gardées telles quelles par la base. @param {import('../conversations/routes.mjs').ConversationInput} conversation */
+export const toConversationRow = (conversation) => ({
+  id: conversation.id,
+  kind: conversation.kind,
+  business_id: conversation.businessId,
+  title: conversation.title,
+  favorite: conversation.favorite,
+  messages: conversation.messages,
+  created_at: conversation.createdAt,
+  updated_at: conversation.updatedAt,
+})
 
 /**
  * @typedef {{ token: string, userId: string }} BusinessSession
@@ -27,6 +42,11 @@ import { BusinessError } from './validate.mjs'
  * @property {(session: BusinessSession, businessId: string) => Promise<Subscription>} subscription
  * @property {(session: BusinessSession, businessId: string) => Promise<string>} beginAiRequest Réserve une question (erreur 429 au-delà de la limite du jour).
  * @property {(session: BusinessSession, requestId: string, result: AiRequestResult) => Promise<void>} finishAiRequest
+ * @property {(session: BusinessSession) => Promise<import('../conversations/routes.mjs').ConversationSummary[]>} listConversations
+ * @property {(session: BusinessSession, id: string) => Promise<import('../conversations/routes.mjs').StoredConversation | null>} getConversation
+ * @property {(session: BusinessSession, conversation: import('../conversations/routes.mjs').ConversationInput) => Promise<import('../conversations/routes.mjs').ConversationSummary>} saveConversation
+ * @property {(session: BusinessSession, id: string, changes: { title?: string | null, favorite?: boolean }) => Promise<import('../conversations/routes.mjs').ConversationSummary | null>} updateConversation
+ * @property {(session: BusinessSession, id: string) => Promise<void>} deleteConversation
  *
  * @typedef {{ start: string, end: string }} Period
  * @typedef {{ id: string, soldAt: string, status: string, totalAmount: number, totalCost: number, customerName: string | null, note: string | null }} Sale
@@ -139,7 +159,7 @@ export function toBusinessError(httpStatus, body) {
  * @returns {BusinessStore}
  */
 export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { fetchImpl = fetch } = {}) {
-  /** @param {BusinessSession} session @param {string} method @param {string} path @param {unknown} [body] @param {boolean} [representation] */
+  /** @param {BusinessSession} session @param {string} method @param {string} path @param {unknown} [body] @param {boolean | string} [representation] */
   const request = async (session, method, path, body, representation = false) => {
     let response
     try {
@@ -149,7 +169,7 @@ export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { f
           apikey: publishableKey,
           Authorization: `Bearer ${session.token}`,
           'Content-Type': 'application/json',
-          ...(representation ? { Prefer: 'return=representation' } : {}),
+          ...(representation ? { Prefer: typeof representation === 'string' ? `return=representation,${representation}` : 'return=representation' } : {}),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(10_000),
@@ -263,6 +283,25 @@ export function createSupabaseBusinessStore({ supabaseUrl, publishableKey }, { f
         p_output_tokens: result.outputTokens,
         p_estimated_cost_micro_usd: result.costMicroUsd,
       })
+    },
+    async listConversations(session) {
+      const rows = await request(session, 'GET', `conversations?select=${CONVERSATION_COLUMNS}&user_id=eq.${id(session.userId)}&order=updated_at.desc&limit=500`)
+      return rows.map(toConversationSummary)
+    },
+    async getConversation(session, conversationId) {
+      const rows = await request(session, 'GET', `conversations?select=${CONVERSATION_COLUMNS},messages&user_id=eq.${id(session.userId)}&id=eq.${id(conversationId)}`)
+      return rows?.length ? toStoredConversation(rows[0]) : null
+    },
+    async saveConversation(session, conversation) {
+      const [row] = await request(session, 'POST', `conversations?on_conflict=user_id,id&select=${CONVERSATION_COLUMNS}`, { user_id: session.userId, ...toConversationRow(conversation) }, 'resolution=merge-duplicates')
+      return toConversationSummary(row)
+    },
+    async updateConversation(session, conversationId, changes) {
+      const rows = await request(session, 'PATCH', `conversations?select=${CONVERSATION_COLUMNS}&user_id=eq.${id(session.userId)}&id=eq.${id(conversationId)}`, changes, true)
+      return rows?.length ? toConversationSummary(rows[0]) : null
+    },
+    async deleteConversation(session, conversationId) {
+      await request(session, 'DELETE', `conversations?user_id=eq.${id(session.userId)}&id=eq.${id(conversationId)}`)
     },
   }
 }

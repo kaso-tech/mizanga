@@ -58,6 +58,11 @@ function readMessage(value: unknown): ChatMessage | null {
   }
 }
 
+/** Relit les messages d’une conversation enregistrée (sur l’appareil ou sur le compte) ; les illisibles sont ignorés. */
+export function parseMessages(stored: unknown): ChatMessage[] {
+  return Array.isArray(stored) ? stored.map(readMessage).filter((message): message is ChatMessage => message !== null) : []
+}
+
 /** Valide une liste de conversations (enregistrement local ou sauvegarde importée) ; toute entrée illisible est ignorée. */
 export function parseConversations(stored: unknown): Conversation[] {
   if (!Array.isArray(stored)) return []
@@ -73,6 +78,7 @@ export function parseConversations(stored: unknown): Conversation[] {
       messages,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
+      ...(isString(conversation.accountId) ? { accountId: conversation.accountId } : {}),
     }]
   })
 }
@@ -86,7 +92,7 @@ export function loadConversations(): Conversation[] {
   }
 }
 
-const withoutFileContents = (conversations: Conversation[]) => conversations.map((conversation) => ({
+export const withoutFileContents = (conversations: Conversation[]) => conversations.map((conversation) => ({
   ...conversation,
   messages: conversation.messages.map((message) => (
     message.attachments ? { ...message, attachments: message.attachments.map(({ data: _data, ...meta }) => meta) } : message
@@ -99,7 +105,9 @@ const legacyBackupFormat = 'mizanga-conversations'
 
 /** Fichier de sauvegarde de l’historique (JSON), sans le contenu des fichiers joints. */
 export function createBackup(conversations: Conversation[], now = new Date()): string {
-  return JSON.stringify({ format: backupFormat, version: 1, exportedAt: now.toISOString(), conversations: withoutFileContents(conversations) }, null, 2)
+  // Le compte d’origine n’est pas exporté : une sauvegarde importée appartient à l’appareil qui l’importe.
+  const exported = withoutFileContents(conversations).map(({ accountId: _accountId, ...conversation }) => conversation)
+  return JSON.stringify({ format: backupFormat, version: 1, exportedAt: now.toISOString(), conversations: exported }, null, 2)
 }
 
 /** Lit un fichier de sauvegarde ; renvoie null s’il ne vient pas de Gilli ou est illisible. */
@@ -107,7 +115,7 @@ export function readBackup(text: string): Conversation[] | null {
   try {
     const backup = JSON.parse(text) as { format?: unknown; conversations?: unknown } | null
     if ((backup?.format !== backupFormat && backup?.format !== legacyBackupFormat) || !Array.isArray(backup.conversations)) return null
-    return parseConversations(backup.conversations)
+    return parseConversations(backup.conversations).map(({ accountId: _accountId, ...conversation }) => conversation)
   } catch {
     return null
   }

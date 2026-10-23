@@ -1,10 +1,24 @@
-import { Download, Info, LogIn, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, ShoppingBag, Star, Store, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, PawPrint, Pencil, Printer, Search, Settings, ShieldCheck, ShoppingBag, Sprout, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { accountInitial, type AccountView } from '../app/accountView'
+import { adminSections, type AdminSectionId } from '../app/adminSections'
 import { Brand } from './Brand'
 import { downloadConversation } from '../app/exportConversation'
-import type { AppView, Conversation } from '../domain/types'
+import type { AppView, Conversation, ConversationKind, ConversationSummary } from '../domain/types'
 import { searchConversations } from '../app/searchConversations'
+
+/** Icône et nom de chaque espace de conversation, pour les reconnaître dans la liste. */
+const conversationKinds: Record<ConversationKind, { icon: LucideIcon; label: string }> = {
+  general: { icon: MessageSquare, label: 'Généraliste' },
+  commerce: { icon: Store, label: 'Commerce' },
+  elevage: { icon: PawPrint, label: 'Élevage' },
+  agriculture: { icon: Sprout, label: 'Agriculture' },
+}
+
+/** Ligne de la liste : conversation du chatbot (sur l’appareil) ou d’un assistant Business (sur le compte). */
+type SidebarItem =
+  | { kind: 'general'; id: string; title: string; favorite: boolean; createdAt: string; conversation: Conversation }
+  | { kind: Exclude<ConversationKind, 'general'>; id: string; title: string; favorite: boolean; createdAt: string; summary: ConversationSummary }
 
 interface SidebarProps {
   activeView: AppView
@@ -23,9 +37,76 @@ interface SidebarProps {
   account: AccountView
   onSignIn: () => void
   onOpenAccount: () => void
+  /** Conversations des assistants de l’Espace Business, enregistrées sur le compte. */
+  accountConversations?: ConversationSummary[]
+  activeAccountConversationId?: string
+  onSelectAccountConversation?: (summary: ConversationSummary) => void
+  onRenameAccountConversation?: (id: string, title: string) => void
+  onToggleAccountFavorite?: (id: string) => void
+  onRemoveAccountConversation?: (id: string) => void
+  /** Console d’administration : section affichée. */
+  adminSection?: AdminSectionId
+  onAdminSection?: (section: AdminSectionId) => void
 }
 
-export function Sidebar({
+export function Sidebar(props: SidebarProps) {
+  return props.activeView === 'admin' ? <AdminSidebar {...props} /> : <UserSidebar {...props} />
+}
+
+/** Tiroir mobile : focus sur « Fermer » à l’ouverture, Échap pour fermer, retour du focus à la fermeture. */
+function useDrawerFocus(isOpen: boolean, onClose: () => void) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  useEffect(() => {
+    if (!isOpen) return
+    const returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    closeButtonRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (returnFocusTo?.isConnected) returnFocusTo.focus()
+    }
+  }, [isOpen])
+  return closeButtonRef
+}
+
+/** Menu latéral de la console d’administration : ses sections, et le retour à Gilli. */
+function AdminSidebar({ isOpen, onClose, onNavigate, adminSection = 'apercu', onAdminSection }: SidebarProps) {
+  const closeButtonRef = useDrawerFocus(isOpen, onClose)
+  return (
+    <>
+      <div className={`drawer-backdrop ${isOpen ? 'is-visible' : ''}`} onClick={onClose} aria-hidden="true" />
+      <aside className={`sidebar is-admin ${isOpen ? 'is-open' : ''}`} aria-label="Navigation de la console">
+        <div className="weave-band sidebar-band" aria-hidden="true" />
+        <div className="sidebar-top">
+          <Brand />
+          <button ref={closeButtonRef} className="icon-button close-drawer" type="button" aria-label="Fermer le menu" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+        <p className="admin-sidebar-label"><ShieldCheck size={16} aria-hidden="true" /> Console d’administration</p>
+        <nav className="admin-sidebar-nav" aria-label="Sections de la console">
+          {adminSections.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" className={`nav-item ${adminSection === id ? 'is-active' : ''}`} aria-current={adminSection === id ? 'page' : undefined} onClick={() => { onAdminSection?.(id); onClose() }}>
+              <Icon size={16} aria-hidden="true" /> {label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-foot">
+          <button type="button" className="nav-item" onClick={() => onNavigate('chat')}>
+            <ArrowLeft size={16} aria-hidden="true" /> Retour à Gilli
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+function UserSidebar({
   activeView,
   conversations,
   activeConversationId,
@@ -42,30 +123,27 @@ export function Sidebar({
   account,
   onSignIn,
   onOpenAccount,
+  accountConversations = [],
+  activeAccountConversationId,
+  onSelectAccountConversation,
+  onRenameAccountConversation,
+  onToggleAccountFavorite,
+  onRemoveAccountConversation,
 }: SidebarProps) {
   const [query, setQuery] = useState('')
   const [onlyFavorites, setOnlyFavorites] = useState(false)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  const closeButtonRef = useDrawerFocus(isOpen, onClose)
 
-  // Tiroir mobile : focus sur « Fermer » à l’ouverture, Échap pour fermer, retour du focus à la fermeture.
-  useEffect(() => {
-    if (!isOpen) return
-    const returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    closeButtonRef.current?.focus()
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      if (returnFocusTo?.isConnected) returnFocusTo.focus()
-    }
-  }, [isOpen])
-
-  const visibleConversations = searchConversations(conversations, query).filter((conversation) => !onlyFavorites || conversation.favorite)
-  const emptyMessage = conversations.length === 0 ? 'Aucune conversation pour l’instant.' : onlyFavorites ? 'Aucun favori.' : 'Aucun résultat.'
+  // Une seule liste, de la plus récente à la plus ancienne ; l’icône indique l’espace de chaque conversation.
+  const normalizedQuery = query.trim().toLocaleLowerCase('fr')
+  const items: SidebarItem[] = [
+    ...searchConversations(conversations, query).map((conversation): SidebarItem => ({ kind: 'general', id: conversation.id, title: conversation.title || 'Sans titre', favorite: Boolean(conversation.favorite), createdAt: conversation.createdAt, conversation })),
+    ...accountConversations
+      .filter((summary) => summary.kind !== 'general' && (!normalizedQuery || (summary.title ?? '').toLocaleLowerCase('fr').includes(normalizedQuery)))
+      .map((summary): SidebarItem => ({ kind: summary.kind as Exclude<ConversationKind, 'general'>, id: summary.id, title: summary.title || 'Sans titre', favorite: summary.favorite, createdAt: summary.createdAt, summary })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const visibleItems = items.filter((item) => !onlyFavorites || item.favorite)
+  const emptyMessage = conversations.length + accountConversations.length === 0 ? 'Aucune conversation pour l’instant.' : onlyFavorites ? 'Aucun favori.' : 'Aucun résultat.'
 
   return (
     <>
@@ -98,25 +176,39 @@ export function Sidebar({
         <nav className="conversation-list" aria-label="Conversations de cette session">
           <p className="nav-label">{savesConversations ? 'Conversations' : 'Cette session'}</p>
           {!savesConversations && <p className="nav-note">Non enregistré : disparaît à la fermeture.</p>}
-          {visibleConversations.length === 0 ? (
+          {visibleItems.length === 0 ? (
             <p className="conversation-empty">{emptyMessage}</p>
           ) : (
             <ul>
-              {visibleConversations.map((conversation) => {
-                const isActive = conversation.id === activeConversationId && activeView === 'chat'
-                return (
+              {visibleItems.map((item) => (
+                item.kind === 'general' ? (
                   <ConversationRow
-                    key={conversation.id}
-                    conversation={conversation}
-                    isActive={isActive}
-                    onSelect={() => onSelectConversation(conversation.id)}
-                    onToggleFavorite={() => onToggleFavorite(conversation.id)}
-                    onRename={(title) => onRenameConversation(conversation.id, title)}
-                    onRemove={() => onRemoveConversation(conversation.id)}
-                    onPrint={() => onPrintConversation(conversation.id)}
+                    key={item.id}
+                    kind={item.kind}
+                    title={item.title}
+                    favorite={item.favorite}
+                    isActive={item.id === activeConversationId && activeView === 'chat'}
+                    onSelect={() => onSelectConversation(item.id)}
+                    onToggleFavorite={() => onToggleFavorite(item.id)}
+                    onRename={(title) => onRenameConversation(item.id, title)}
+                    onRemove={() => onRemoveConversation(item.id)}
+                    onExport={() => downloadConversation(item.conversation)}
+                    onPrint={() => onPrintConversation(item.id)}
+                  />
+                ) : (
+                  <ConversationRow
+                    key={item.id}
+                    kind={item.kind}
+                    title={item.title}
+                    favorite={item.favorite}
+                    isActive={item.id === activeAccountConversationId && activeView === 'business'}
+                    onSelect={() => onSelectAccountConversation?.(item.summary)}
+                    onToggleFavorite={() => onToggleAccountFavorite?.(item.id)}
+                    onRename={(title) => onRenameAccountConversation?.(item.id, title)}
+                    onRemove={() => onRemoveAccountConversation?.(item.id)}
                   />
                 )
-              })}
+              ))}
             </ul>
           )}
         </nav>
@@ -152,22 +244,27 @@ export function Sidebar({
 }
 
 interface ConversationRowProps {
-  conversation: Conversation
+  kind: ConversationKind
+  title: string
+  favorite: boolean
   isActive: boolean
   onSelect: () => void
   onToggleFavorite: () => void
   onRename: (title: string) => void
   onRemove: () => void
-  onPrint: () => void
+  /** Absents (conversations d’assistant) : pas d’export ni d’impression. */
+  onExport?: () => void
+  onPrint?: () => void
 }
 
-/** Ligne de l’historique : ouverture, favori, et menu « … » (renommer, exporter, supprimer). */
-function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, onRename, onRemove, onPrint }: ConversationRowProps) {
+/** Ligne de l’historique : espace (icône), ouverture, favori, et menu « … » (renommer, exporter, supprimer). */
+function ConversationRow({ kind, title, favorite, isActive, onSelect, onToggleFavorite, onRename, onRemove, onExport, onPrint }: ConversationRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
   const rowRef = useRef<HTMLLIElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const title = conversation.title || 'Sans titre'
+  const { icon: KindIcon, label: kindLabel } = conversationKinds[kind]
+  const renameId = `rename-${useId()}`
 
   useEffect(() => {
     if (!menuOpen) return
@@ -196,9 +293,9 @@ function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, o
     }
     return (
       <li className="conversation-row">
-        <label className="visually-hidden" htmlFor={`rename-${conversation.id}`}>Nouveau titre</label>
+        <label className="visually-hidden" htmlFor={renameId}>Nouveau titre</label>
         <input
-          id={`rename-${conversation.id}`}
+          id={renameId}
           className="rename-input"
           autoFocus
           maxLength={80}
@@ -219,17 +316,19 @@ function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, o
 
   return (
     <li ref={rowRef} className="conversation-row">
-      <button type="button" className={`conversation-item ${isActive ? 'is-active' : ''}`} aria-current={isActive ? 'page' : undefined} onClick={onSelect}>
-        {title}
+      <button type="button" className={`conversation-item ${isActive ? 'is-active' : ''}`} aria-current={isActive ? 'page' : undefined} onClick={onSelect} title={`${kindLabel} · ${title}`}>
+        <KindIcon size={15} className={`conversation-kind is-${kind}`} aria-hidden="true" />
+        <span className="visually-hidden">{kindLabel} : </span>
+        <span className="conversation-title">{title}</span>
       </button>
       <button
         type="button"
-        className={`row-action is-star ${conversation.favorite ? 'is-on' : ''}`}
-        aria-label={conversation.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-        aria-pressed={Boolean(conversation.favorite)}
+        className={`row-action is-star ${favorite ? 'is-on' : ''}`}
+        aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+        aria-pressed={favorite}
         onClick={onToggleFavorite}
       >
-        <Star size={16} fill={conversation.favorite ? 'currentColor' : 'none'} />
+        <Star size={16} fill={favorite ? 'currentColor' : 'none'} />
       </button>
       <button
         ref={menuButtonRef}
@@ -247,12 +346,16 @@ function ConversationRow({ conversation, isActive, onSelect, onToggleFavorite, o
           <button type="button" role="menuitem" autoFocus onClick={() => { setMenuOpen(false); setRenaming(title) }}>
             <Pencil size={15} aria-hidden="true" /> Renommer
           </button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); downloadConversation(conversation) }}>
-            <Download size={15} aria-hidden="true" /> Exporter (.md)
-          </button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPrint() }}>
-            <Printer size={15} aria-hidden="true" /> Imprimer ou PDF
-          </button>
+          {onExport && (
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport() }}>
+              <Download size={15} aria-hidden="true" /> Exporter (.md)
+            </button>
+          )}
+          {onPrint && (
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPrint() }}>
+              <Printer size={15} aria-hidden="true" /> Imprimer ou PDF
+            </button>
+          )}
           <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); onRemove() }}>
             <Trash2 size={15} aria-hidden="true" /> Supprimer
           </button>

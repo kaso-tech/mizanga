@@ -195,6 +195,77 @@ test('assistant : une phrase prépare une vente et une dépense, enregistrées a
   await expect(page.getByRole('list', { name: 'Liste des dépenses' })).toContainText('Transport')
 })
 
+test('conversations : celles de l’assistant Commerce et du chatbot restent sur le compte et se retrouvent dans le menu', async ({ page, browser }, info) => {
+  const email = emailFor(info)
+  await signInAndCreateShop(page, email, 'Boutique Mémoire')
+  await addProduct(page, { name: 'Savon', unit: 'pièce', buy: '250', sell: '300', quantity: '20' })
+  await page.getByRole('tab', { name: 'Assistant' }).tap()
+  await expect(page.getByText(/conversation enregistrée sur votre compte/)).toBeVisible()
+  await page.getByRole('textbox', { name: 'Votre question' }).fill('Vends 2 savons à Mariam')
+  await page.getByRole('button', { name: 'Envoyer' }).tap()
+  const sale = page.getByRole('form', { name: 'Fiche à vérifier : Vente' })
+  await sale.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
+  await expect(sale).toContainText('Vente de 600 F CFA enregistrée.')
+  await page.getByRole('form', { name: 'Fiche à vérifier : Dépense' }).getByRole('button', { name: 'Ignorer' }).tap()
+
+  // Une question au chatbot généraliste, puis l’application est rechargée.
+  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  await page.getByRole('complementary', { name: 'Navigation principale' }).getByRole('button', { name: 'Nouvelle conversation' }).tap()
+  await page.getByRole('textbox', { name: 'Votre message' }).fill('Bonjour Gilli')
+  // La conversation part au compte une fois la réponse terminée.
+  const pushed = page.waitForResponse((response) => response.url().includes('/api/conversations/conversation-') && response.request().method() === 'PUT' && response.ok())
+  await page.getByRole('button', { name: 'Envoyer' }).tap()
+  await expect(page.getByRole('article', { name: 'Réponse de Gilli' })).toContainText('Bonjour, je suis Gilli.')
+  await pushed
+  await page.reload()
+  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  const list = page.getByRole('navigation', { name: 'Conversations de cette session' })
+  await expect(list.getByRole('button', { name: 'Commerce : Vends 2 savons à Mariam' })).toBeVisible()
+  await expect(list.getByRole('button', { name: /^Généraliste : / })).toBeVisible()
+  await expectFitsScreen(page, 'menu des conversations')
+
+  // Ouverte depuis le menu : l’assistant Commerce montre la conversation et ses fiches.
+  await list.getByRole('button', { name: 'Commerce : Vends 2 savons à Mariam' }).tap()
+  await expect(page.getByRole('tab', { name: 'Assistant' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('article', { name: 'Votre message' })).toContainText('Vends 2 savons à Mariam')
+  await expect(page.getByRole('form', { name: 'Fiche à vérifier : Vente' })).toContainText('Enregistré')
+  await expect(page.getByRole('form', { name: 'Fiche à vérifier : Dépense' })).toContainText('Ignoré')
+
+  // Autre téléphone, même compte : les deux conversations y sont.
+  const other = await browser.newPage({ ...info.project.use })
+  await other.goto('/business')
+  await other.locator('.business-welcome').getByRole('button', { name: 'Se connecter' }).tap()
+  await other.getByRole('textbox', { name: /e-mail/i }).fill(email)
+  await other.keyboard.press('Enter')
+  await other.getByRole('button', { name: 'J’ai reçu un code' }).tap()
+  await other.locator('input[autocomplete="one-time-code"]').fill(LOGIN_CODE)
+  await other.keyboard.press('Enter')
+  await expect(other.getByRole('heading', { level: 1, name: 'Boutique Mémoire' })).toBeVisible()
+  await other.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  const otherList = other.getByRole('navigation', { name: 'Conversations de cette session' })
+  await expect(otherList.getByRole('button', { name: 'Commerce : Vends 2 savons à Mariam' })).toBeVisible()
+  await otherList.getByRole('button', { name: /^Généraliste : / }).tap()
+  await expect(other.getByRole('article', { name: 'Votre message' })).toContainText('Bonjour Gilli')
+  await other.close()
+})
+
+test('console d’administration : menu latéral propre, sans les conversations', async ({ page }) => {
+  await page.goto('/admin')
+  await page.getByLabel(/Mot de passe/).fill('mot-de-passe-admin-e2e')
+  await page.keyboard.press('Enter')
+  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  const menu = page.getByRole('complementary', { name: 'Navigation de la console' })
+  await expect(menu.getByRole('button', { name: 'Modération marketplace' })).toBeVisible()
+  await expect(menu.getByRole('button', { name: 'Nouvelle conversation' })).toHaveCount(0)
+  await expectFitsScreen(page, 'menu de la console')
+  await menu.getByRole('button', { name: 'Modération marketplace' }).tap()
+  await expect(page.getByRole('heading', { level: 2, name: 'Modération marketplace' })).toBeVisible()
+  expect(new URL(page.url()).hash).toBe('#moderation')
+  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
+  await menu.getByRole('button', { name: 'Retour à Gilli' }).tap()
+  await expect(page.getByRole('textbox', { name: 'Votre message' })).toBeVisible()
+})
+
 /** Publie un produit sur la marketplace (vitrine créée au besoin) ; renvoie le badge d’état affiché. @param {import('@playwright/test').Page} page @param {string} productName @param {string} title */
 async function publishListing(page, productName, title, withPhoto = true) {
   await page.getByRole('button', { name: `Publier sur la marketplace : ${productName}` }).tap()

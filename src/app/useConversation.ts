@@ -233,13 +233,34 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
   const rename = (conversationId: string, title: string) => {
     const trimmed = title.trim().slice(0, 80)
     if (!trimmed) return
-    setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? { ...conversation, title: trimmed } : conversation)))
+    // La date de modification change aussi : le nouveau titre l’emporte sur les autres appareils.
+    setConversations((current) => current.map((conversation) => (conversation.id === conversationId ? { ...conversation, title: trimmed, updatedAt: new Date().toISOString() } : conversation)))
   }
 
   const toggleFavorite = (conversationId: string) => {
     setConversations((current) => current.map((conversation) => (
-      conversation.id === conversationId ? { ...conversation, favorite: !conversation.favorite } : conversation
+      conversation.id === conversationId ? { ...conversation, favorite: !conversation.favorite, updatedAt: new Date().toISOString() } : conversation
     )))
+  }
+
+  /**
+   * Synchronisation avec le compte : marque les conversations enregistrées sur le compte `accountId`,
+   * remplace celles qui ont changé ailleurs et retire celles qui n’ont plus leur place sur l’appareil
+   * (supprimées depuis un autre appareil, ou appartenant à un compte déconnecté).
+   */
+  const applyAccountSync = ({ accountId, pulled = [], markIds = [], dropIds = [] }: { accountId?: string; pulled?: Conversation[]; markIds?: string[]; dropIds?: string[] }) => {
+    const drop = new Set(dropIds)
+    const mark = new Set(markIds)
+    if (activeId && drop.has(activeId)) {
+      controllerRef.current?.abort()
+      setActiveId(undefined)
+    }
+    setConversations((current) => {
+      const merged = mergeConversations(current, pulled.map((conversation) => ({ ...conversation, accountId }))).conversations
+      return merged
+        .filter((conversation) => !drop.has(conversation.id))
+        .map((conversation) => (mark.has(conversation.id) && conversation.accountId !== accountId ? { ...conversation, accountId } : conversation))
+    })
   }
 
   /** Un second clic sur le même avis le retire. */
@@ -252,6 +273,7 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
 
   return {
     conversations: sortedConversations,
+    applyAccountSync,
     activeConversation,
     messages: activeConversation?.messages ?? [],
     isGenerating,

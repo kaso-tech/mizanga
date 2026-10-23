@@ -1159,3 +1159,31 @@ button.account-chip:hover { opacity: .9; }
   .fade-up { animation: none !important; }
   a { color: inherit; }
 }
+
+/* Liste des conversations : icône de l’espace (généraliste, commerce, élevage, agriculture). */
+.conversation-item { display: flex; align-items: center; gap: 8px; }
+.conversation-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-kind { flex: 0 0 auto; color: var(--muted-foreground); }
+.conversation-kind.is-commerce { color: var(--ochre); }
+.conversation-kind.is-elevage { color: var(--primary); }
+.conversation-kind.is-agriculture { color: var(--primary); }
+
+/* Menu latéral de la console d’administration. */
+.admin-sidebar-label { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 24px; color: var(--muted-foreground); font-size: 13px; font-weight: 600; }
+.admin-sidebar-nav { display: grid; align-content: start; gap: 2px; flex: 1; padding: 4px 12px; overflow-y: auto; }
+/* Ordinateur, menu ouvert : les sections sont dans le menu latéral, pas en double dans la page. */
+@media (min-width: 1024px) {
+  .app-shell:not(.is-sidebar-collapsed) .admin-page .settings-nav { display: none; }
+  .app-shell:not(.is-sidebar-collapsed) .admin-page .settings-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Espace Business : activités (Commerce, Élevage, Agriculture). */
+.business-modules { display: flex; width: 100%; margin-bottom: 4px; }
+.business-modules button { display: inline-flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 8px; border: 0; border-radius: 9px; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.business-modules button.is-selected { color: var(--foreground); background: var(--card); box-shadow: 0 1px 3px color-mix(in oklab, var(--foreground) 14%, transparent); }
+.business-modules button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.business-module { display: contents; }
+.business-module[hidden] { display: none; }
+.business-upcoming { display: grid; justify-items: center; gap: 8px; text-align: center; }
+.business-upcoming h2 { margin: 0; font-size: 18px; }
+.business-upcoming p { margin: 0; max-width: 520px; color: var(--muted-foreground); }

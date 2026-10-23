@@ -1,7 +1,8 @@
 // Accès aux données Business pour les tests : mêmes requêtes que l’API REST de Supabase, exécutées sur
 // PGlite avec l’identité de l’utilisateur (rôle authenticated), donc avec les règles RLS et les fonctions
 // contrôlées réelles.
-import { MOVEMENT_COLUMNS, PRODUCT_COLUMNS, toBusiness, toBusinessError, toExpense, toMovement, toProduct, toAiQuota, toProductSales, toSale, toSummary } from '../../server/business/supabase-store.mjs'
+import { toConversationSummary, toStoredConversation } from '../../server/conversations/routes.mjs'
+import { CONVERSATION_COLUMNS, MOVEMENT_COLUMNS, PRODUCT_COLUMNS, toBusiness, toBusinessError, toExpense, toMovement, toProduct, toAiQuota, toProductSales, toSale, toSummary } from '../../server/business/supabase-store.mjs'
 import { BusinessError } from '../../server/business/validate.mjs'
 import { asUser } from './database.mjs'
 
@@ -20,6 +21,7 @@ export function createPgliteBusinessStore(db) {
   }
   const productColumns = PRODUCT_COLUMNS.split(',').join(', ')
   const movementColumns = MOVEMENT_COLUMNS.split(',').join(', ')
+  const conversationColumns = CONVERSATION_COLUMNS.split(',').join(', ')
 
   return {
     async listBusinesses({ userId }) {
@@ -89,6 +91,28 @@ export function createPgliteBusinessStore(db) {
     },
     async finishAiRequest({ userId }, requestId, result) {
       await query(userId, 'select public.finish_ai_request($1, $2, $3, $4, $5, $6, $7)', [requestId, result.status, result.provider, result.model, result.inputTokens, result.outputTokens, result.costMicroUsd])
+    },
+    async listConversations({ userId }) {
+      return (await query(userId, `select ${conversationColumns} from public.conversations where user_id = $1 order by updated_at desc limit 500`, [userId])).map(toConversationSummary)
+    },
+    async getConversation({ userId }, id) {
+      const rows = await query(userId, `select ${conversationColumns}, messages from public.conversations where user_id = $1 and id = $2`, [userId, id])
+      return rows.length ? toStoredConversation(rows[0]) : null
+    },
+    async saveConversation({ userId }, c) {
+      // Comme l’API REST : un titre ou un favori absent garde la valeur enregistrée.
+      const [row] = await query(userId, `insert into public.conversations (user_id, id, kind, business_id, title, favorite, messages, created_at, updated_at) values ($1, $2, $3, $4, $5, coalesce($6, false), $7::jsonb, $8, $9)
+        on conflict (user_id, id) do update set kind = excluded.kind, business_id = excluded.business_id, messages = excluded.messages, created_at = excluded.created_at, updated_at = excluded.updated_at,
+          title = case when $10 then excluded.title else conversations.title end, favorite = case when $11 then excluded.favorite else conversations.favorite end
+        returning ${conversationColumns}`, [userId, c.id, c.kind, c.businessId, c.title ?? null, c.favorite ?? null, JSON.stringify(c.messages), c.createdAt, c.updatedAt, c.title !== undefined, c.favorite !== undefined])
+      return toConversationSummary(row)
+    },
+    async updateConversation({ userId }, id, changes) {
+      const rows = await query(userId, `update public.conversations set title = case when $3 then $4 else title end, favorite = coalesce($5, favorite) where user_id = $1 and id = $2 returning ${conversationColumns}`, [userId, id, changes.title !== undefined, changes.title ?? null, changes.favorite ?? null])
+      return rows.length ? toConversationSummary(rows[0]) : null
+    },
+    async deleteConversation({ userId }, id) {
+      await query(userId, 'delete from public.conversations where user_id = $1 and id = $2', [userId, id])
     },
   }
 }

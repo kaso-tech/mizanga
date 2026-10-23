@@ -2,8 +2,10 @@ import { RotateCcw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { isImage, prepareAttachments } from '../../app/attachments'
 import { formatAmount, formatQuantity } from '../../app/businessFormat'
-import type { Attachment, ChatMessage as ChatMessageType } from '../../domain/types'
+import { parseMessages } from '../../app/conversationStorage'
+import type { Attachment, ChatMessage as ChatMessageType, ConversationKind, ConversationSummary } from '../../domain/types'
 import { BusinessApiError, type AiQuota, type AssistantContext, type AssistantMessage, type AssistantProposal, type Business, type BusinessApi, type Product } from '../../services/businessApi'
+import type { ConversationsApi, StoredConversation } from '../../services/conversationsApi'
 import { BrandMark } from '../Brand'
 import { ChatMessage } from '../ChatMessage'
 import { Composer } from '../Composer'
@@ -39,7 +41,52 @@ function describeProposal({ proposal, status }: ProposalState) {
   return `[Fiche ${what} : ${outcome}]`
 }
 
-const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
+const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`)
+
+const proposalStatuses: ProposalStatus[] = ['pending', 'done', 'dismissed']
+
+/** Demande d’ouverture venue du menu latéral : une conversation enregistrée, ou une nouvelle (id null). */
+export interface OpenRequest {
+  id: string | null
+  nonce: number
+}
+
+/** Titre d’une conversation d’assistant : sa première question. */
+function titleOf(messages: ChatMessageType[]) {
+  const first = messages.find((message) => message.role === 'user')
+  const line = first?.content.trim().split(/\r?\n/)[0] ?? ''
+  if (!line) return first?.attachments?.length ? 'Photo de produit' : 'Conversation'
+  return line.length > 48 ? `${line.slice(0, 47).trimEnd()}…` : line
+}
+
+/**
+ * Messages enregistrés sur le compte : ceux du chat, avec leurs fiches (une fiche en cours
+ * d’enregistrement redevient « à vérifier ») et les chiffres transmis à l’assistant.
+ */
+function toStoredMessages(messages: ChatMessageType[], proposals: Record<string, ProposalState[]>, contexts: Record<string, AssistantContext>) {
+  return messages.map((message) => ({
+    ...message,
+    ...(message.attachments ? { attachments: message.attachments.map(({ data: _data, ...meta }) => meta) } : {}),
+    ...(proposals[message.id] ? { proposals: proposals[message.id].map((state) => ({ ...state, status: state.status === 'saving' ? 'pending' : state.status })) } : {}),
+    ...(contexts[message.id] ? { context: contexts[message.id] } : {}),
+  }))
+}
+
+function fromStored(stored: StoredConversation) {
+  const messages = parseMessages(stored.messages)
+  const proposals: Record<string, ProposalState[]> = {}
+  const contexts: Record<string, AssistantContext> = {}
+  for (const raw of stored.messages as Array<{ id?: unknown; proposals?: unknown; context?: unknown }>) {
+    if (typeof raw?.id !== 'string') continue
+    if (Array.isArray(raw.proposals)) {
+      proposals[raw.id] = raw.proposals.filter((state: Partial<ProposalState> | null) => (
+        typeof state?.proposal?.id === 'string' && typeof state.proposal.action === 'string' && typeof state.proposal.values === 'object' && proposalStatuses.includes(state.status as ProposalStatus)
+      ))
+    }
+    if (raw.context && typeof raw.context === 'object') contexts[raw.id] = raw.context as AssistantContext
+  }
+  return { messages, proposals, contexts }
+}
 
 /** Chiffres que l’assistant a reçus, pour que le commerçant puisse vérifier sa réponse. */
 function ContextDetails({ context }: { context: AssistantContext }) {
@@ -75,16 +122,23 @@ function ContextDetails({ context }: { context: AssistantContext }) {
 
 /**
  * Assistant Business, présenté comme le chatbot de Gilli (mêmes messages, même zone de saisie, mêmes
- * actions) mais répondant à partir des chiffres du commerce. La conversation reste sur cet écran
- * (elle n’est pas enregistrée) ; chaque question compte dans la limite du jour.
+ * actions) mais répondant à partir des chiffres du commerce. Avec `conversations`, la conversation est
+ * enregistrée sur le compte (avec ses fiches) et retrouvée depuis le menu latéral ; chaque question
+ * compte dans la limite du jour.
  */
-export function AssistantPanel({ api, business, products, onDataChanged, onNotify }: {
+export function AssistantPanel({ api, business, products, onDataChanged, onNotify, conversations = null, kind = 'commerce', openRequest, onConversationSaved, onConversationOpened }: {
   api: BusinessApi
   business: Business
   products: Product[]
   /** Appelé après un enregistrement confirmé (les produits et le stock ont changé). */
   onDataChanged: () => Promise<void>
   onNotify: (message: string, tone?: 'success' | 'info') => void
+  conversations?: ConversationsApi | null
+  kind?: Exclude<ConversationKind, 'general'>
+  openRequest?: OpenRequest
+  onConversationSaved?: (summary: ConversationSummary) => void
+  /** Conversation affichée (null : nouvelle conversation pas encore enregistrée). */
+  onConversationOpened?: (id: string | null) => void
 }) {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
   const [contexts, setContexts] = useState<Record<string, AssistantContext>>({})
@@ -98,6 +152,77 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
   const controllerRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  // Conversation enregistrée : identifiant, date de création, titre déjà envoyé, dernier contenu enregistré.
+  const savedRef = useRef<{ id: string | null; createdAt: string; titleSent: boolean; snapshot: string }>({ id: null, createdAt: '', titleSent: false, snapshot: '' })
+  const callbacksRef = useRef({ onConversationSaved, onConversationOpened, onNotify })
+  callbacksRef.current = { onConversationSaved, onConversationOpened, onNotify }
+
+  /** Change à chaque conversation affichée : une réponse en retard n’atterrit pas dans une autre. */
+  const displayRef = useRef(0)
+  const show = (next: { messages: ChatMessageType[]; proposals: Record<string, ProposalState[]>; contexts: Record<string, AssistantContext> }) => {
+    displayRef.current += 1
+    setMessages(next.messages)
+    setProposals(next.proposals)
+    setContexts(next.contexts)
+  }
+
+  // Ouverture depuis le menu latéral.
+  const openNonce = openRequest?.nonce
+  const openId = openRequest?.id
+  useEffect(() => {
+    if (openNonce === undefined) return
+    controllerRef.current?.abort()
+    if (!openId || !conversations) {
+      savedRef.current = { id: null, createdAt: '', titleSent: false, snapshot: '' }
+      show({ messages: [], proposals: {}, contexts: {} })
+      return
+    }
+    if (openId === savedRef.current.id) return
+    let cancelled = false
+    setIsLoading(true)
+    conversations.get(openId)
+      .then((stored) => {
+        if (cancelled) return
+        const loaded = fromStored(stored)
+        savedRef.current = { id: stored.id, createdAt: stored.createdAt, titleSent: true, snapshot: JSON.stringify(toStoredMessages(loaded.messages, loaded.proposals, loaded.contexts)) }
+        show(loaded)
+        callbacksRef.current.onConversationOpened?.(stored.id)
+      })
+      .catch((caught: unknown) => { if (!cancelled) callbacksRef.current.onNotify(caught instanceof BusinessApiError ? caught.userMessage : 'La conversation n’a pas pu être ouverte.') })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
+  }, [openNonce, openId, conversations])
+
+  // Enregistrement sur le compte, une fois la réponse terminée (et à chaque fiche confirmée ou ignorée).
+  useEffect(() => {
+    if (!conversations || isGenerating || isLoading || messages.length === 0) return
+    const stored = toStoredMessages(messages, proposals, contexts)
+    const snapshot = JSON.stringify(stored)
+    if (snapshot === savedRef.current.snapshot) return
+    const timer = window.setTimeout(() => {
+      const saved = savedRef.current
+      if (!saved.id) savedRef.current = { ...saved, id: `${kind}-${newId()}`, createdAt: new Date().toISOString() }
+      const { id, createdAt, titleSent } = savedRef.current
+      if (!id) return
+      conversations.save({ id, kind, businessId: business.id, ...(titleSent ? {} : { title: titleOf(messages) }), messages: stored, createdAt, updatedAt: new Date().toISOString() })
+        .then((result) => {
+          if (savedRef.current.id !== id) return
+          if ('newer' in result) {
+            // Modifiée entre-temps sur un autre appareil : la version la plus récente est affichée.
+            const loaded = fromStored(result.newer)
+            savedRef.current = { ...savedRef.current, titleSent: true, snapshot: JSON.stringify(toStoredMessages(loaded.messages, loaded.proposals, loaded.contexts)) }
+            show(loaded)
+            return
+          }
+          savedRef.current = { ...savedRef.current, titleSent: true, snapshot }
+          callbacksRef.current.onConversationSaved?.(result.saved)
+          callbacksRef.current.onConversationOpened?.(id)
+        })
+        .catch(() => undefined)
+    }, 600)
+    return () => window.clearTimeout(timer)
+  }, [conversations, kind, business.id, messages, proposals, contexts, isGenerating, isLoading])
 
   useEffect(() => {
     api.assistantQuota(business.id).then(setQuota).catch(() => setQuota(null))
@@ -117,10 +242,11 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
     const controller = new AbortController()
     controllerRef.current = controller
     const answerId = newId()
+    const display = displayRef.current
     let context: AssistantContext | undefined
     let hasProposals = false
     /** Crée la réponse au premier fragment, puis la met à jour. */
-    const updateAnswer = (change: (answer: ChatMessageType) => ChatMessageType) => setMessages((current) => {
+    const updateAnswer = (change: (answer: ChatMessageType) => ChatMessageType) => displayRef.current === display && setMessages((current) => {
       const existing = current.find((message) => message.id === answerId)
       const base: ChatMessageType = existing ?? { id: answerId, role: 'assistant', content: '', createdAt: new Date().toISOString(), status: 'streaming' }
       const updated = change(base)
@@ -142,14 +268,14 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
         } else if ('proposals' in event) {
           hasProposals = true
           updateAnswer((answer) => answer)
-          setProposals((current) => ({ ...current, [answerId]: event.proposals.map((proposal) => ({ proposal, status: 'pending' })) }))
+          if (displayRef.current === display) setProposals((current) => ({ ...current, [answerId]: event.proposals.map((proposal) => ({ proposal, status: 'pending' })) }))
         } else {
           setQuota(event.quota)
         }
       }, controller.signal)
       // Fiches sans texte : une phrase d’accompagnement plutôt qu’une réponse vide.
       updateAnswer((answer) => ({ ...answer, status: 'complete', content: answer.content || (hasProposals ? 'Voici la fiche à vérifier avant l’enregistrement.' : '') }))
-      if (context) setContexts((current) => ({ ...current, [answerId]: context as AssistantContext }))
+      if (context && displayRef.current === display) setContexts((current) => ({ ...current, [answerId]: context as AssistantContext }))
     } catch (caught) {
       if (controller.signal.aborted) {
         updateAnswer((answer) => ({ ...answer, status: 'stopped' }))
@@ -230,9 +356,9 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
   }
 
   const reset = () => {
-    setMessages([])
-    setContexts({})
-    setProposals({})
+    savedRef.current = { id: null, createdAt: '', titleSent: false, snapshot: '' }
+    show({ messages: [], proposals: {}, contexts: {} })
+    onConversationOpened?.(null)
     setFocusToken((token) => token + 1)
   }
 
@@ -240,7 +366,9 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
 
   return (
     <section aria-label="Assistant" className="assistant-panel">
-      {messages.length === 0 ? (
+      {isLoading ? (
+        <div className="page-loading" aria-busy="true" />
+      ) : messages.length === 0 ? (
         <div className="welcome assistant-welcome">
           <div className="welcome-head fade-up">
             <div className="weave-band welcome-band" aria-hidden="true" />
@@ -305,7 +433,7 @@ export function AssistantPanel({ api, business, products, onDataChanged, onNotif
 
       <div className="assistant-composer-zone">
         {remaining !== null && quota && (
-          <p className="assistant-quota">{remaining} question{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''} aujourd’hui (sur {quota.limit}) · conversation non enregistrée</p>
+          <p className="assistant-quota">{remaining} question{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''} aujourd’hui (sur {quota.limit}) · {conversations ? 'conversation enregistrée sur votre compte' : 'conversation non enregistrée'}</p>
         )}
         <Composer
           value={draft}
