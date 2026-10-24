@@ -61,12 +61,10 @@ describe('Composer', () => {
     expect(screen.getByRole('button', { name: 'Envoyer' })).toBeDisabled()
   })
 
-  it('insère les caractères du mooré à la position du curseur', async () => {
-    const { textarea } = renderComposer('ab')
-    await userEvent.click(screen.getByRole('button', { name: 'Caractères du mooré' }))
-    textarea.setSelectionRange(1, 1)
-    await userEvent.click(screen.getByRole('button', { name: 'Insérer ʋ' }))
-    expect(textarea.value).toBe('aʋb')
+  it('ne propose plus de clavier de caractères spéciaux et invite à chercher un produit', () => {
+    renderComposer('')
+    expect(screen.queryByRole('button', { name: /Caractères/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Votre message' })).toHaveAttribute('placeholder', 'Que cherchez-vous ? Produit, budget, ville…')
   })
 
   it('permet d’envoyer une pièce jointe seule et transmet les fichiers collés', async () => {

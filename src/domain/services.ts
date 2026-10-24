@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation, LinguisticFeedback, LinguisticPreferences } from './types'
+import type { ChatMessage, Conversation, LinguisticFeedback, LinguisticPreferences, ShoppingListing } from './types'
 
 export interface SourceReference {
   title: string
@@ -20,6 +20,8 @@ export interface AiChunk {
   sources?: SourceReference[]
   /** Suggestions de recherche Google, à afficher telles quelles avec la réponse (conditions de Google). */
   searchSuggestionsHtml?: string
+  /** Annonces de la marketplace trouvées par l’assistant d’achat. */
+  listings?: ShoppingListing[]
 }
 
 /**

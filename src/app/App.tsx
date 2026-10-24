@@ -5,9 +5,8 @@ import { Composer } from '../components/Composer'
 import { Header } from '../components/Header'
 import { Sidebar } from '../components/Sidebar'
 import type { AiService } from '../domain/services'
-import { responseLanguageLabels } from '../data/content'
-import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type ConversationSummary, type LinguisticFeedback, type LinguisticPreferences, type MessageRating } from '../domain/types'
-import type { BusinessModule } from '../components/business/BusinessView'
+import { offeredResponseLanguages } from '../data/content'
+import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type ConversationSummary, type LinguisticPreferences, type MessageRating } from '../domain/types'
 import type { AuthClientFactory, AuthConfig } from '../services/authService'
 import { createConversationsApi } from '../services/conversationsApi'
 import { BusinessApiError } from '../services/businessApi'
@@ -32,7 +31,6 @@ const BusinessView = lazy(() => import('../components/business/BusinessView').th
 const MarketplaceView = lazy(() => import('../components/marketplace/MarketplaceView').then((module) => ({ default: module.MarketplaceView })))
 const TermsView = lazy(() => import('../components/TermsView').then((module) => ({ default: module.TermsView })))
 const AccountDialog = lazy(() => import('../components/AccountDialog').then((module) => ({ default: module.AccountDialog })))
-const FeedbackDialog = lazy(() => import('../components/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })))
 
 const routeByView: Record<AppView, string> = {
   chat: '/',
@@ -56,7 +54,7 @@ const titleByView: Record<AppView, string> = {
   settings: 'Paramètres',
   about: 'À propos',
   admin: 'Administration',
-  business: 'Espace Business',
+  business: 'Espace vendeur',
   marketplace: 'Marketplace',
   terms: 'Conditions d’utilisation',
 }
@@ -118,10 +116,9 @@ function loadPreferences(): LinguisticPreferences {
     const stored = JSON.parse(localStorage.getItem(preferencesStorageKey) ?? '{}') as Partial<LinguisticPreferences>
     return {
       ...defaultPreferences,
-      ...(stored.responseLanguage && Object.hasOwn(responseLanguageLabels, stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
+      ...(stored.responseLanguage && offeredResponseLanguages.includes(stored.responseLanguage) ? { responseLanguage: stored.responseLanguage } : {}),
       ...(stored.userWritingMode === 'standard' || stored.userWritingMode === 'informal' ? { userWritingMode: stored.userWritingMode } : {}),
       ...(stored.theme === 'light' || stored.theme === 'dark' || stored.theme === 'system' ? { theme: stored.theme } : {}),
-      ...(stored.modelTier === 'standard' || stored.modelTier === 'lite' ? { modelTier: stored.modelTier } : {}),
       ...(stored.textSize && ['small', 'normal', 'large', 'xlarge'].includes(stored.textSize) ? { textSize: stored.textSize } : {}),
       ...(typeof stored.saveConversations === 'boolean' ? { saveConversations: stored.saveConversations } : {}),
       ...(typeof stored.customInstructions === 'string' ? { customInstructions: stored.customInstructions.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS) } : {}),
@@ -183,15 +180,13 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
     isGenerating: conversation.isGenerating,
     applyAccountSync: conversation.applyAccountSync,
   })
-  const [businessOpen, setBusinessOpen] = useState<{ id: string | null; nonce: number; module: BusinessModule }>()
+  const [businessOpen, setBusinessOpen] = useState<{ id: string | null; nonce: number }>()
   const [activeBusinessConversationId, setActiveBusinessConversationId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [draftAttachments, setDraftAttachments] = useState<Attachment[]>([])
   const [isPreparingFiles, setIsPreparingFiles] = useState(false)
   const [focusToken, setFocusToken] = useState(0)
   const [copiedMessageId, setCopiedMessageId] = useState<string>()
-  const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null)
-  const [reportedPassage, setReportedPassage] = useState('')
   const [speakingMessageId, setSpeakingMessageId] = useState<string>()
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>(loadSavedPrompts)
   const isMobile = useIsMobileLayout()
@@ -332,12 +327,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   }
 
   /** Quota du modèle principal épuisé : bascule sur le modèle économe (quota distinct) et relance. */
-  const switchToLiteModel = () => {
-    updatePreferences({ modelTier: 'lite' })
-    conversation.regenerate({ modelTier: 'lite' })
-    notify('Modèle économe activé. Vous pourrez revenir au modèle standard dans Paramètres › Général.', 'success')
-  }
-
   const exportConversations = () => {
     downloadFile(`gilli-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`, createBackup(conversation.conversations), 'application/json')
     notify('Sauvegarde téléchargée. Le contenu des fichiers joints n’y figure pas.', 'success')
@@ -383,6 +372,14 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
     setPrintToken((token) => token + 1)
   }
 
+  /** Annonce proposée par l’assistant d’achat : ouverte dans la marketplace. */
+  const openListing = (id: string) => {
+    window.history.pushState({}, '', `/marketplace/annonce/${encodeURIComponent(id)}`)
+    setMarketplaceVisit((visit) => visit + 1)
+    setActiveView('marketplace')
+    setDrawerOpen(false)
+  }
+
   const selectConversation = (conversationId: string) => {
     conversation.select(conversationId)
     navigate('chat')
@@ -390,8 +387,8 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
 
   /** Conversation d’un assistant Business : ouverte dans son onglet de l’Espace Business. */
   const selectAccountConversation = (summary: ConversationSummary) => {
-    if (summary.kind === 'general') return
-    setBusinessOpen((current) => ({ id: summary.id, nonce: (current?.nonce ?? 0) + 1, module: summary.kind as BusinessModule }))
+    if (summary.kind !== 'commerce') return
+    setBusinessOpen((current) => ({ id: summary.id, nonce: (current?.nonce ?? 0) + 1 }))
     setActiveBusinessConversationId(summary.id)
     navigate('business')
   }
@@ -402,8 +399,8 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
       .then(() => {
         notify('Conversation supprimée.', 'success')
         // Conversation affichée : l’assistant repart sur une nouvelle conversation.
-        if (id === activeBusinessConversationId && summary && summary.kind !== 'general') {
-          setBusinessOpen((current) => ({ id: null, nonce: (current?.nonce ?? 0) + 1, module: summary.kind as BusinessModule }))
+        if (id === activeBusinessConversationId && summary) {
+          setBusinessOpen((current) => ({ id: null, nonce: (current?.nonce ?? 0) + 1 }))
           setActiveBusinessConversationId(null)
         }
       })
@@ -491,16 +488,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   const rateMessage = (message: ChatMessage, rating: MessageRating) => {
     conversation.rate(message.id, rating)
     if (message.rating !== rating) notify('Avis noté sur cet appareil : la collecte des retours et la validation linguistique ne sont pas encore activées.')
-  }
-
-  const openReport = (message: ChatMessage, selectedPassage: string) => {
-    setReportedPassage(selectedPassage)
-    setReportedMessage(message)
-  }
-
-  const submitReport = (_feedback: LinguisticFeedback) => {
-    setReportedMessage(null)
-    notify('Merci ! Le signalement est prêt, mais l’enregistrement n’est pas encore connecté : il n’a pas été envoyé.')
   }
 
   const toggleSidebar = () => {
@@ -594,10 +581,9 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
             onNewConversation={startNewConversation}
             onCopy={copyMessage}
             onRegenerate={() => conversation.regenerate()}
-            onUseLiteModel={aiService.offersLiteModel && preferences.modelTier !== 'lite' ? switchToLiteModel : undefined}
+            onOpenListing={openListing}
             onEditLastMessage={conversation.editLastUserMessage}
             onRate={rateMessage}
-            onReport={openReport}
             speakingMessageId={speakingMessageId}
             onSelectVersion={(message, index) => conversation.selectVersion(message.id, index)}
             savedPrompts={savedPrompts}
@@ -661,10 +647,9 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
         <Header
           isMenuOpen={isMobile ? drawerOpen : !sidebarCollapsed}
           isDemonstration={aiService.isDemonstration}
-          offersLiteModel={Boolean(aiService.offersLiteModel)}
-          modelTier={preferences.modelTier}
           onToggleSidebar={toggleSidebar}
-          onModelTierChange={(modelTier) => updatePreferences({ modelTier })}
+          onOpenMarketplace={() => navigate('marketplace')}
+          isMarketplaceActive={activeView === 'marketplace'}
           onOpenSettings={() => navigate('settings')}
           account={accountView}
           onSignIn={() => setAccountDialogOpen(true)}
@@ -685,11 +670,6 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
               notify('Vous êtes connecté.', 'success')
             }}
           />
-        </Suspense>
-      )}
-      {reportedMessage && (
-        <Suspense fallback={null}>
-        <FeedbackDialog key={reportedMessage?.id ?? 'closed'} message={reportedMessage} initialPassage={reportedPassage} onClose={() => setReportedMessage(null)} onSubmit={submitReport} />
         </Suspense>
       )}
       {toastRegion}

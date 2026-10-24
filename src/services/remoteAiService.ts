@@ -1,5 +1,5 @@
 import { AiServiceError, type AiChunk, type AiService, type SourceReference } from '../domain/services'
-import type { ChatMessage } from '../domain/types'
+import type { ChatMessage, ShoppingListing } from '../domain/types'
 import type { AuthConfig } from './authService'
 import { demoAiService } from './demoAiService'
 
@@ -56,7 +56,7 @@ export function selectHistory(messages: ChatMessage[]) {
   while (selected.length > 1 && selected[0].role !== 'user') selected.shift()
 
   let attachmentBytes = 0
-  const withFiles = selected.reverse().map(({ role, content, attachments = [] }) => {
+  const withFiles = selected.reverse().map(({ role, content, attachments = [], listings = [] }) => {
     const sent = attachments.filter((attachment) => {
       if (!attachment.data || attachmentBytes + attachment.size > MAX_HISTORY_ATTACHMENT_BYTES) return false
       attachmentBytes += attachment.size
@@ -66,7 +66,8 @@ export function selectHistory(messages: ChatMessage[]) {
     const missing = attachments.filter((attachment) => !sent.includes(attachment)).map((attachment) => `[Fichier joint non disponible : ${attachment.name}]`)
     return {
       role,
-      content: [content, ...missing].filter(Boolean).join('\n'),
+      // Annonces montrées dans une réponse précédente : rappelées au moteur pour les questions qui suivent (« et la 2 ? »).
+      content: [content, ...missing, ...(listings.length ? [`[Annonces montrées : ${listings.map((item) => `${item.rank}. ${item.title} — ${item.price} F CFA, ${item.city}`).join(' ; ')}]`] : [])].filter(Boolean).join('\n'),
       ...(sent.length > 0 ? { attachments: sent.map(({ name, mimeType, data }) => ({ name, mimeType, data })) } : {}),
     }
   })
@@ -125,9 +126,10 @@ export function createRemoteAiService({ label, offersLiteModel = false, endpoint
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (!line.trim()) continue
-          const event = JSON.parse(line) as ErrorBody & { text?: string; sources?: SourceReference[]; searchSuggestionsHtml?: string }
+          const event = JSON.parse(line) as ErrorBody & { text?: string; sources?: SourceReference[]; searchSuggestionsHtml?: string; listings?: ShoppingListing[] }
           if (event.error) throw errorFrom(event)
           // La langue réelle de la réponse n’est pas connue : elle n’est pas indiquée plutôt que devinée.
+          if (Array.isArray(event.listings)) yield { text: '', listings: event.listings }
           if (event.text) yield { text: event.text }
           if (event.sources || event.searchSuggestionsHtml) yield { text: '', sources: event.sources ?? [], searchSuggestionsHtml: event.searchSuggestionsHtml }
         }

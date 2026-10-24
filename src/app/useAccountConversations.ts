@@ -74,7 +74,8 @@ export function useAccountConversations({ api, userId, isSignedOut, saveEnabled,
     void (async () => {
       const remote = await api.list()
       if (cancelled) return
-      setBusinessConversations(remote.filter((summary) => summary.kind !== 'general'))
+      // Seules les conversations des assistants encore proposés sont listées (les anciens onglets Élevage et Agriculture ont été retirés).
+      setBusinessConversations(remote.filter((summary) => summary.kind === 'commerce'))
       if (!saveEnabled) return
       const remoteGeneral = new Map(remote.filter((summary) => summary.kind === 'general').map((summary) => [summary.id, summary]))
       const local = new Map(conversationsRef.current.map((conversation) => [conversation.id, conversation]))
@@ -159,7 +160,7 @@ export function useAccountConversations({ api, userId, isSignedOut, saveEnabled,
     try {
       upsertBusinessConversation(await api.update(id, changes))
     } catch (error) {
-      setBusinessConversations(await api.list().then((all) => all.filter((summary) => summary.kind !== 'general')).catch(() => businessConversations))
+      setBusinessConversations(await api.list().then((all) => all.filter((summary) => summary.kind === 'commerce')).catch(() => businessConversations))
       throw error
     }
   }

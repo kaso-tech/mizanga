@@ -1,4 +1,4 @@
-import type { Attachment, ChatMessage, Conversation, ReplyVersion } from '../domain/types'
+import type { Attachment, ChatMessage, Conversation, ReplyVersion, ShoppingListing } from '../domain/types'
 
 const storageKey = 'gilli.conversations.v1'
 
@@ -41,6 +41,36 @@ function readVersions(message: Partial<ChatMessage>): Pick<ChatMessage, 'version
   return { versions, versionIndex: index }
 }
 
+/** Annonces d’une réponse de l’assistant d’achat ; une fiche incomplète est ignorée. */
+function readListings(value: unknown): ShoppingListing[] {
+  if (!Array.isArray(value)) return []
+  const strings = (items: unknown) => (Array.isArray(items) ? items.filter(isString).slice(0, 10) : [])
+  return value.slice(0, 10).flatMap((item): ShoppingListing[] => {
+    const listing = item as Partial<ShoppingListing> | null
+    if (!listing || !isString(listing.id) || !isString(listing.title) || typeof listing.price !== 'number' || typeof listing.rank !== 'number') return []
+    return [{
+      rank: listing.rank,
+      id: listing.id,
+      title: listing.title,
+      price: listing.price,
+      currency: isString(listing.currency) ? listing.currency : 'XOF',
+      unit: isString(listing.unit) ? listing.unit : 'pièce',
+      condition: isString(listing.condition) ? listing.condition : 'new',
+      city: isString(listing.city) ? listing.city : '',
+      sellerName: isString(listing.sellerName) ? listing.sellerName : '',
+      sellerVerified: listing.sellerVerified === true,
+      // Seules les photos servies par Gilli (adresse relative ou https) sont gardées.
+      photo: isString(listing.photo) && /^(\/|https:\/\/)/.test(listing.photo) ? listing.photo : null,
+      score: typeof listing.score === 'number' ? listing.score : 0,
+      reasons: strings(listing.reasons),
+      warnings: strings(listing.warnings),
+      overBudget: listing.overBudget === true,
+      whatsapp: isString(listing.whatsapp) && /^\d{8,15}$/.test(listing.whatsapp) ? listing.whatsapp : null,
+      phone: isString(listing.phone) && /^\d{8,15}$/.test(listing.phone) ? listing.phone : null,
+    }]
+  })
+}
+
 /** Relit un message enregistré ; toute donnée inattendue est ignorée. */
 function readMessage(value: unknown): ChatMessage | null {
   const message = value as Partial<ChatMessage> | null
@@ -54,6 +84,7 @@ function readMessage(value: unknown): ChatMessage | null {
     ...(attachments.length > 0 ? { attachments } : {}),
     ...(message.webSearch === true ? { webSearch: true } : {}),
     ...readReplyFields(message),
+    ...(message.role === 'assistant' && readListings(message.listings).length > 0 ? { listings: readListings(message.listings) } : {}),
     ...(message.role === 'assistant' ? readVersions(message) : {}),
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Conditions d’utilisation de Gilli (chatbot, Espace Business et marketplace).
+ * Conditions d’utilisation de Gilli (assistant d’achat, Espace vendeur et marketplace).
  * La liste des produits interdits doit rester cohérente avec le contrôle automatique des annonces
  * (server/marketplace/rules.mjs et server/marketplace/moderation.mjs).
  */
@@ -11,12 +11,12 @@ export function TermsView() {
 
       <section>
         <h2>1. Objet</h2>
-        <p>Gilli est un service qui propose un assistant d’intelligence artificielle, un espace de gestion pour les commerçants (Espace Business) et une marketplace où les commerçants présentent leurs produits. En utilisant Gilli, vous acceptez les présentes conditions.</p>
+        <p>Gilli est un service qui propose une marketplace où les commerçants présentent leurs produits, un assistant d’achat qui aide à trouver les annonces correspondant à votre besoin et un espace de gestion pour les commerçants (Espace vendeur). Le paiement et la livraison se règlent directement entre le client et le vendeur, en dehors de Gilli. En utilisant Gilli, vous acceptez les présentes conditions.</p>
       </section>
 
       <section>
         <h2>2. Comptes</h2>
-        <p>L’Espace Business et la publication d’annonces demandent un compte. Vous êtes responsable de l’usage de votre compte et des informations que vous y enregistrez. Un compte peut être suspendu en cas de non-respect des présentes conditions.</p>
+        <p>L’Espace vendeur et la publication d’annonces demandent un compte. Vous êtes responsable de l’usage de votre compte et des informations que vous y enregistrez. Un compte peut être suspendu en cas de non-respect des présentes conditions.</p>
       </section>
 
       <section>
@@ -63,14 +63,12 @@ export function TermsView() {
       <section>
         <h2>8. Données personnelles</h2>
         <p>Le nom de la vitrine, la ville et les numéros de contact du vendeur sont publics, afin que les clients puissent le joindre. Les données de gestion du commerce (ventes, dépenses, stock, noms des clients) restent privées et ne sont visibles que par les membres du commerce. Les photos jointes à l’assistant ne sont pas conservées.</p>
-        <p>Une fois connecté, vos conversations (chatbot et assistants de l’Espace Business) sont enregistrées sur votre compte pour que vous les retrouviez sur vos appareils ; elles ne sont visibles que par vous et vous pouvez les supprimer à tout moment. Le contenu des fichiers joints n’est pas enregistré. L’enregistrement des conversations du chatbot peut être désactivé dans les paramètres.</p>
+        <p>Une fois connecté, vos conversations (assistant d’achat et assistant de l’Espace vendeur) sont enregistrées sur votre compte pour que vous les retrouviez sur vos appareils ; elles ne sont visibles que par vous et vous pouvez les supprimer à tout moment. Le contenu des fichiers joints n’est pas enregistré. L’enregistrement des conversations de l’assistant d’achat peut être désactivé dans les paramètres.</p>
       </section>
 
       <section>
         <h2>9. Assistant d’intelligence artificielle</h2>
-        <p>Les réponses de l’assistant peuvent contenir des erreurs. Les résultats et conseils de l’Espace Business sont des estimations à partir des données saisies : ils ne constituent ni un résultat comptable ou fiscal certifié, ni un avis juridique.</p>
-        <p>Pour l’élevage, l’assistant ne remplace pas un vétérinaire : il ne donne ni dose, ni traitement, ni diagnostic. En cas d’animaux malades ou de mortalité inhabituelle, consultez un vétérinaire ou le service vétérinaire de votre zone.</p>
-        <p>Pour l’agriculture, l’assistant ne donne pas de dose de produit de traitement et ne remplace pas l’agent d’agriculture : suivez l’étiquette des produits et les conseils des services agricoles. Il ne fournit ni prévision météo ni prix du marché.</p>
+        <p>Les réponses de l’assistant peuvent contenir des erreurs. Les résultats et conseils de l’Espace vendeur sont des estimations à partir des données saisies : ils ne constituent ni un résultat comptable ou fiscal certifié, ni un avis juridique.</p>
       </section>
 
       <section>

@@ -203,7 +203,7 @@ export function validateAssistantInput(body) {
 }
 
 /**
- * Déroulé commun des assistants de l’Espace Business (Commerce, Élevage). Répond en NDJSON :
+ * Déroulé commun des assistants de l’Espace Business (Commerce). Répond en NDJSON :
  * `{ context, quota }`, puis `{ text }` fragment par fragment, puis les fiches d’action à confirmer
  * (`{ proposals }`), puis `{ done, quota }` (ou `{ error }` si le moteur échoue). Chaque question est
  * comptée dans la limite du jour et sa consommation enregistrée.

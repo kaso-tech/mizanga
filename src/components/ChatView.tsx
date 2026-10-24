@@ -1,9 +1,17 @@
-import { ArrowDown, Bookmark, RotateCcw } from 'lucide-react'
+import { ArrowDown, Bookmark, RotateCcw, Search } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { SavedPrompt } from '../app/savedPrompts'
 import type { ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
 import { BrandMark } from './Brand'
 import { ChatMessage } from './ChatMessage'
+
+/** Exemples de recherches proposés à l’accueil (le client les complète ou les envoie tels quels). */
+const shoppingExamples = [
+  'Un téléphone Android performant à moins de 50 000 F',
+  'Un réfrigérateur pour une petite boutique',
+  'Des chaussures de sport pointure 42',
+  'Un sac de riz parfumé 25 kg à Ouagadougou',
+]
 
 interface ChatViewProps {
   messages: ChatMessageType[]
@@ -16,10 +24,11 @@ interface ChatViewProps {
   onCopy: (message: ChatMessageType) => void
   onRegenerate: () => void
   /** Proposé quand le quota du modèle principal est épuisé et qu’un modèle économe existe. */
-  onUseLiteModel?: () => void
   onEditLastMessage: (content: string) => void
   onRate: (message: ChatMessageType, rating: MessageRating) => void
-  onReport: (message: ChatMessageType, selectedPassage: string) => void
+  onReport?: (message: ChatMessageType, selectedPassage: string) => void
+  /** Ouvre une annonce proposée par l’assistant d’achat. */
+  onOpenListing?: (id: string) => void
   /** Lecture à voix haute ; absent quand elle est désactivée ou non prise en charge. */
   onSpeak?: (message: ChatMessageType) => void
   speakingMessageId?: string
@@ -39,10 +48,10 @@ export function ChatView({
   onNewConversation,
   onCopy,
   onRegenerate,
-  onUseLiteModel,
   onEditLastMessage,
   onRate,
   onReport,
+  onOpenListing,
   onSpeak,
   speakingMessageId,
   onSelectVersion,
@@ -100,7 +109,16 @@ export function ChatView({
       <section className="welcome" aria-labelledby="welcome-title">
         <div className="welcome-head fade-up">
           <div className="weave-band welcome-band" aria-hidden="true" />
-          <h1 id="welcome-title">Comment puis-je vous aider&#8239;?</h1>
+          <h1 id="welcome-title">Que cherchez-vous&#8239;?</h1>
+          <p className="welcome-intro">Dites ce qu’il vous faut et votre budget : Gilli cherche dans la marketplace et compare pour vous.</p>
+        </div>
+        <div className="saved-prompt-row" aria-label="Exemples de recherches">
+          {shoppingExamples.map((example) => (
+            <button type="button" key={example} className="saved-prompt-chip" onClick={() => onSuggestion(example)}>
+              <Search size={14} aria-hidden="true" />
+              <span>{example}</span>
+            </button>
+          ))}
         </div>
         {savedPrompts.length > 0 && (
           <div className="saved-prompt-row" aria-label="Vos consignes">
@@ -135,11 +153,11 @@ export function ChatView({
             onRegenerate={onRegenerate}
             onRate={onRate}
             onReport={onReport}
+            onOpenListing={onOpenListing}
             onSpeak={onSpeak}
             isSpeaking={speakingMessageId === message.id}
             onSelectVersion={message === lastMessage && !isGenerating ? onSelectVersion : undefined}
             onSavePrompt={onSavePrompt}
-            onUseLiteModel={message === lastMessage && !isGenerating ? onUseLiteModel : undefined}
           />
         ))}
         {isGenerating && !isStreaming && (

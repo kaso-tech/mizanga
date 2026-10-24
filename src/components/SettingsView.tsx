@@ -1,4 +1,4 @@
-import { AudioLines, Database, Download, Info, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, UserRound, type LucideIcon } from 'lucide-react'
+import { AudioLines, Database, Download, Languages, Monitor, Moon, Play, SlidersHorizontal, Sparkles, Sun, Trash2, Upload, UserRound, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { accountInitial, type AccountView } from '../app/accountView'
 import { getInstallState, promptInstall, subscribeInstallState } from '../app/installPrompt'
@@ -6,8 +6,8 @@ import { MAX_PROMPT_TITLE_CHARS, MAX_SAVED_PROMPTS, type SavedPrompt } from '../
 import { isSpeechSupported, listVoices, speak, speechRates, subscribeVoices } from '../app/speech'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS } from '../services/remoteAiService'
 import { isVoiceRecordingSupported } from '../app/voiceRecording'
-import { responseLanguageLabels, userWritingModeLabels } from '../data/content'
-import type { LinguisticPreferences, ModelTier, ResponseLanguage, TextSize, ThemePreference, UserWritingMode } from '../domain/types'
+import { offeredResponseLanguages, responseLanguageLabels } from '../data/content'
+import type { LinguisticPreferences, ResponseLanguage, TextSize, ThemePreference } from '../domain/types'
 
 type SectionId = 'general' | 'personnalisation' | 'langue' | 'donnees' | 'voix' | 'compte'
 
@@ -195,7 +195,6 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
       <div className="setting-group">
         <SettingRow
           label="Messages vocaux"
-          description="Le mooré parlé n’est pas encore bien compris."
         >
           <span className="value-pill">{isVoiceRecordingSupported() ? 'Disponible' : 'Non pris en charge ici'}</span>
         </SettingRow>
@@ -231,10 +230,6 @@ function VoiceSettings({ preferences, onChange }: { preferences: LinguisticPrefe
           </span>
         </SettingRow>
       </div>
-      <p className="settings-callout">
-        <Info size={16} aria-hidden="true" />
-        <span>Aucune voix mooré n’est encore disponible.</span>
-      </p>
     </>
   )
 }
@@ -342,31 +337,14 @@ export function SettingsView({ preferences, account, onSignIn, onSignOut, engine
                 />
               </SettingRow>
               <InstallRow />
-              {engine.offersLiteModel ? (
-                <SettingRow
-                  label="Modèle de réponses"
-                  htmlFor="setting-model-tier"
-                >
-                  <SelectControl<ModelTier>
-                    id="setting-model-tier"
-                    value={preferences.modelTier}
-                    options={[
-                      { value: 'standard', label: 'Standard — plus approfondi' },
-                      { value: 'lite', label: 'Économe — plus rapide' },
-                    ]}
-                    onChange={(modelTier) => onChange({ modelTier })}
-                  />
-                </SettingRow>
-              ) : (
-                <SettingRow label="Moteur de réponses">
-                  <span className="value-pill">{engine.label}</span>
-                </SettingRow>
-              )}
+              <SettingRow label="Moteur de réponses">
+                <span className="value-pill">{engine.label}</span>
+              </SettingRow>
               <SettingRow label="Langue de l’interface" htmlFor="setting-interface-language">
                 <SelectControl
                   id="setting-interface-language"
                   value="fr"
-                  options={[{ value: 'fr', label: 'Français' }, { value: 'mos', label: 'Mooré — bientôt', disabled: true }]}
+                  options={[{ value: 'fr', label: 'Français' }]}
                   onChange={() => undefined}
                 />
               </SettingRow>
@@ -387,19 +365,8 @@ export function SettingsView({ preferences, account, onSignIn, onSignOut, engine
                   <SelectControl<ResponseLanguage>
                     id="setting-response-language"
                     value={preferences.responseLanguage}
-                    options={Object.entries(responseLanguageLabels).map(([value, label]) => ({ value, label }))}
+                    options={offeredResponseLanguages.map((value) => ({ value, label: responseLanguageLabels[value] }))}
                     onChange={(responseLanguage) => onChange({ responseLanguage })}
-                  />
-                </SettingRow>
-                <SettingRow label="Ma façon d’écrire le mooré" htmlFor="setting-writing-mode">
-                  <SelectControl<UserWritingMode>
-                    id="setting-writing-mode"
-                    value={preferences.userWritingMode}
-                    options={[
-                      ...Object.entries(userWritingModeLabels).map(([value, label]) => ({ value, label })),
-                      { value: 'automatic', label: 'Détection automatique — bientôt', disabled: true },
-                    ]}
-                    onChange={(userWritingMode) => onChange({ userWritingMode })}
                   />
                 </SettingRow>
               </div>
@@ -451,7 +418,7 @@ export function SettingsView({ preferences, account, onSignIn, onSignOut, engine
               </div>
 
               <div className="danger-zone">
-                <SettingRow label="Supprimer toutes les conversations" description={account.status === 'signedIn' ? 'Conversations du chatbot, sur cet appareil et sur votre compte. Action définitive.' : 'Action définitive.'}>
+                <SettingRow label="Supprimer toutes les conversations" description={account.status === 'signedIn' ? 'Conversations de l’assistant d’achat, sur cet appareil et sur votre compte. Action définitive.' : 'Action définitive.'}>
                   {confirmingClear ? (
                     <span className="confirm-actions">
                       <button type="button" className="secondary-button" onClick={() => setConfirmingClear(false)}>Annuler</button>

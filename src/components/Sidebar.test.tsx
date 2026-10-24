@@ -6,7 +6,7 @@ import { Sidebar } from './Sidebar'
 
 const general: Conversation = { id: 'conversation-1', title: 'Photosynthèse', messages: [{ id: 'm1', role: 'user', content: 'Explique', createdAt: '2026-10-22T10:00:00.000Z' }], createdAt: '2026-10-22T10:00:00.000Z', updatedAt: '2026-10-22T10:00:00.000Z' }
 const assistant: ConversationSummary = { id: 'commerce-1', kind: 'commerce', businessId: 'b1', title: 'Ventes du mois', favorite: false, createdAt: '2026-10-23T09:00:00.000Z', updatedAt: '2026-10-23T09:00:00.000Z' }
-const herd: ConversationSummary = { ...assistant, id: 'elevage-1', kind: 'elevage', title: 'Vaccins des poules', favorite: true, createdAt: '2026-10-21T09:00:00.000Z' }
+const stock: ConversationSummary = { ...assistant, id: 'commerce-2', title: 'Stock du riz', favorite: true, createdAt: '2026-10-21T09:00:00.000Z' }
 
 function renderSidebar(activeView: AppView = 'chat') {
   const handlers = {
@@ -31,7 +31,7 @@ function renderSidebar(activeView: AppView = 'chat') {
       account={{ status: 'signedIn', email: 'awa@example.bf' }}
       onSignIn={() => {}}
       onOpenAccount={() => {}}
-      accountConversations={[assistant, herd]}
+      accountConversations={[assistant, stock]}
       {...handlers}
     />,
   )
@@ -42,7 +42,7 @@ describe('menu latéral', () => {
   it('réunit les conversations de tous les espaces, reconnaissables à leur icône', async () => {
     const handlers = renderSidebar()
     const list = screen.getByRole('navigation', { name: 'Conversations de cette session' })
-    expect(within(list).getAllByRole('button', { name: /^(Généraliste|Commerce|Élevage|Agriculture) : / }).map((button) => button.textContent)).toEqual(['Commerce : Ventes du mois', 'Généraliste : Photosynthèse', 'Élevage : Vaccins des poules'])
+    expect(within(list).getAllByRole('button', { name: /^(Généraliste|Commerce) : / }).map((button) => button.textContent)).toEqual(['Commerce : Ventes du mois', 'Généraliste : Photosynthèse', 'Commerce : Stock du riz'])
 
     await userEvent.click(within(list).getByRole('button', { name: 'Commerce : Ventes du mois' }))
     expect(handlers.onSelectAccountConversation).toHaveBeenCalledWith(assistant)
@@ -56,6 +56,6 @@ describe('menu latéral', () => {
 
     // Le filtre Favoris s’applique aussi aux conversations d’assistant.
     await userEvent.click(screen.getByRole('button', { name: 'Favoris' }))
-    expect(within(list).getAllByRole('button', { name: /^(Généraliste|Commerce|Élevage) : / }).map((button) => button.textContent)).toEqual(['Élevage : Vaccins des poules'])
+    expect(within(list).getAllByRole('button', { name: /^(Généraliste|Commerce) : / }).map((button) => button.textContent)).toEqual(['Commerce : Stock du riz'])
   })
 })

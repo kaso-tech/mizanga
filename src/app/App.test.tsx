@@ -23,7 +23,7 @@ const renderApp = (path = '/') => {
 describe('App', () => {
   it('affiche l’accueil et rend les adresses canoniques', () => {
     renderApp('/inconnu')
-    expect(screen.getByRole('heading', { name: /Comment puis-je vous aider/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Que cherchez-vous/ })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
   })
 
@@ -49,19 +49,6 @@ describe('App', () => {
     expect(within(sidebar).getByRole('button', { name: 'Généraliste : Explique la photosynthèse' })).toBeInTheDocument()
   })
 
-  it('exige un type d’erreur et une correction avant de préparer un signalement', async () => {
-    renderApp()
-    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
-    await userEvent.click(await screen.findByRole('button', { name: /Signaler une erreur en mooré/ }))
-    const dialog = await screen.findByRole('dialog', { name: 'Signaler une erreur en mooré' })
-    const submit = within(dialog).getByRole('button', { name: 'Préparer le signalement' })
-    expect(submit).toBeDisabled()
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Grammaire' }))
-    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Proposition de correction' }), 'ɛ')
-    expect(submit).toBeEnabled()
-    await userEvent.click(submit)
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  })
 
   it('navigue entre les sections des paramètres au clavier et supprime les conversations après confirmation', async () => {
     renderApp()
@@ -100,7 +87,7 @@ describe('App', () => {
     expect(await screen.findByText('Génération arrêtée.', { selector: '.message-status' })).toBeInTheDocument()
 
     await userEvent.keyboard('{Control>}{Shift>}o{/Shift}{/Control}')
-    expect(await screen.findByRole('heading', { name: /Comment puis-je vous aider/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Que cherchez-vous/ })).toBeInTheDocument()
   })
 
   it('transmet les instructions personnelles enregistrées au moteur', async () => {
@@ -174,7 +161,7 @@ describe('App', () => {
     await userEvent.keyboard('{Enter}')
     expect(screen.getByRole('textbox', { name: 'Votre message' })).toHaveValue('Résume ce texte en 5 points')
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /Comment puis-je vous aider/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Que cherchez-vous/ })).toBeInTheDocument()
   })
 
   it('ferme le menu des consignes avec Échap et garde le texte', async () => {
@@ -230,26 +217,44 @@ describe('App', () => {
     }
   })
 
-  it('propose le modèle économe quand le quota est épuisé', async () => {
-    const tiers: string[] = []
+  it('assistant d’achat : affiche les annonces proposées en fiches et ouvre l’annonce dans la marketplace', async () => {
+    const listing = { rank: 1, id: 'a1', title: 'Tecno Spark 20', price: 48000, currency: 'XOF', unit: 'pièce', condition: 'new', city: 'Ouagadougou', sellerName: 'Awa Téléphones', sellerVerified: true, photo: null, score: 90, reasons: ['Dans votre budget (48 000 F CFA)', 'Mémoire vive (RAM) : 8 Go'], warnings: [], overBudget: false, whatsapp: '22670123456', phone: null }
+    const remote: AiService = { isDemonstration: false, label: 'Gemini', async *generate() { yield { text: '', listings: [listing] }; yield { text: 'Le [1] est le meilleur choix.' } } }
+    window.history.replaceState({}, '', '/')
+    render(<App aiService={remote} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Un téléphone à 50 000 F{Enter}')
+    const results = await screen.findByRole('list', { name: 'Annonces proposées' })
+    expect(within(results).getByText('Tecno Spark 20')).toBeInTheDocument()
+    expect(within(results).getByText('Mémoire vive (RAM) : 8 Go')).toBeInTheDocument()
+    expect(within(results).getByRole('link', { name: /WhatsApp/ })).toHaveAttribute('href', expect.stringContaining('https://wa.me/22670123456'))
+    expect(await screen.findByText(/Le \[1\] est le meilleur choix/)).toBeInTheDocument()
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ listing: null }, { status: 404 })))
+    try {
+      await userEvent.click(within(results).getByRole('link', { name: 'Voir l’annonce' }))
+      expect(window.location.pathname).toBe('/marketplace/annonce/a1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('quota épuisé : propose de réessayer, sans changer de modèle', async () => {
     const remote: AiService = {
       isDemonstration: false,
       label: 'Gemini',
       offersLiteModel: true,
-      async *generate({ preferences }) {
-        tiers.push(preferences.modelTier)
-        if (preferences.modelTier === 'standard') throw new AiServiceError('La limite d’utilisation gratuite du moteur est atteinte.', undefined, 'quota')
-        yield { text: 'Réponse économe' }
+      // eslint-disable-next-line require-yield -- le moteur refuse avant toute réponse
+      async *generate() {
+        throw new AiServiceError('La limite d’utilisation gratuite du moteur est atteinte.', undefined, 'quota')
       },
     }
     window.history.replaceState({}, '', '/')
     render(<App aiService={remote} />)
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
-    await userEvent.click(await screen.findByRole('button', { name: /Réessayer avec le modèle économe/ }))
-    expect(await screen.findByText('Réponse économe')).toBeInTheDocument()
-    expect(tiers).toEqual(['standard', 'lite'])
-    expect(JSON.parse(localStorage.getItem('gilli.preferences.v1') ?? '{}').modelTier).toBe('lite')
+    expect(await screen.findByText(/La limite d’utilisation gratuite/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Réessayer/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /modèle économe/ })).not.toBeInTheDocument()
   })
+
 
   it('imprime une conversation depuis son menu', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined)
@@ -344,20 +349,30 @@ describe('App', () => {
     }
   })
 
-  it('choisit le modèle depuis l’en-tête quand le moteur en propose deux', async () => {
+  it('n’affiche plus de choix de modèle et ouvre la marketplace depuis l’icône de l’en-tête', async () => {
     const tiers: string[] = []
     const remote: AiService = { isDemonstration: false, label: 'Gemini', offersLiteModel: true, async *generate({ preferences }) { tiers.push(preferences.modelTier); yield { text: 'ok' } } }
+    localStorage.setItem('gilli.preferences.v1', JSON.stringify({ modelTier: 'lite' }))
     window.history.replaceState({}, '', '/')
     render(<App aiService={remote} />)
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Modèle' }), 'lite')
+    expect(screen.queryByRole('combobox', { name: 'Modèle' })).not.toBeInTheDocument()
+    // Une préférence « économe » enregistrée avant la refonte n’est plus appliquée.
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
     await screen.findByText('ok')
-    expect(tiers).toEqual(['lite'])
-    cleanup()
-
-    renderApp()
-    expect(screen.queryByRole('combobox', { name: 'Modèle' })).not.toBeInTheDocument()
-    expect(screen.getByText('Démonstration', { selector: '.model-badge' })).toBeInTheDocument()
+    expect(tiers).toEqual(['standard'])
+    // La marketplace n’est plus dans le menu latéral mais dans l’en-tête.
+    expect(within(screen.getByRole('complementary', { name: 'Navigation principale' })).queryByRole('button', { name: 'Marketplace' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Espace vendeur' })).toBeInTheDocument()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).startsWith('/api/marketplace/categories')
+      ? Response.json({ categories: [], conditions: {}, cities: [] })
+      : Response.json({ total: 0, items: [] }))))
+    try {
+      await userEvent.click(screen.getByRole('button', { name: 'Marketplace' }))
+      expect(window.location.pathname).toBe('/marketplace')
+      expect(await screen.findByRole('button', { name: 'Marketplace' })).toHaveAttribute('aria-current', 'page')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('connecte un utilisateur avec un code reçu par e-mail, puis le déconnecte', async () => {

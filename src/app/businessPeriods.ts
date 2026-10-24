@@ -18,8 +18,7 @@ export const periodLabels: Record<PeriodPreset, string> = {
 
 /** Périodes de l’onglet Commerce. */
 export const commercePresets: PeriodPreset[] = ['today', 'yesterday', 'last7', 'thisMonth', 'lastMonth']
-/** Périodes de l’onglet Élevage : un lot se suit sur plusieurs semaines ou mois. */
-export const livestockPresets: PeriodPreset[] = ['last30', 'last90', 'thisMonth', 'lastMonth', 'thisYear']
+
 
 /** Jour du calendrier (AAAA-MM-JJ) d’un instant dans un fuseau horaire. */
 export function localDay(timeZone: string, now = new Date()) {

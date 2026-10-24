@@ -46,6 +46,27 @@ export interface Attachment {
   data?: string
 }
 
+/** Annonce proposée par l’assistant d’achat, avec son classement calculé par le serveur. */
+export interface ShoppingListing {
+  rank: number
+  id: string
+  title: string
+  price: number
+  currency: string
+  unit: string
+  condition: string
+  city: string
+  sellerName: string
+  sellerVerified: boolean
+  photo: string | null
+  score: number
+  reasons: string[]
+  warnings: string[]
+  overBudget: boolean
+  whatsapp: string | null
+  phone: string | null
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -57,7 +78,7 @@ export interface ChatMessage {
   status?: ChatMessageStatus
   /** Explication montrée quand `status` vaut « error ». */
   errorMessage?: string
-  /** « quota » : quota du moteur épuisé ; le modèle économe peut prendre le relais. */
+  /** « quota » : quota du moteur épuisé. */
   errorCode?: 'quota'
   isDemonstration?: boolean
   attachments?: Attachment[]
@@ -67,6 +88,8 @@ export interface ChatMessage {
   /** Réponse : sources web consultées et suggestions de recherche Google associées. */
   sources?: Array<{ title: string; url: string }>
   searchSuggestionsHtml?: string
+  /** Réponse de l’assistant d’achat : annonces trouvées dans la marketplace, affichées en fiches. */
+  listings?: ShoppingListing[]
   /** Avis local de l’utilisateur ; il n’est envoyé nulle part dans cette version. */
   rating?: MessageRating
   /**
@@ -77,12 +100,12 @@ export interface ChatMessage {
   versionIndex?: number
 }
 
-export type ReplyVersion = Pick<ChatMessage, 'content' | 'createdAt' | 'language' | 'status' | 'errorMessage' | 'errorCode' | 'isDemonstration' | 'sources' | 'searchSuggestionsHtml' | 'rating'>
+export type ReplyVersion = Pick<ChatMessage, 'content' | 'createdAt' | 'language' | 'status' | 'errorMessage' | 'errorCode' | 'isDemonstration' | 'sources' | 'searchSuggestionsHtml' | 'listings' | 'rating'>
 
 export type MessageRating = 'positive' | 'negative' | 'correct'
 
-/** Espace d’une conversation : chatbot généraliste ou assistant d’un onglet de l’Espace Business. */
-export type ConversationKind = 'general' | 'commerce' | 'elevage' | 'agriculture'
+/** Espace d’une conversation : assistant d’achat (accueil) ou assistant de l’Espace vendeur. */
+export type ConversationKind = 'general' | 'commerce'
 
 /** Conversation du chatbot généraliste (enregistrée sur l’appareil, et sur le compte une fois connecté). */
 export interface Conversation {

@@ -1,4 +1,4 @@
-import { Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, PawPrint, Pencil, Printer, Search, Settings, ShoppingBag, Sprout, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
+import { Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { accountInitial, type AccountView } from '../app/accountView'
 import { Brand } from './Brand'
@@ -10,8 +10,6 @@ import { searchConversations } from '../app/searchConversations'
 const conversationKinds: Record<ConversationKind, { icon: LucideIcon; label: string }> = {
   general: { icon: MessageSquare, label: 'Généraliste' },
   commerce: { icon: Store, label: 'Commerce' },
-  elevage: { icon: PawPrint, label: 'Élevage' },
-  agriculture: { icon: Sprout, label: 'Agriculture' },
 }
 
 /** Ligne de la liste : conversation du chatbot (sur l’appareil) ou d’un assistant Business (sur le compte). */
@@ -174,11 +172,8 @@ export function Sidebar({
         </nav>
 
         <div className="sidebar-foot">
-          <button type="button" className={`nav-item ${activeView === 'marketplace' ? 'is-active' : ''}`} aria-current={activeView === 'marketplace' ? 'page' : undefined} onClick={() => onNavigate('marketplace')}>
-            <ShoppingBag size={16} aria-hidden="true" /> Marketplace
-          </button>
           <button type="button" className={`nav-item ${activeView === 'business' ? 'is-active' : ''}`} aria-current={activeView === 'business' ? 'page' : undefined} onClick={() => onNavigate('business')}>
-            <Store size={16} aria-hidden="true" /> Espace Business
+            <Store size={16} aria-hidden="true" /> Espace vendeur
           </button>
           <button type="button" className={`nav-item ${activeView === 'settings' ? 'is-active' : ''}`} onClick={() => onNavigate('settings')}>
             <Settings size={16} aria-hidden="true" /> Paramètres

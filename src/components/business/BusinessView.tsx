@@ -1,4 +1,4 @@
-import { AlertTriangle, BadgeCheck, Globe, History, PackagePlus, PawPrint, Pencil, Plus, Search, Sprout, Store, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, Globe, History, PackagePlus, Pencil, Plus, Search, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { AccountView } from '../../app/accountView'
 import { periodFor, type PeriodPreset } from '../../app/businessPeriods'
@@ -19,8 +19,6 @@ import { ProductDialog } from './ProductDialog'
 import { ResultsPanel } from './ResultsPanel'
 import { SalesPanel } from './SalesPanel'
 import { SubscriptionDialog } from './SubscriptionDialog'
-import { LivestockView } from '../livestock/LivestockView'
-import { AgricultureView } from '../agriculture/AgricultureView'
 
 /** Pays de la zone UEMOA (franc CFA, XOF) proposés à la création ; d’autres pays suivront. */
 const countries: Array<{ code: string; name: string }> = [
@@ -32,15 +30,6 @@ const countries: Array<{ code: string; name: string }> = [
   { code: 'NE', name: 'Niger' },
   { code: 'SN', name: 'Sénégal' },
   { code: 'TG', name: 'Togo' },
-]
-
-/** Activités de l’Espace Business : chacune a ses données et son assistant. */
-export type BusinessModule = 'commerce' | 'elevage' | 'agriculture'
-
-const modules: Array<{ id: BusinessModule; label: string; icon: LucideIcon }> = [
-  { id: 'commerce', label: 'Commerce', icon: Store },
-  { id: 'elevage', label: 'Élevage', icon: PawPrint },
-  { id: 'agriculture', label: 'Agriculture', icon: Sprout },
 ]
 
 
@@ -72,7 +61,7 @@ interface BusinessViewProps {
   /** Conversations des assistants, enregistrées sur le compte. */
   conversations?: ConversationsApi | null
   /** Conversation d’assistant à ouvrir (choisie dans le menu latéral). */
-  openConversation?: OpenRequest & { module: BusinessModule }
+  openConversation?: OpenRequest
   onConversationSaved?: (summary: ConversationSummary) => void
   onConversationOpened?: (id: string | null) => void
 }
@@ -114,7 +103,7 @@ function BusinessSetup({ onCreate }: { onCreate: (input: { name: string; country
   )
 }
 
-/** Espace Business : produits et stocks, ventes, dépenses et résultats du commerce de l’utilisateur. */
+/** Espace vendeur : produits et stocks, ventes, dépenses et résultats du commerce de l’utilisateur. */
 export function BusinessView({ account, client, onSignIn, onNotify, conversations = null, openConversation, onConversationSaved, onConversationOpened }: BusinessViewProps) {
   const api = useMemo(() => (client ? createBusinessApi(() => client.accessToken()) : null), [client])
   const [business, setBusiness] = useState<Business | null | undefined>(undefined)
@@ -123,14 +112,7 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
   const [query, setQuery] = useState('')
   const [onlyLow, setOnlyLow] = useState(false)
   const [dialog, setDialog] = useState<DialogState>(null)
-  const [module, setModule] = useState<BusinessModule>(openConversation?.module ?? 'commerce')
-  const [elevageVisited, setElevageVisited] = useState(false)
-  const [agricultureVisited, setAgricultureVisited] = useState(false)
-  useEffect(() => {
-    if (module === 'elevage') setElevageVisited(true)
-    if (module === 'agriculture') setAgricultureVisited(true)
-  }, [module])
-  const [tab, setTab] = useState<Tab>(openConversation?.module === 'commerce' ? 'assistant' : 'products')
+  const [tab, setTab] = useState<Tab>(openConversation ? 'assistant' : 'products')
   const [preset, setPreset] = useState<PeriodPreset>('today')
   // Marketplace (propriétaire seulement) : vitrine et annonces ; undefined tant que non chargées.
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null | undefined>(undefined)
@@ -158,12 +140,9 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
 
   // Conversation choisie dans le menu latéral : son onglet s’ouvre.
   const openNonce = openConversation?.nonce
-  const openModule = openConversation?.module
   useEffect(() => {
-    if (openNonce === undefined || !openModule) return
-    setModule(openModule)
-    if (openModule === 'commerce') setTab('assistant')
-  }, [openNonce, openModule])
+    if (openNonce !== undefined) setTab('assistant')
+  }, [openNonce])
 
   const businessId = business?.id
   const isOwner = business?.role === 'owner'
@@ -182,13 +161,13 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
   }, [api, businessId, isOwner])
 
   if (account.status === 'unavailable') {
-    return <div className="page-view business-view"><h1>Espace Business</h1><p className="settings-callout"><Store size={16} aria-hidden="true" /><span>L’espace Business demande un compte : il n’est pas encore disponible sur ce serveur.</span></p></div>
+    return <div className="page-view business-view"><h1>Espace vendeur</h1><p className="settings-callout"><Store size={16} aria-hidden="true" /><span>L’Espace vendeur demande un compte : il n’est pas encore disponible sur ce serveur.</span></p></div>
   }
   if (account.status === 'loading') return <div className="page-loading" aria-busy="true" />
   if (account.status === 'signedOut') {
     return (
       <div className="page-view business-view">
-        <h1>Espace Business</h1>
+        <h1>Espace vendeur</h1>
         <div className="settings-section business-welcome">
           <Store size={28} aria-hidden="true" />
           <p>Gérez vos produits et votre stock, enregistrez ventes et dépenses, et posez vos questions à l’assistant.</p>
@@ -216,45 +195,7 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
 
   return (
     <div className="page-view business-view">
-      <h1>{business?.name ?? 'Espace Business'}</h1>
-      {business && (
-        <div className="segmented business-modules" role="tablist" aria-label="Activités">
-          {modules.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" role="tab" aria-selected={module === id} className={module === id ? 'is-selected' : ''} onClick={() => setModule(id)}>
-              <Icon size={15} aria-hidden="true" /> {label}
-            </button>
-          ))}
-        </div>
-      )}
-      {/* Monté dès la première visite puis gardé : la conversation de l’assistant Agriculture reste. */}
-      {business && api && (module === 'agriculture' || agricultureVisited) && (
-        <div className="business-module" hidden={module !== 'agriculture'}>
-          <AgricultureView
-            api={api.agriculture}
-            business={business}
-            onNotify={onNotify}
-            conversations={conversations}
-            openRequest={openConversation?.module === 'agriculture' ? openConversation : undefined}
-            onConversationSaved={onConversationSaved}
-            onConversationOpened={onConversationOpened}
-          />
-        </div>
-      )}
-      {/* Monté dès la première visite puis gardé : la conversation de l’assistant Élevage reste. */}
-      {business && api && (module === 'elevage' || elevageVisited) && (
-        <div className="business-module" hidden={module !== 'elevage'}>
-          <LivestockView
-            api={api.livestock}
-            business={business}
-            onNotify={onNotify}
-            conversations={conversations}
-            openRequest={openConversation?.module === 'elevage' ? openConversation : undefined}
-            onConversationSaved={onConversationSaved}
-            onConversationOpened={onConversationOpened}
-          />
-        </div>
-      )}
-      <div className="business-module" hidden={Boolean(business) && module !== 'commerce'}>
+      <h1>{business?.name ?? 'Espace vendeur'}</h1>
       {business && api && (
         <div className="business-chips">
           <button type="button" className="subscription-chip" onClick={() => setDialog({ type: 'subscription' })}>
@@ -295,7 +236,7 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
             onDataChanged={() => loadProducts(business.id)}
             onNotify={onNotify}
             conversations={conversations}
-            openRequest={openConversation?.module === 'commerce' ? openConversation : undefined}
+            openRequest={openConversation}
             onConversationSaved={onConversationSaved}
             onConversationOpened={onConversationOpened}
           />
@@ -369,7 +310,6 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
           )}
         </>
       )}
-      </div>
 
       {business && api && dialog?.type === 'create' && (
         <ProductDialog currency={currency} onClose={() => setDialog(null)} onSave={(input) => mutate(() => api.createProduct(business.id, input), 'Produit ajouté.')} />

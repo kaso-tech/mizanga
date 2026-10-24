@@ -89,6 +89,19 @@ export function useConversation(aiService: AiService, preferences: LinguisticPre
     try {
       for await (const chunk of aiService.generate({ messages: history, preferences: { ...preferencesRef.current, ...overrides } }, { signal: controller.signal })) {
         if (controller.signal.aborted) break
+        // Fiches des annonces : elles arrivent avant le texte de la réponse.
+        if (chunk.listings) {
+          const listings = chunk.listings
+          if (!hasReply) {
+            hasReply = true
+            updateMessages(conversationId, (messages) => [...messages, withVersions({
+              id: replyId, role: 'assistant', content: '', createdAt: new Date().toISOString(), status: 'streaming', isDemonstration: aiService.isDemonstration, listings,
+            })])
+          } else {
+            updateMessage(conversationId, replyId, (message) => ({ ...message, listings }))
+          }
+          if (!chunk.text) continue
+        }
         if (chunk.sources || chunk.searchSuggestionsHtml) {
           updateMessage(conversationId, replyId, (message) => ({ ...message, sources: chunk.sources, searchSuggestionsHtml: chunk.searchSuggestionsHtml }))
           if (!chunk.text) continue

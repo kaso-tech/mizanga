@@ -3,7 +3,7 @@
 // jeton de l’utilisateur : chacun ne lit et ne modifie que les siennes (règles RLS).
 import { BusinessError, isUuid } from '../business/validate.mjs'
 
-export const CONVERSATION_KINDS = ['general', 'commerce', 'elevage', 'agriculture']
+export const CONVERSATION_KINDS = ['general', 'commerce']
 const MAX_MESSAGES = 500
 const MAX_STORED_BYTES = 2_000_000
 const ID_PATTERN = /^[A-Za-z0-9-]{8,80}$/

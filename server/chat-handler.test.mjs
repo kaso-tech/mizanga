@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApiHandler } from './chat-handler.mjs'
 import { nextMidnight, quotaResetTime } from './ai/gemini.mjs'
-import { buildSystemInstruction } from './ai/system-instruction.mjs'
+import { buildShoppingInstruction } from './shopping/assistant.mjs'
 
 /** @type {{ status: number, events: unknown[], body?: unknown }} */
 let upstreamReply = { status: 200, events: [] }
@@ -115,10 +115,12 @@ describe('API Gilli', () => {
       { role: 'model', parts: [{ text: 'Bonjour !' }] },
       { role: 'user', parts: [{ text: 'Explique ɛ et ʋ' }] },
     ])
+    // Accueil de Gilli : l’assistant d’achat, sans recherche web.
     const instruction = lastUpstreamRequest.body.systemInstruction.parts[0].text
-    expect(instruction).toContain('Réponds en mooré, dans l’orthographe standardisée')
-    expect(instruction).toContain('écriture informelle')
-    expect(instruction).toContain('ne prétends jamais maîtriser')
+    expect(instruction).toContain('Tu es l’assistant d’achat de Gilli')
+    expect(instruction).toContain('Réponds dans la langue du dernier message du client.')
+    expect(instruction).toContain('Hors sujet : tu ne traites que les achats.')
+    expect(instruction).not.toContain('mooré')
   })
 
   it('traduit un dépassement de quota en message clair, avec l’heure de réinitialisation', async () => {
@@ -144,7 +146,7 @@ describe('API Gilli', () => {
     const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) })
     const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0]
     const overview = /** @type {any} */ (await (await fetch(`${base}/api/admin/overview`, { headers: { cookie } })).json())
-    expect(overview.engineErrors).toEqual([{ at: expect.any(String), feature: 'chat (modèle standard)', model: 'gemini-flash-latest', httpStatus: 429, quotas: ['GenerateRequestsPerDayPerProjectPerModel-FreeTier (limite 20)'], message: 'You exceeded your current quota.' }])
+    expect(overview.engineErrors).toEqual([{ at: expect.any(String), feature: 'assistant d’achat (modèle standard)', model: 'gemini-flash-latest', httpStatus: 429, quotas: ['GenerateRequestsPerDayPerProjectPerModel-FreeTier (limite 20)'], message: 'You exceeded your current quota.' }])
   })
 
   it('situe la réinitialisation d’un quota journalier à minuit, heure du Pacifique', () => {
@@ -193,44 +195,26 @@ describe('API Gilli', () => {
     expect((await post(base, notBase64)).status).toBe(400)
   })
 
-  it('propose la recherche web au moteur et relaie les sources et suggestions Google quand il s’en sert', async () => {
-    upstreamReply = {
-      status: 200,
-      events: [
-        textEvent('Selon la météo, '),
-        { candidates: [{ content: { parts: [{ text: 'il fera chaud.' }] }, groundingMetadata: {
-          groundingChunks: [
-            { web: { uri: 'https://meteo.example.bf/ouaga', title: 'meteo.example.bf' } },
-            { web: { uri: 'https://meteo.example.bf/ouaga', title: 'doublon' } },
-            { web: { uri: 'javascript:alert(1)', title: 'piège' } },
-          ],
-          searchEntryPoint: { renderedContent: '<div class="chips">météo Ouagadougou</div>' },
-        } }] },
-      ],
-    }
+  it('ne propose plus la recherche web : l’assistant reste sur les achats', async () => {
+    upstreamReply = { status: 200, events: [textEvent('Je suis là pour vous aider à trouver quoi acheter sur Gilli.')] }
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase })
-    const response = await post(base, validBody)
-    const lines = (await response.text()).trim().split('\n').map((line) => JSON.parse(line))
-    expect(lines).toEqual([
-      { text: 'Selon la météo, ' },
-      { text: 'il fera chaud.' },
-      { sources: [{ title: 'meteo.example.bf', url: 'https://meteo.example.bf/ouaga' }], searchSuggestionsHtml: '<div class="chips">météo Ouagadougou</div>' },
-    ])
-    // La recherche est toujours proposée : le modèle décide seul de s’en servir.
-    expect(lastUpstreamRequest.body.tools).toEqual([{ google_search: {} }])
-    expect(lastUpstreamRequest.body.systemInstruction.parts[0].text).toContain('Recherche web : utilise la recherche Google seulement quand')
+    const lines = (await (await post(base, validBody)).text()).trim().split('\n').map((line) => JSON.parse(line))
+    expect(lines).toEqual([{ text: 'Je suis là pour vous aider à trouver quoi acheter sur Gilli.' }])
+    // Sans marketplace configurée : ni recherche Google, ni fonction de recherche.
+    expect(lastUpstreamRequest.body.tools).toBeUndefined()
   })
+
 
   it('ajoute les instructions personnelles, bornées et après les règles de Gilli', async () => {
     upstreamReply = { status: 200, events: [textEvent('ok')] }
     const base = await startApi({ apiKey: 'cle', apiBase: geminiBase })
     await (await post(base, { ...validBody, preferences: { ...validBody.preferences, customInstructions: `  Je suis enseignant à Koudougou.${'x'.repeat(2000)}` } })).text()
     const instruction = lastUpstreamRequest.body.systemInstruction.parts[0].text
-    expect(instruction).toContain('Instructions personnelles de l’utilisateur')
+    expect(instruction).toContain('Instructions personnelles du client')
     expect(instruction).toContain('Je suis enseignant à Koudougou.')
-    expect(instruction.indexOf('ne prétends jamais maîtriser')).toBeLessThan(instruction.indexOf('Je suis enseignant'))
-    expect(instruction.length).toBeLessThan(buildSystemInstruction(validBody.preferences).length + 1700)
-    expect(buildSystemInstruction({ customInstructions: '   ' })).not.toContain('Instructions personnelles')
+    expect(instruction.indexOf('Hors sujet')).toBeLessThan(instruction.indexOf('Je suis enseignant'))
+    expect(instruction.length).toBeLessThan(buildShoppingInstruction(validBody.preferences, '2026-10-24').length + 1700)
+    expect(buildShoppingInstruction({ customInstructions: '   ' }, '2026-10-24')).not.toContain('Instructions personnelles')
   })
 
   it('utilise le modèle économe quand la demande le choisit', async () => {
@@ -242,7 +226,7 @@ describe('API Gilli', () => {
     expect(lastUpstreamRequest.url).toBe('/v1beta/models/gemini-test:streamGenerateContent?alt=sse')
   })
 
-  it('transmet la référence du mooré validée et annonce son contenu', async () => {
+  it('annonce la référence du mooré à la console, sans l’envoyer à l’assistant d’achat', async () => {
     const referenceDir = mkdtempSync(join(tmpdir(), 'moore-api-'))
     try {
       writeFileSync(join(referenceDir, 'fiche.md'), '## Orthographe\nRègle de test validée.')
@@ -255,10 +239,8 @@ describe('API Gilli', () => {
       expect(overview.reference.sheetChars).toBeGreaterThan(0)
       await (await post(base, validBody)).text()
       const instruction = lastUpstreamRequest.body.systemInstruction.parts[0].text
-      expect(instruction).toContain('Référence du mooré rédigée et validée par des locuteurs')
-      expect(instruction).toContain('Règle de test validée.')
-      expect(instruction).toContain('- eau → mot-test')
-      expect(instruction).not.toContain('mot-brouillon')
+      expect(instruction).not.toContain('Référence du mooré')
+      expect(instruction).not.toContain('mot-test')
     } finally {
       rmSync(referenceDir, { recursive: true, force: true })
     }

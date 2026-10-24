@@ -1,4 +1,5 @@
-import { BookmarkPlus, Check, Zap, CheckCheck, ChevronLeft, ChevronRight, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
+import { BookmarkPlus, Check, CheckCheck, ChevronLeft, ChevronRight, Copy, FileText, Flag, Globe, Library, Pencil, RefreshCw, Share2, Square, ThumbsDown, ThumbsUp, Volume2 } from 'lucide-react'
+import { ShoppingResults } from './ShoppingResults'
 import { lazy, Suspense, useState } from 'react'
 import { formatSize, isAudio, isImage } from '../app/attachments'
 import type { Attachment, ChatMessage as ChatMessageType, MessageRating } from '../domain/types'
@@ -155,6 +156,8 @@ function UserMessage({ message, canEdit, onCopy, onEdit, onSavePrompt }: { messa
 }
 
 interface ChatMessageProps {
+  /** Ouvre une annonce proposée par l’assistant d’achat (dans la marketplace). */
+  onOpenListing?: (id: string) => void
   message: ChatMessageType
   copiedMessageId?: string
   canRegenerate: boolean
@@ -170,10 +173,9 @@ interface ChatMessageProps {
   /** Changer de version ; seulement pour la dernière réponse, que la suite de la conversation ne contredit pas. */
   onSelectVersion?: (message: ChatMessageType, index: number) => void
   onSavePrompt?: (prompt: string) => void
-  onUseLiteModel?: () => void
 }
 
-export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt, onUseLiteModel }: ChatMessageProps) {
+export function ChatMessage({ onOpenListing, message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt }: ChatMessageProps) {
   // Le passage sélectionné dans la réponse pré-remplit le formulaire de signalement.
   const [selectedPassage, setSelectedPassage] = useState('')
 
@@ -196,6 +198,7 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
             </Suspense>
           </div>
         )}
+        {message.listings && message.listings.length > 0 && <ShoppingResults listings={message.listings} onOpenListing={onOpenListing} />}
         {isDone && (message.sources || message.searchSuggestionsHtml) && <WebSources sources={message.sources} searchSuggestionsHtml={message.searchSuggestionsHtml} />}
         {message.status === 'stopped' && <p className="message-status">Génération arrêtée.</p>}
         {message.status === 'error' && <p className="message-error" role="alert">{message.errorMessage ?? 'Une erreur est survenue lors de la génération. Réessayez.'}</p>}
@@ -204,9 +207,6 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
           <div className="message-actions">
             {onSelectVersion && <VersionNav message={message} onSelect={(index) => onSelectVersion(message, index)} />}
             <button type="button" className="has-label" onClick={onRegenerate}><RefreshCw size={16} aria-hidden="true" /> Réessayer</button>
-            {message.errorCode === 'quota' && onUseLiteModel && (
-              <button type="button" className="has-label is-highlighted" onClick={onUseLiteModel}><Zap size={16} aria-hidden="true" /> Réessayer avec le modèle économe</button>
-            )}
           </div>
         )}
         {isDone && message.content && (
@@ -243,7 +243,7 @@ export function ChatMessage({ message, copiedMessageId, canRegenerate, canEdit, 
             {onReport && (
               <button type="button" className="has-label" onClick={() => onReport(message, selectedPassage)}>
                 <Flag size={16} aria-hidden="true" />
-                <span className="label-long">Signaler une erreur en mooré</span><span className="label-short">Signaler</span>
+                <span className="label-long">Signaler une erreur</span><span className="label-short">Signaler</span>
               </button>
             )}
           </div>

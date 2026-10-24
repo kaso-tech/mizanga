@@ -16,10 +16,10 @@ import { createGeminiProvider } from './gemini.mjs'
  * @property {string} name Identifiant du fournisseur (annoncé par /api/health, ex. « gemini »).
  * @property {boolean} configured Vrai si le fournisseur peut répondre (clé présente…).
  * @property {{ standard: string, lite: string }} models Modèles réellement utilisés (console d’administration).
- * @property {(request: { messages: AiMessage[], preferences: AiPreferences, reference?: string, instructions?: string, webSearch?: boolean, functions?: AiFunction[], tier?: 'standard' | 'lite', signal?: AbortSignal }) => AsyncGenerator<AiReplyEvent>} streamReply
+ * @property {(request: { messages: AiMessage[], preferences: AiPreferences, reference?: string, instructions?: string, webSearch?: boolean, functions?: AiFunction[], tier?: 'standard' | 'lite', feature?: string, signal?: AbortSignal }) => AsyncGenerator<AiReplyEvent>} streamReply
  *   Réponse diffusée par fragments, terminée par les jetons consommés (`usage`) quand le fournisseur
  *   les donne ; `instructions` remplace les consignes générales, `webSearch: false` retire la recherche
- *   web ; `functions` propose des actions que le modèle demande par `functionCall`. Lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
+ *   web ; `functions` propose des actions que le modèle demande par `functionCall` ; `feature` nomme la fonctionnalité dans les diagnostics de la console. Lève une UpstreamError (server/ai/errors.mjs) en cas d’échec.
  * @property {(request: { text: string, signal?: AbortSignal }) => Promise<string | null>} generateTitle
  *   Titre court d’une conversation à partir de son premier message.
  * @property {(request: { instructions: string, text: string, images?: Array<{ mimeType: string, data: string }>, schema: Record<string, unknown>, signal?: AbortSignal }) => Promise<unknown>} [generateJson]

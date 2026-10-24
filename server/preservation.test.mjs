@@ -88,7 +88,8 @@ describe('préservation du chatbot', () => {
     }
     const base = await startApi()
     const view = await browserView(await postJson(`${base}/api/chat`, conversation))
-    expect({ upstream: upstreamRequests, browser: view }).toMatchSnapshot()
+    // La date du jour figure dans les consignes : elle est remplacée pour que l’instantané reste stable.
+    expect(JSON.parse(JSON.stringify({ upstream: upstreamRequests, browser: view }).replace(/Date du jour : \d{4}-\d{2}-\d{2}/g, 'Date du jour : <date>'))).toMatchSnapshot()
   })
 
   it('requête avec le modèle économe', async () => {

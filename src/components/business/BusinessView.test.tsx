@@ -154,22 +154,4 @@ describe('espace Business', () => {
     expect(screen.getByText('Thé')).toBeInTheDocument()
   })
 
-  it('présente les activités Commerce, Élevage et Agriculture', async () => {
-    fakeBusinessServer()
-    await fetch('/api/business', { method: 'POST', headers: { Authorization: 'Bearer jeton' }, body: JSON.stringify({ name: 'Ferme Awa', countryCode: 'BF' }) })
-    renderView()
-    const activities = await screen.findByRole('tablist', { name: 'Activités' })
-    expect(within(activities).getByRole('tab', { name: 'Commerce' })).toHaveAttribute('aria-selected', 'true')
-    expect(await screen.findByRole('tab', { name: 'Produits' })).toBeVisible()
-
-    await userEvent.click(within(activities).getByRole('tab', { name: 'Élevage' }))
-    expect(screen.getByRole('tablist', { name: 'Sections de l’élevage' })).toBeVisible()
-    expect(screen.getByRole('tab', { name: 'Lots' })).toBeVisible()
-    expect(screen.queryByRole('tab', { name: 'Produits' })).not.toBeInTheDocument()
-    await userEvent.click(within(activities).getByRole('tab', { name: 'Agriculture' }))
-    expect(screen.getByRole('tablist', { name: 'Sections de l’agriculture' })).toBeVisible()
-    expect(screen.getByRole('tab', { name: 'Parcelles' })).toBeVisible()
-    await userEvent.click(within(activities).getByRole('tab', { name: 'Commerce' }))
-    expect(screen.getByRole('tab', { name: 'Produits' })).toBeVisible()
-  })
 })

@@ -1,9 +1,8 @@
-import { ArrowUp, Bookmark, Check, Clock, FileText, Keyboard, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Bookmark, Check, Clock, FileText, LoaderCircle, Mic, Paperclip, Square, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { acceptAttribute, formatSize, isAudio, isImage } from '../app/attachments'
 import { filterSavedPrompts, type SavedPrompt } from '../app/savedPrompts'
 import { MAX_RECORDING_SECONDS, formatDuration, isVoiceRecordingSupported, useVoiceRecording } from '../app/voiceRecording'
-import { mooreCharacters } from '../data/content'
 import type { Attachment } from '../domain/types'
 
 interface ComposerProps {
@@ -61,12 +60,11 @@ export function Composer({
   allowVoice = allowAttachments,
   accept = acceptAttribute,
   attachLabel = 'Joindre une photo ou un fichier',
-  placeholder = 'Demandez n’importe quoi, en français ou en mooré…',
+  placeholder = 'Que cherchez-vous ? Produit, budget, ville…',
   label = 'Votre message',
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [showCharacters, setShowCharacters] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [canRecord] = useState(isVoiceRecordingSupported)
   const recording = useVoiceRecording({ onRecorded: (file) => onAddFiles([file]), onError: onNotify })
@@ -115,18 +113,6 @@ export function Composer({
     onSend(value)
   }
 
-  /** Insère le texte à la position du curseur, sans jamais modifier le reste de la saisie. */
-  const insert = (text: string) => {
-    const textarea = textareaRef.current
-    const start = textarea?.selectionStart ?? value.length
-    const end = textarea?.selectionEnd ?? value.length
-    onValueChange(value.slice(0, start) + text + value.slice(end))
-    requestAnimationFrame(() => {
-      textarea?.focus()
-      textarea?.setSelectionRange(start + text.length, start + text.length)
-    })
-  }
-
   return (
     <div className="composer-wrap">
       {isOffline && (
@@ -167,15 +153,6 @@ export function Composer({
           Aucune consigne enregistrée. Enregistrez un de vos messages avec son bouton <Bookmark size={13} aria-label="signet" />, ou ajoutez-en dans Paramètres › Personnalisation.
         </p>
       )}
-      {showCharacters && (
-        <div className="character-palette" role="group" aria-label="Caractères du mooré">
-          {mooreCharacters.map((character) => (
-            <button key={character} type="button" lang="mos" aria-label={`Insérer ${character}`} onClick={() => insert(character)}>
-              {character}
-            </button>
-          ))}
-        </div>
-      )}
       <div
         className={`composer ${isDragging ? 'is-dragging' : ''}`}
         onDragOver={(event) => {
@@ -195,7 +172,7 @@ export function Composer({
           <div className="recording-bar" role="status">
             <span className="recording-dot" aria-hidden="true" />
             <span className="recording-time">{formatDuration(recording.elapsed)} / {formatDuration(MAX_RECORDING_SECONDS)}</span>
-            <span className="recording-note">Enregistrement… La compréhension du mooré parlé n’est pas encore garantie.</span>
+            <span className="recording-note">Enregistrement…</span>
             <button type="button" className="secondary-button" onClick={recording.cancel}>Annuler</button>
             <button type="button" className="primary-button" onClick={recording.stop}><Check size={16} aria-hidden="true" /> Terminer</button>
           </div>
@@ -288,16 +265,6 @@ export function Composer({
               <Paperclip size={20} />
             </button>
           )}
-          <button
-            type="button"
-            className={`composer-tool ${showCharacters ? 'is-active' : ''}`}
-            aria-label="Caractères du mooré"
-            aria-pressed={showCharacters}
-            title="Caractères du mooré"
-            onClick={() => setShowCharacters((shown) => !shown)}
-          >
-            <Keyboard size={20} />
-          </button>
           {allowVoice && <button
             type="button"
             className={`composer-tool ${isRecording ? 'is-recording' : ''}`}

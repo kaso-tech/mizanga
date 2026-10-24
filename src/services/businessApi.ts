@@ -1,6 +1,4 @@
 // Appels à l’espace Business du serveur de Gilli, avec le jeton de connexion de l’utilisateur.
-import { createAgricultureApi } from './agricultureApi'
-import { createLivestockApi } from './livestockApi'
 
 export interface Business {
   id: string
@@ -252,7 +250,7 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     if (!response.ok || !data) throw new BusinessApiError(data?.error ?? 'Une erreur est survenue. Réessayez.', response.status)
     return data
   }
-  /** Question à un assistant (Commerce ou Élevage) ; la réponse NDJSON arrive par fragments. */
+  /** Question à l’assistant ; la réponse NDJSON arrive par fragments. */
   const stream = async <Event extends object>(path: string, messages: AssistantMessage[], onEvent: (event: Event) => void, signal?: AbortSignal) => {
     const response = await send('POST', path, { messages }, signal)
     if (!response.ok || !response.body) {
@@ -311,9 +309,5 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     askAssistant: (businessId: string, messages: AssistantMessage[], onEvent: (event: AssistantEvent) => void, signal?: AbortSignal) => (
       stream(`/${businessId}/assistant`, messages, onEvent, signal)
     ),
-    /** Onglet Élevage : lots, journal, santé, résultats et assistant. */
-    livestock: createLivestockApi(request, stream),
-    /** Onglet Agriculture : parcelles, cultures, journal, travaux prévus, résultats et assistant. */
-    agriculture: createAgricultureApi(request, stream),
   }
 }

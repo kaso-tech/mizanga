@@ -13,6 +13,7 @@ export const snapshotReply = (message: ChatMessage): ReplyVersion => ({
   isDemonstration: message.isDemonstration,
   sources: message.sources,
   searchSuggestionsHtml: message.searchSuggestionsHtml,
+  listings: message.listings,
   rating: message.rating,
 })
 

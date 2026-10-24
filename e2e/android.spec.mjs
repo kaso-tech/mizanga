@@ -302,221 +302,6 @@ test('console d’administration : application à part, connexion par e-mail et 
   await expect(page.getByRole('textbox', { name: 'Votre message' })).toBeVisible()
 })
 
-test('élevage : lots, journal, santé, résultats et assistant, au franc près', async ({ page }, info) => {
-  await signInAndCreateShop(page, emailFor(info), 'Ferme Awa')
-  await page.getByRole('tablist', { name: 'Activités' }).getByRole('tab', { name: 'Élevage' }).tap()
-  await expect(page.getByRole('tab', { name: 'Lots' })).toHaveAttribute('aria-selected', 'true')
-
-  // Lot de poulets (en groupe) et troupeau de bovins (un par un).
-  await page.getByRole('button', { name: 'Nouveau lot' }).tap()
-  let dialog = page.getByRole('dialog', { name: 'Nouveau lot' })
-  await dialog.getByLabel('Nom du lot').fill('Poulets bande 1')
-  await dialog.getByRole('combobox', { name: /^Espèce/ }).selectOption('poultry')
-  await dialog.getByLabel('Effectif de départ').fill('200')
-  await expectFitsScreen(page, 'nouveau lot')
-  await dialog.getByRole('button', { name: 'Créer le lot' }).tap()
-  await expect(dialog).toBeHidden()
-  const poultry = page.locator('.herd-card', { hasText: 'Poulets bande 1' })
-  await expect(poultry).toContainText('200 animaux')
-
-  await page.getByRole('button', { name: 'Nouveau lot' }).tap()
-  dialog = page.getByRole('dialog', { name: 'Nouveau lot' })
-  await dialog.getByLabel('Nom du lot').fill('Bovins')
-  await dialog.getByRole('combobox', { name: /^Espèce/ }).selectOption('cattle')
-  await expect(dialog.getByRole('radio', { name: /Un par un/ })).toBeChecked()
-  await dialog.getByRole('button', { name: 'Créer le lot' }).tap()
-  await expect(dialog).toBeHidden()
-
-  /** @param {string} herd @param {string} kind @param {Record<string, string>} fields */
-  const record = async (herd, kind, fields) => {
-    await page.getByRole('button', { name: `Événement pour ${herd}` }).tap()
-    const form = page.getByRole('dialog', { name: 'Nouvel événement' })
-    await form.getByRole('combobox', { name: /^Événement/ }).selectOption(kind)
-    for (const [label, value] of Object.entries(fields)) {
-      const input = form.getByLabel(new RegExp(`^${label}`))
-      if (await input.evaluate((element) => element.tagName === 'SELECT')) await input.selectOption(value)
-      else await input.fill(value)
-    }
-    await form.getByRole('button', { name: 'Enregistrer' }).tap()
-    await expect(form).toBeHidden()
-  }
-  await record('Poulets bande 1', 'death', { 'Nombre d’animaux': '4', 'Cause': 'Chaleur' })
-  await record('Poulets bande 1', 'feed', { 'Coût de l’aliment': '45 000' })
-  await record('Poulets bande 1', 'sale', { 'Nombre d’animaux': '50', 'Montant de la vente': '150000' })
-  await expect(poultry).toContainText('146 animaux')
-  await record('Bovins', 'purchase', { 'Numéro de l’animal': 'BF-001', 'Sexe': 'female', 'Prix d’achat total': '350000' })
-  await expect(page.locator('.herd-card', { hasText: 'Bovins' })).toContainText('1 animal')
-  await expectFitsScreen(page, 'lots')
-
-  // Santé : rappel en retard, puis fait avec son coût.
-  await page.getByRole('tab', { name: 'Santé' }).tap()
-  await page.getByRole('button', { name: 'Nouveau soin' }).tap()
-  dialog = page.getByRole('dialog', { name: 'Nouveau soin' })
-  await dialog.getByRole('combobox', { name: /^Lot/ }).selectOption({ label: 'Poulets bande 1' })
-  await dialog.getByLabel('Vaccin, traitement ou motif').fill('Newcastle')
-  await dialog.getByLabel('Date prévue').fill(new Date(Date.now() - 86_400_000).toISOString().slice(0, 10))
-  await dialog.getByRole('button', { name: 'Enregistrer le soin' }).tap()
-  await expect(dialog).toBeHidden()
-  await expect(page.getByRole('list', { name: 'Soins en retard' })).toContainText('En retard de 1 jour')
-  await expectFitsScreen(page, 'santé')
-  await page.getByRole('button', { name: 'Marquer comme fait : Newcastle (Poulets bande 1)' }).tap()
-  dialog = page.getByRole('dialog', { name: 'Soin fait : Newcastle' })
-  await dialog.getByLabel(/Coût/).fill('6000')
-  await dialog.getByRole('button', { name: 'Marquer comme fait' }).tap()
-  await expect(page.getByRole('list', { name: 'Soins faits' })).toContainText('6 000')
-
-  // Résultats des 30 derniers jours : 4 morts sur 201 animaux (2 %), coûts 45 000 + 6 000 + 350 000.
-  await page.getByRole('tab', { name: 'Résultats' }).tap()
-  const results = page.locator('.results-grid')
-  await expect(results).toContainText('Marge estimée')
-  expect(plain(await results.textContent())).toContain('Mortalité (4 morts)2 %')
-  expect(plain(await results.textContent())).toContain('Coûts401 000 F CFA')
-  expect(plain(await results.textContent())).toContain('Ventes d’animaux150 000 F CFA')
-  expect(plain(await results.textContent())).toContain('Marge estimée-251 000 F CFA')
-  await expectFitsScreen(page, 'résultats de l’élevage')
-
-  // Journal : le propriétaire annule la mortalité, l’effectif revient.
-  await page.getByRole('tab', { name: 'Journal' }).tap()
-  const journal = page.getByRole('list', { name: 'Journal de l’élevage' })
-  await expect(journal).toContainText('Mortalité · 4')
-  await page.getByRole('button', { name: /^Annuler : Mortalité/ }).tap()
-  await page.getByRole('dialog', { name: 'Annuler l’événement' }).getByRole('button', { name: 'Annuler l’événement' }).tap()
-  await expect(journal.locator('.journal-card.is-cancelled')).toContainText('Mortalité · 4')
-  await page.getByRole('tab', { name: 'Lots' }).tap()
-  await expect(poultry).toContainText('150 animaux')
-
-  // Assistant : une phrase prépare une fiche de mortalité, enregistrée après confirmation.
-  await page.getByRole('tab', { name: 'Assistant' }).tap()
-  await page.getByRole('textbox', { name: 'Votre question' }).fill('J’ai perdu 2 poulets ce matin')
-  await page.getByRole('button', { name: 'Envoyer' }).tap()
-  const card = page.getByRole('form', { name: 'Fiche à vérifier : Mortalité' })
-  await expect(card.getByRole('combobox', { name: /^Lot/ })).toHaveValue(/.+/)
-  await expect(card.getByLabel('Nombre d’animaux')).toHaveValue('2')
-  await expect(page.getByText(/contactez un vétérinaire/).first()).toBeVisible()
-  await expectFitsScreen(page, 'assistant Élevage')
-  await card.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
-  await expect(card).toContainText('Mortalité de 2 enregistrée dans « Poulets bande 1 ».')
-  await page.getByRole('tab', { name: 'Lots' }).tap()
-  await expect(poultry).toContainText('148 animaux')
-
-  // La conversation est dans le menu, avec l’icône de l’élevage.
-  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
-  const row = page.getByRole('navigation', { name: 'Conversations de cette session' }).getByRole('button', { name: 'Élevage : J’ai perdu 2 poulets ce matin' })
-  await expect(row).toBeVisible()
-  // Rouverte après rechargement : l’onglet Élevage › Assistant affiche la conversation et sa fiche.
-  await page.reload()
-  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
-  await row.tap()
-  await expect(page.getByRole('tab', { name: 'Assistant' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('article', { name: 'Votre message' })).toContainText('J’ai perdu 2 poulets ce matin')
-  await expect(page.getByRole('form', { name: 'Fiche à vérifier : Mortalité' })).toContainText('Enregistré')
-})
-
-test('agriculture : parcelles, cultures, journal, travaux, résultats et assistant, au kg et au franc près', async ({ page }, info) => {
-  await signInAndCreateShop(page, emailFor(info), 'Ferme Koudougou')
-  await page.getByRole('tablist', { name: 'Activités' }).getByRole('tab', { name: 'Agriculture' }).tap()
-  await expect(page.getByRole('tab', { name: 'Parcelles' })).toHaveAttribute('aria-selected', 'true')
-
-  await page.getByRole('button', { name: 'Nouvelle parcelle' }).tap()
-  let dialog = page.getByRole('dialog', { name: 'Nouvelle parcelle' })
-  await dialog.getByLabel('Nom de la parcelle').fill('Champ 1')
-  await dialog.getByLabel('Surface').fill('2')
-  await expectFitsScreen(page, 'nouvelle parcelle')
-  await dialog.getByRole('button', { name: 'Créer la parcelle' }).tap()
-  await expect(dialog).toBeHidden()
-  const plot = page.locator('.plot-card', { hasText: 'Champ 1' })
-  await expect(plot).toContainText('2 ha')
-
-  await page.getByRole('button', { name: 'Nouvelle culture sur Champ 1' }).tap()
-  dialog = page.getByRole('dialog', { name: 'Nouvelle culture' })
-  await dialog.getByRole('combobox', { name: /^Culture/ }).selectOption('maize')
-  await dialog.getByLabel('Surface cultivée').fill('1,5')
-  await expectFitsScreen(page, 'nouvelle culture')
-  await dialog.getByRole('button', { name: 'Créer la culture' }).tap()
-  await expect(dialog).toBeHidden()
-  const crop = plot.locator('.crop-row', { hasText: 'Maïs' })
-  await expect(crop).toContainText('1,5 ha')
-
-  /** @param {string} kind @param {Record<string, string>} fields */
-  const record = async (kind, fields) => {
-    await page.getByRole('button', { name: 'Opération pour Maïs (Champ 1)' }).tap()
-    const form = page.getByRole('dialog', { name: 'Nouvelle opération' })
-    await form.getByRole('combobox', { name: /^Opération/ }).selectOption(kind)
-    for (const [label, value] of Object.entries(fields)) {
-      const input = form.getByLabel(new RegExp(`^${label}`))
-      if (await input.evaluate((element) => element.tagName === 'SELECT')) await input.selectOption(value)
-      else await input.fill(value)
-    }
-    await form.getByRole('button', { name: 'Enregistrer' }).tap()
-    await expect(form).toBeHidden()
-  }
-  await record('input', { 'Type d’intrant': 'fertilizer', 'Produit': 'NPK 15-15-15', 'Quantité': '3', 'Unité': 'sac', 'Coût': '54 000' })
-  await record('work', { 'Travail': 'weeding', 'Main-d’œuvre': '20000' })
-  await record('harvest', { 'Quantité': '18', 'Unité': 'sac', 'Poids d’un sac': '100' })
-  await expect.poll(async () => plain(await crop.textContent())).toContain('Récolté : 1 800 kg · en stock : 1 800 kg')
-  await record('sale', { 'Quantité': '1000', 'Montant de la vente': '250000' })
-  await expect.poll(async () => plain(await crop.textContent())).toContain('en stock : 800 kg')
-  await expectFitsScreen(page, 'parcelles et cultures')
-
-  // Travail prévu en retard, puis fait avec la main-d’œuvre (il entre au journal).
-  await page.getByRole('tab', { name: 'Travaux' }).tap()
-  await page.getByRole('button', { name: 'Nouveau travail prévu' }).tap()
-  dialog = page.getByRole('dialog', { name: 'Nouveau travail prévu' })
-  await dialog.getByRole('combobox', { name: /^Travail/ }).selectOption('treatment')
-  await dialog.getByLabel(/^Précision/).fill('Traitement chenilles')
-  await dialog.getByLabel('Date prévue').fill(new Date(Date.now() - 86_400_000).toISOString().slice(0, 10))
-  await dialog.getByRole('button', { name: 'Enregistrer le rappel' }).tap()
-  await expect(dialog).toBeHidden()
-  await expect(page.getByRole('list', { name: 'Travaux en retard' })).toContainText('En retard de 1 jour')
-  await page.getByRole('button', { name: 'Marquer comme fait : Traitement chenilles (Maïs — Champ 1)' }).tap()
-  dialog = page.getByRole('dialog', { name: 'Travail fait : Traitement chenilles' })
-  await dialog.getByLabel(/Main-d’œuvre/).fill('6000')
-  await dialog.getByRole('button', { name: 'Marquer comme fait' }).tap()
-  await expect(page.getByRole('list', { name: 'Travaux faits' })).toContainText('Traitement chenilles')
-
-  // Résultats : 1 800 kg sur 1,5 ha → 1 200 kg/ha ; coûts 54 000 + 20 000 + 6 000 = 80 000 ; marge 170 000.
-  await page.getByRole('tab', { name: 'Résultats' }).tap()
-  const row = page.getByRole('table', { name: 'Résultats par culture' }).getByRole('row', { name: /Maïs — Champ 1/ })
-  await expect(row).toContainText('kg/ha')
-  await expect.poll(async () => plain(await row.textContent())).toContain('1 200 kg/ha')
-  const results = plain(await page.locator('.results-grid').textContent())
-  expect(results).toContain('Encore en stock800 kg')
-  expect(results).toContain('Coûts80 000 F CFA')
-  expect(results).toContain('Marge estimée170 000 F CFA')
-  await expectFitsScreen(page, 'résultats de l’agriculture')
-
-  // Journal : le propriétaire annule la vente, le stock revient.
-  await page.getByRole('tab', { name: 'Journal' }).tap()
-  await page.getByRole('button', { name: /^Annuler : Vente de récolte/ }).tap()
-  await page.getByRole('dialog', { name: 'Annuler l’opération' }).getByRole('button', { name: 'Annuler l’opération' }).tap()
-  await expect(page.getByRole('list', { name: 'Journal de l’exploitation' }).locator('.journal-card.is-cancelled')).toContainText('Vente de récolte')
-  await page.getByRole('tab', { name: 'Parcelles' }).tap()
-  await expect.poll(async () => plain(await crop.textContent())).toContain('en stock : 1 800 kg')
-
-  // Assistant : une phrase prépare une fiche de vente, enregistrée après confirmation.
-  await page.getByRole('tab', { name: 'Assistant' }).tap()
-  await page.getByRole('textbox', { name: 'Votre question' }).fill('J’ai vendu 2 sacs de maïs à 50 000')
-  await page.getByRole('button', { name: 'Envoyer' }).tap()
-  const card = page.getByRole('form', { name: 'Fiche à vérifier : Vente de récolte' })
-  await expect(card.getByRole('combobox', { name: /^Culture/ })).toHaveValue(/.+/)
-  await expect(card.getByLabel('Quantité')).toHaveValue('2')
-  await expectFitsScreen(page, 'assistant Agriculture')
-  await card.getByRole('button', { name: 'Confirmer et enregistrer' }).tap()
-  await expect.poll(async () => plain(await card.textContent())).toContain('Vente de récolte de 200 kg enregistrée (Maïs — Champ 1), 50 000 F CFA.')
-  await page.getByRole('tab', { name: 'Parcelles' }).tap()
-  await expect.poll(async () => plain(await crop.textContent())).toContain('en stock : 1 600 kg')
-
-  // La conversation est dans le menu (icône agriculture) et se rouvre après rechargement.
-  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
-  const conversation = page.getByRole('navigation', { name: 'Conversations de cette session' }).getByRole('button', { name: 'Agriculture : J’ai vendu 2 sacs de maïs à 50 000' })
-  await expect(conversation).toBeVisible()
-  await page.reload()
-  await page.getByRole('button', { name: 'Ouvrir le menu' }).tap()
-  await conversation.tap()
-  await expect(page.getByRole('tab', { name: 'Assistant' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('form', { name: 'Fiche à vérifier : Vente de récolte' })).toContainText('Enregistré')
-})
-
 /** Publie un produit sur la marketplace (vitrine créée au besoin) ; renvoie le badge d’état affiché. @param {import('@playwright/test').Page} page @param {string} productName @param {string} title */
 async function publishListing(page, productName, title, withPhoto = true) {
   await page.getByRole('button', { name: `Publier sur la marketplace : ${productName}` }).tap()
@@ -541,6 +326,39 @@ async function publishListing(page, productName, title, withPhoto = true) {
   await expect(dialog).toBeHidden()
   return page.locator('.product-card', { hasText: productName }).locator('.listing-badge')
 }
+
+test('assistant d’achat : un client décrit son besoin, l’assistant propose les annonces de la marketplace', async ({ page, browser }, info) => {
+  await signInAndCreateShop(page, emailFor(info), 'Boutique Tecno')
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
+  const title = `Tecno Spark 20 neuf ${info.project.name}`
+  await expect(await publishListing(page, 'Tecno Spark 20', title)).toHaveText('En ligne')
+
+  // Un client, sans compte : l’assistant est l’accueil ; la marketplace est dans l’en-tête.
+  const client = await browser.newPage({ ...info.project.use })
+  await client.goto('/')
+  await expect(client.getByRole('heading', { level: 1, name: 'Que cherchez-vous ?' })).toBeVisible()
+  await expect(client.getByRole('combobox', { name: 'Modèle' })).toHaveCount(0)
+  await expect(client.getByRole('button', { name: /Caractères/ })).toHaveCount(0)
+  await client.getByRole('textbox', { name: 'Votre message' }).fill('Je cherche un téléphone Tecno à moins de 50 000 F à Ouaga')
+  await client.getByRole('button', { name: 'Envoyer' }).tap()
+  const results = client.getByRole('list', { name: 'Annonces proposées' })
+  const card = results.getByRole('listitem').filter({ hasText: title })
+  await expect(card).toBeVisible()
+  expect(plain(await card.textContent())).toContain('48 000 F CFA')
+  await expect(card).toContainText('Dans votre budget')
+  await expect(card).toContainText('Mémoire vive (RAM) : 8 Go')
+  await expect(card.getByRole('link', { name: /WhatsApp/ })).toHaveAttribute('href', /^https:\/\/wa\.me\/22670123456/)
+  await expect(client.getByRole('article', { name: 'Réponse de Gilli' })).toContainText('Voici ce que j’ai trouvé.')
+  await expectFitsScreen(client, 'annonces proposées par l’assistant')
+
+  // La fiche ouvre l’annonce dans la marketplace.
+  await card.getByRole('link', { name: 'Voir l’annonce', exact: true }).tap()
+  await expect(client.getByRole('heading', { level: 1, name: title })).toBeVisible()
+  expect(new URL(client.url()).pathname).toMatch(/^\/marketplace\/annonce\//)
+  await client.getByRole('button', { name: 'Marketplace' }).tap()
+  expect(new URL(client.url()).pathname).toBe('/marketplace')
+  await client.close()
+})
 
 test('marketplace : un vendeur publie, un visiteur trouve l’annonce et contacte le vendeur', async ({ page, browser }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Awa Téléphones')

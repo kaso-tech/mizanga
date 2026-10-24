@@ -19,7 +19,7 @@ interface ProposalState<Proposal> {
 }
 
 /**
- * Ce qui distingue un assistant de l’Espace Business (Commerce, Élevage…) : ses adresses, ses textes,
+ * Ce qui distingue un assistant de l’Espace Business (Commerce…) : ses adresses, ses textes,
  * ses fiches et l’affichage des chiffres qu’il a reçus.
  */
 export interface AssistantAdapter<Context, Proposal extends { id: string }> {

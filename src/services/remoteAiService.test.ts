@@ -148,4 +148,19 @@ describe('remoteAiService', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ engine: 'demo' })))
     expect((await detectServer()).authConfig).toBeUndefined()
   })
+
+  it('transmet les annonces de l’assistant d’achat et les rappelle au moteur dans la suite de la conversation', async () => {
+    const listing = { rank: 1, id: 'a1', title: 'Tecno Spark 20', price: 48000, currency: 'XOF', unit: 'pièce', condition: 'new', city: 'Ouagadougou', sellerName: 'Awa', sellerVerified: true, photo: null, score: 90, reasons: [], warnings: [], overBudget: false, whatsapp: null, phone: null }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamedResponse([`${JSON.stringify({ listings: [listing] })}\n{"text":"Voici [1]."}\n`])))
+    const chunks = []
+    for await (const chunk of createRemoteAiService({ label: 'Gemini' }).generate(request, { signal: new AbortController().signal })) chunks.push(chunk)
+    expect(chunks).toEqual([{ text: '', listings: [listing] }, { text: 'Voici [1].' }])
+
+    const history = selectHistory([
+      { id: 'u1', role: 'user', content: 'Un téléphone à 50 000 F', createdAt: '2026-10-24T00:00:00.000Z' },
+      { id: 'a1', role: 'assistant', content: 'Voici [1].', createdAt: '2026-10-24T00:00:01.000Z', listings: [listing] },
+      { id: 'u2', role: 'user', content: 'Et la 1, elle a quelle batterie ?', createdAt: '2026-10-24T00:00:02.000Z' },
+    ])
+    expect(history[1].content).toBe('Voici [1].\n[Annonces montrées : 1. Tecno Spark 20 — 48000 F CFA, Ouagadougou]')
+  })
 })

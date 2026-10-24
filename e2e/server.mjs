@@ -11,8 +11,6 @@ import { createApiHandler } from '../server/chat-handler.mjs'
 import { createTestDatabase } from '../supabase/tests/database.mjs'
 import { createPgliteMarketplace } from '../supabase/tests/pglite-marketplace.mjs'
 import { createPgliteBusinessStore } from '../supabase/tests/pglite-store.mjs'
-import { createPgliteLivestockStore } from '../supabase/tests/pglite-livestock.mjs'
-import { createPgliteAgricultureStore } from '../supabase/tests/pglite-agriculture.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const appPort = Number(process.env.E2E_PORT ?? 4173)
@@ -92,18 +90,20 @@ createServer(async (req, res) => {
   const today = instructions.split('\n').find((/** @type {string} */ line) => line.startsWith('- Aujourd’hui')) ?? 'Bonjour, je suis Gilli.'
   res.writeHead(200, { 'Content-Type': 'text/event-stream' })
   const lastParts = payload.contents?.at(-1)?.parts ?? []
-  // Assistant Élevage : « J’ai perdu 2 poulets… » → fiche de mortalité pour le premier lot de volailles.
-  if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('J’ai perdu'))) {
-    const herd = /^- (.+?) : Volailles,/m.exec(instructions)?.[1] ?? 'Poulets'
-    const call = { functionCall: { name: 'proposer_evenement_elevage', args: { lot: herd, type: 'mortalite', nombre: 2, cause: 'inconnue' } } }
-    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Voici la fiche à vérifier. Si d’autres poulets meurent, contactez un vétérinaire.' }, call] } }], usageMetadata: { promptTokenCount: 1600, candidatesTokenCount: 25 } })}\n\n`)
+  // Assistant d’achat : « Je cherche un … à moins de N F » → recherche dans la marketplace, puis réponse
+  // rédigée à partir des annonces trouvées (seconde étape, sans fonction).
+  const lastText = lastParts.map((/** @type {any} */ part) => part.text ?? '').join(' ')
+  const offersSearch = (payload.tools ?? []).some((/** @type {any} */ tool) => tool.functionDeclarations?.some((/** @type {any} */ fn) => fn.name === 'rechercher_annonces'))
+  if (offersSearch && lastText.startsWith('Je cherche')) {
+    const budget = Number(/moins de ([\d\s]+) ?F/.exec(lastText)?.[1]?.replace(/\s/g, '') ?? 0) || undefined
+    const call = { functionCall: { name: 'rechercher_annonces', args: { requete: 'tecno', categorie: 'telephones', budget_max: budget, ville: 'Ouagadougou', criteres: [{ caracteristique: 'ram_go', minimum: 4 }] } } }
+    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [call] } }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 15 } })}\n\n`)
     return void res.end()
   }
-  // Assistant Agriculture : « J’ai vendu 2 sacs… » → fiche de vente pour la première culture listée.
-  if (lastParts.some((/** @type {any} */ part) => part.text?.startsWith('J’ai vendu'))) {
-    const crop = /^- (.+? — .+?) : saison/m.exec(instructions)?.[1] ?? 'Maïs'
-    const call = { functionCall: { name: 'proposer_operation_agricole', args: { culture: crop, type: 'vente', quantite: 2, unite: 'sac', poids_unite_kg: 100, montant: 50000 } } }
-    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Voici la fiche de vente à vérifier.' }, call] } }], usageMetadata: { promptTokenCount: 1600, candidatesTokenCount: 25 } })}\n\n`)
+  if (instructions.includes('Résultats de la recherche dans la marketplace')) {
+    const first = /^\[1\] (.+?) — /m.exec(instructions)?.[1]
+    const text = first ? `Voici ce que j’ai trouvé. Le [1] ${first} correspond à votre budget.` : 'Aucune annonce ne correspond pour le moment.'
+    res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }], usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 20 } })}\n\n`)
     return void res.end()
   }
   // « Vends 2 Savon, et 1500 de transport » : fiches de vente et de dépense.
@@ -137,8 +137,6 @@ const handler = createApiHandler({
     return email ? ensureUser(email) : null
   },
   businessStore: createPgliteBusinessStore(db),
-  livestockStore: createPgliteLivestockStore(db),
-  agricultureStore: createPgliteAgricultureStore(db),
   marketplace,
   moderationKey: MODERATION_KEY,
   adminEmail: ADMIN_EMAIL,
