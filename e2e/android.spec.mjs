@@ -287,7 +287,7 @@ test('console d’administration : application à part, connexion par e-mail et 
   await menu.getByRole('button', { name: 'Modération marketplace' }).tap()
   await expect(page.getByRole('heading', { level: 1, name: 'Modération marketplace' })).toBeVisible()
   await expect(menu).toBeHidden()
-  expect(new URL(page.url()).hash).toBe('#moderation')
+  await expect.poll(() => new URL(page.url()).hash).toBe('#moderation')
   await expectFitsScreen(page, 'console')
   // Le bouton « retour » d’Android ferme le menu sans quitter la console.
   await page.getByRole('button', { name: 'Ouvrir le menu de la console' }).tap()
