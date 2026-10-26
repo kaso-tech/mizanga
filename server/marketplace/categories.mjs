@@ -3,7 +3,8 @@
 // précises (saisies par le vendeur) : elles servent aux filtres et, plus tard, aux recommandations.
 
 /**
- * @typedef {{ key: string, label: string, type: 'text' | 'number' | 'select' | 'boolean', unit?: string, options?: string[], max?: number }} Attribute
+ * @typedef {{ key: string, label: string, type: 'text' | 'number' | 'select' | 'boolean', unit?: string, options?: string[], max?: number, better?: 'higher' | 'lower' }} Attribute
+ * `better` : pour la comparaison, la valeur la plus haute (ou la plus basse) est la meilleure.
  * @typedef {{ id: string, label: string }} Subcategory
  * @typedef {{ id: string, label: string, subcategories: Subcategory[], attributes?: Attribute[] }} Category
  */
@@ -11,7 +12,7 @@
 const brand = /** @type {Attribute} */ ({ key: 'marque', label: 'Marque', type: 'text', max: 40 })
 const model = /** @type {Attribute} */ ({ key: 'modele', label: 'Modèle', type: 'text', max: 60 })
 const color = /** @type {Attribute} */ ({ key: 'couleur', label: 'Couleur', type: 'text', max: 30 })
-const warranty = /** @type {Attribute} */ ({ key: 'garantie_mois', label: 'Garantie', type: 'number', unit: 'mois', max: 120 })
+const warranty = /** @type {Attribute} */ ({ key: 'garantie_mois', label: 'Garantie', type: 'number', unit: 'mois', max: 120, better: 'higher' })
 
 /** @param {string} id @param {string} label */
 const sub = (id, label) => ({ id, label })
@@ -21,15 +22,15 @@ export const CATEGORIES = [
   {
     id: 'telephones', label: 'Téléphones et accessoires',
     subcategories: [sub('smartphones', 'Smartphones'), sub('telephones-simples', 'Téléphones simples'), sub('tablettes', 'Tablettes'), sub('accessoires-telephone', 'Accessoires (coques, chargeurs, écouteurs)'), sub('montres-connectees', 'Montres connectées')],
-    attributes: [brand, model, { key: 'ram_go', label: 'Mémoire vive (RAM)', type: 'number', unit: 'Go', max: 64 }, { key: 'stockage_go', label: 'Stockage', type: 'number', unit: 'Go', max: 2048 },
-      { key: 'batterie_mah', label: 'Batterie', type: 'number', unit: 'mAh', max: 30000 }, { key: 'ecran_pouces', label: 'Écran', type: 'number', unit: 'pouces', max: 20 },
+    attributes: [brand, model, { key: 'ram_go', label: 'Mémoire vive (RAM)', type: 'number', unit: 'Go', max: 64, better: 'higher' }, { key: 'stockage_go', label: 'Stockage', type: 'number', unit: 'Go', max: 2048, better: 'higher' },
+      { key: 'batterie_mah', label: 'Batterie', type: 'number', unit: 'mAh', max: 30000, better: 'higher' }, { key: 'ecran_pouces', label: 'Écran', type: 'number', unit: 'pouces', max: 20 },
       { key: 'reseau', label: 'Réseau', type: 'select', options: ['2G', '3G', '4G', '5G'] }, { key: 'double_sim', label: 'Double SIM', type: 'boolean' }, color, warranty],
   },
   {
     id: 'informatique', label: 'Informatique',
     subcategories: [sub('ordinateurs-portables', 'Ordinateurs portables'), sub('ordinateurs-bureau', 'Ordinateurs de bureau'), sub('imprimantes', 'Imprimantes et scanners'), sub('stockage', 'Clés USB et disques'), sub('reseau', 'Réseau et Wi-Fi'), sub('accessoires-informatique', 'Accessoires informatiques')],
-    attributes: [brand, model, { key: 'processeur', label: 'Processeur', type: 'text', max: 60 }, { key: 'ram_go', label: 'Mémoire vive (RAM)', type: 'number', unit: 'Go', max: 256 },
-      { key: 'stockage_go', label: 'Stockage', type: 'number', unit: 'Go', max: 16384 }, { key: 'type_stockage', label: 'Type de stockage', type: 'select', options: ['SSD', 'HDD', 'eMMC'] },
+    attributes: [brand, model, { key: 'processeur', label: 'Processeur', type: 'text', max: 60 }, { key: 'ram_go', label: 'Mémoire vive (RAM)', type: 'number', unit: 'Go', max: 256, better: 'higher' },
+      { key: 'stockage_go', label: 'Stockage', type: 'number', unit: 'Go', max: 16384, better: 'higher' }, { key: 'type_stockage', label: 'Type de stockage', type: 'select', options: ['SSD', 'HDD', 'eMMC'] },
       { key: 'ecran_pouces', label: 'Écran', type: 'number', unit: 'pouces', max: 40 }, warranty],
   },
   {
@@ -46,7 +47,7 @@ export const CATEGORIES = [
   {
     id: 'energie-solaire', label: 'Énergie et solaire',
     subcategories: [sub('panneaux-solaires', 'Panneaux solaires'), sub('batteries', 'Batteries'), sub('onduleurs', 'Onduleurs et régulateurs'), sub('groupes-electrogenes', 'Groupes électrogènes'), sub('eclairage', 'Lampes et éclairage')],
-    attributes: [brand, { key: 'puissance_w', label: 'Puissance', type: 'number', unit: 'W', max: 100000 }, { key: 'capacite_ah', label: 'Capacité', type: 'number', unit: 'Ah', max: 10000 }, { key: 'tension_v', label: 'Tension', type: 'number', unit: 'V', max: 1000 }, warranty],
+    attributes: [brand, { key: 'puissance_w', label: 'Puissance', type: 'number', unit: 'W', max: 100000 }, { key: 'capacite_ah', label: 'Capacité', type: 'number', unit: 'Ah', max: 10000, better: 'higher' }, { key: 'tension_v', label: 'Tension', type: 'number', unit: 'V', max: 1000 }, warranty],
   },
   {
     id: 'mode-femme', label: 'Mode femme',
@@ -96,8 +97,8 @@ export const CATEGORIES = [
   {
     id: 'auto-moto', label: 'Auto et moto',
     subcategories: [sub('motos', 'Motos et tricycles'), sub('voitures', 'Voitures'), sub('pieces-moto', 'Pièces moto'), sub('pieces-auto', 'Pièces auto'), sub('pneus', 'Pneus'), sub('accessoires-auto', 'Accessoires')],
-    attributes: [brand, model, { key: 'annee', label: 'Année', type: 'number', max: 2100 }, { key: 'cylindree_cc', label: 'Cylindrée', type: 'number', unit: 'cm³', max: 10000 },
-      { key: 'kilometrage_km', label: 'Kilométrage', type: 'number', unit: 'km', max: 2000000 }, { key: 'carburant', label: 'Carburant', type: 'select', options: ['Essence', 'Diesel', 'Électrique', 'Hybride'] }],
+    attributes: [brand, model, { key: 'annee', label: 'Année', type: 'number', max: 2100, better: 'higher' }, { key: 'cylindree_cc', label: 'Cylindrée', type: 'number', unit: 'cm³', max: 10000 },
+      { key: 'kilometrage_km', label: 'Kilométrage', type: 'number', unit: 'km', max: 2000000, better: 'lower' }, { key: 'carburant', label: 'Carburant', type: 'select', options: ['Essence', 'Diesel', 'Électrique', 'Hybride'] }],
   },
   {
     id: 'sport-loisirs', label: 'Sport et loisirs',

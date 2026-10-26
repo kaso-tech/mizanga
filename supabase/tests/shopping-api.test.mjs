@@ -129,3 +129,29 @@ describe('assistant d’achat', () => {
     expect(requests.at(-1).instructions).toContain('Hors sujet : tu ne traites que les achats.')
   })
 })
+
+/** @param {string} query */
+const search = async (query) => /** @type {any} */ (await (await fetch(`${base}/api/marketplace/search?${query}`)).json())
+
+describe('recherche avancée de la marketplace', () => {
+  it('trie par prix ou par date, et filtre les caractéristiques de la catégorie', async () => {
+    const titles = (/** @type {any} */ body) => body.items.map((/** @type {any} */ item) => item.title)
+    expect(titles(await search('category=telephones&sort=price_asc'))).toEqual(['Itel A70 Android', 'Tecno Spark 20 Android', 'Samsung Galaxy A15 Android'])
+    expect(titles(await search('category=telephones&sort=price_desc'))).toEqual(['Samsung Galaxy A15 Android', 'Tecno Spark 20 Android', 'Itel A70 Android'])
+    // Au moins 4 Go de RAM et double SIM : l’Itel (3 Go, double SIM non indiquée) est écarté.
+    expect(titles(await search('category=telephones&sort=price_asc&a_ram_go=4&a_double_sim=1'))).toEqual(['Tecno Spark 20 Android', 'Samsung Galaxy A15 Android'])
+    expect(titles(await search('category=telephones&a_marque=tecno'))).toEqual(['Tecno Spark 20 Android'])
+    expect((await search('category=telephones&a_ram_go=16')).total).toBe(0)
+  })
+
+  it('vendeurs vérifiés seulement, annonces publiées après une date (alertes) et paramètres invalides', async () => {
+    expect((await search('category=telephones&verified=1')).total).toBe(0)
+    expect((await search(`category=telephones&publishedAfter=${encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString())}`)).total).toBe(3)
+    expect((await search(`category=telephones&publishedAfter=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`)).total).toBe(0)
+    const refused = await fetch(`${base}/api/marketplace/search?sort=au-hasard`)
+    expect(refused.status).toBe(422)
+    expect((await fetch(`${base}/api/marketplace/search?category=telephones&a_reseau=6G`)).status).toBe(422)
+    // Caractéristique sans catégorie : ignorée.
+    expect((await search('a_ram_go=16')).total).toBe(3)
+  })
+})

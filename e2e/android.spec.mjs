@@ -16,7 +16,7 @@ const emailFor = (info) => `commercant-${info.project.name.replace(/\W+/g, '-')}
 async function expectFitsScreen(page, screen) {
   const overflowing = await page.evaluate(() => {
     const width = window.innerWidth
-    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .settings-nav, .moderation-photos, pre, .katex-display')
+    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .market-tabs, .market-compare-scroll, .settings-nav, .moderation-photos, pre, .katex-display')
     return [...document.querySelectorAll('body *')]
       .filter((element) => {
         const box = element.getBoundingClientRect()
@@ -326,6 +326,69 @@ async function publishListing(page, productName, title, withPhoto = true) {
   await expect(dialog).toBeHidden()
   return page.locator('.product-card', { hasText: productName }).locator('.listing-badge')
 }
+
+test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ page, browser }, info) => {
+  const tag = `cmp${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  await signInAndCreateShop(page, emailFor(info), 'Boutique Comparaison')
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
+  await addProduct(page, { name: 'Itel A70', unit: 'pièce', buy: '30000', sell: '39000', quantity: '2' })
+  await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
+  await expect(await publishListing(page, 'Itel A70', `Itel A70 ${tag}`)).toHaveText('En ligne')
+
+  const client = await browser.newPage({ ...info.project.use })
+  await client.goto(`/marketplace?q=${tag}`)
+  const grid = client.getByRole('list', { name: 'Annonces' })
+  await expect(grid.getByRole('listitem')).toHaveCount(2)
+  await client.getByRole('combobox', { name: 'Trier' }).selectOption('price_asc')
+  await expect(grid.getByRole('listitem').first()).toContainText(`Itel A70 ${tag}`)
+  expect(new URL(client.url()).search).toContain('sort=price_asc')
+  await client.getByRole('button', { name: 'Filtres' }).tap()
+  await expect(client.getByRole('form', { name: 'Filtres' })).toBeVisible()
+  await expectFitsScreen(client, 'filtres de la marketplace')
+  await client.getByRole('form', { name: 'Filtres' }).getByLabel('Vendeurs vérifiés seulement').check()
+  await client.getByRole('button', { name: 'Appliquer' }).tap()
+  await expect(client.getByText('Aucune annonce ne correspond pour le moment.')).toBeVisible()
+  await client.getByRole('button', { name: 'Filtres (1)' }).tap()
+  await client.getByRole('button', { name: 'Effacer les filtres' }).tap()
+  await expect(grid.getByRole('listitem')).toHaveCount(2)
+
+  // Favori et comparaison.
+  await client.getByRole('button', { name: `Ajouter aux favoris : Tecno Spark 20 ${tag}` }).tap()
+  await client.getByRole('button', { name: `Comparer : Tecno Spark 20 ${tag}` }).tap()
+  await client.getByRole('button', { name: `Comparer : Itel A70 ${tag}` }).tap()
+  const bar = client.getByRole('region', { name: 'Comparaison' })
+  await expect(bar).toContainText('2 / 3 à comparer')
+  await expectFitsScreen(client, 'barre de comparaison')
+  await bar.getByRole('button', { name: 'Comparer' }).tap()
+  const table = client.getByRole('table')
+  await expect(table).toBeVisible()
+  const price = table.getByRole('row', { name: /^Prix/ })
+  await expect(price.locator('td').nth(1)).toContainText('Le moins cher')
+  await expect(table.getByRole('row', { name: /^Mémoire vive/ })).toContainText('8 Go')
+  await expectFitsScreen(client, 'comparaison')
+  await client.getByRole('button', { name: 'Retour' }).tap()
+  await client.getByRole('tab', { name: /Favoris/ }).tap()
+  await expect(client.getByRole('list', { name: 'Favoris' })).toContainText(`Tecno Spark 20 ${tag}`)
+  await expectFitsScreen(client, 'favoris')
+
+  // Alerte : créée sur la recherche, puis des annonces « publiées depuis » sont signalées dans l’en-tête.
+  await client.goto(`/marketplace?q=${tag}`)
+  await client.getByRole('button', { name: 'Créer une alerte' }).tap()
+  await expect(client.locator('.toast', { hasText: 'Alerte créée' })).toBeVisible()
+  await client.evaluate(() => {
+    const alerts = JSON.parse(localStorage.getItem('gilli.marketplace.alerts') ?? '[]')
+    localStorage.setItem('gilli.marketplace.alerts', JSON.stringify(alerts.map((/** @type {any} */ alert) => ({ ...alert, seenAt: new Date(Date.now() - 3_600_000).toISOString(), checkedAt: null }))))
+  })
+  await client.goto('/')
+  await expect(client.getByRole('button', { name: 'Marketplace, 2 nouvelles annonces pour vos alertes' })).toBeVisible()
+  await client.getByRole('button', { name: /^Marketplace/ }).tap()
+  await client.getByRole('tab', { name: /Alertes/ }).tap()
+  await client.getByRole('list', { name: 'Alertes' }).getByRole('button', { name: /2 nouvelles annonces/ }).tap()
+  await expect(client.getByRole('list', { name: 'Annonces' }).getByText('Nouveau')).toHaveCount(2)
+  await expect(client.getByRole('button', { name: 'Marketplace' })).toBeVisible()
+  await expectFitsScreen(client, 'alerte ouverte')
+  await client.close()
+})
 
 test('assistant d’achat : un client décrit son besoin, l’assistant propose les annonces de la marketplace', async ({ page, browser }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Tecno')

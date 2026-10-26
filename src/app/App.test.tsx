@@ -219,7 +219,8 @@ describe('App', () => {
 
   it('assistant d’achat : affiche les annonces proposées en fiches et ouvre l’annonce dans la marketplace', async () => {
     const listing = { rank: 1, id: 'a1', title: 'Tecno Spark 20', price: 48000, currency: 'XOF', unit: 'pièce', condition: 'new', city: 'Ouagadougou', sellerName: 'Awa Téléphones', sellerVerified: true, photo: null, score: 90, reasons: ['Dans votre budget (48 000 F CFA)', 'Mémoire vive (RAM) : 8 Go'], warnings: [], overBudget: false, whatsapp: '22670123456', phone: null }
-    const remote: AiService = { isDemonstration: false, label: 'Gemini', async *generate() { yield { text: '', listings: [listing] }; yield { text: 'Le [1] est le meilleur choix.' } } }
+    const other = { ...listing, rank: 2, id: 'a2', title: 'Itel A70', price: 39000, reasons: [], whatsapp: null, phone: '22676000000' }
+    const remote: AiService = { isDemonstration: false, label: 'Gemini', async *generate() { yield { text: '', listings: [listing, other] }; yield { text: 'Le [1] est le meilleur choix.' } } }
     window.history.replaceState({}, '', '/')
     render(<App aiService={remote} />)
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Un téléphone à 50 000 F{Enter}')
@@ -228,9 +229,12 @@ describe('App', () => {
     expect(within(results).getByText('Mémoire vive (RAM) : 8 Go')).toBeInTheDocument()
     expect(within(results).getByRole('link', { name: /WhatsApp/ })).toHaveAttribute('href', expect.stringContaining('https://wa.me/22670123456'))
     expect(await screen.findByText(/Le \[1\] est le meilleur choix/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ajouter aux favoris : Tecno Spark 20' }))
+    expect(JSON.parse(localStorage.getItem('gilli.marketplace.favorites') ?? '[]')).toMatchObject([{ id: 'a1', title: 'Tecno Spark 20', price: 48000 }])
+    expect(screen.getByRole('link', { name: 'Comparer ces 2 annonces' })).toHaveAttribute('href', '/marketplace/comparer?ids=a1,a2')
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ listing: null }, { status: 404 })))
     try {
-      await userEvent.click(within(results).getByRole('link', { name: 'Voir l’annonce' }))
+      await userEvent.click(screen.getAllByRole('link', { name: 'Voir l’annonce' })[0])
       expect(window.location.pathname).toBe('/marketplace/annonce/a1')
     } finally {
       vi.unstubAllGlobals()

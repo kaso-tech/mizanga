@@ -9,7 +9,7 @@ import { BusinessError } from '../business/validate.mjs'
  * @typedef {{ token: string, userId: string }} Session
  * @typedef {{ businessId: string, displayName: string, city: string, whatsapp: string | null, phone: string | null, deliversEverywhere: boolean, deliveryCities: string[], description: string | null, verified: boolean }} SellerProfile
  * @typedef {{ id: string, productId: string, title: string, description: string, category: string, subcategory: string | null, condition: string, attributes: Record<string, unknown>, photos: string[], status: string, revision: number, reasons: string[], moderatedBy: string | null, updatedAt: string }} OwnListing
- * @typedef {{ query?: string | null, category?: string | null, subcategory?: string | null, city?: string | null, minPrice?: number | null, maxPrice?: number | null, condition?: string | null, limit?: number, offset?: number }} SearchFilters
+ * @typedef {{ query?: string | null, category?: string | null, subcategory?: string | null, city?: string | null, minPrice?: number | null, maxPrice?: number | null, condition?: string | null, sort?: string, verifiedOnly?: boolean, attributes?: Record<string, unknown> | null, publishedAfter?: string | null, limit?: number, offset?: number }} SearchFilters
  * @typedef {{ title: string, description: string, category: string, subcategory: string | null, condition: string, attributes: Record<string, unknown>, photos: string[], productId: string }} ListingSubmission
  *
  * @typedef {object} MarketplaceStore
@@ -76,6 +76,10 @@ export const searchParams = (filters) => ({
   p_condition: filters.condition ?? null,
   p_limit: filters.limit ?? 24,
   p_offset: filters.offset ?? 0,
+  p_sort: filters.sort ?? 'relevance',
+  p_verified_only: filters.verifiedOnly ?? false,
+  p_attributes: filters.attributes ?? null,
+  p_published_after: filters.publishedAfter ?? null,
 })
 
 /**

@@ -28,7 +28,8 @@ interface ChatViewProps {
   onRate: (message: ChatMessageType, rating: MessageRating) => void
   onReport?: (message: ChatMessageType, selectedPassage: string) => void
   /** Ouvre une annonce proposée par l’assistant d’achat. */
-  onOpenListing?: (id: string) => void
+  /** Ouvre une page de la marketplace (annonce, comparaison) depuis une fiche de l’assistant. */
+  onOpenMarketplace?: (path: string) => void
   /** Lecture à voix haute ; absent quand elle est désactivée ou non prise en charge. */
   onSpeak?: (message: ChatMessageType) => void
   speakingMessageId?: string
@@ -51,7 +52,7 @@ export function ChatView({
   onEditLastMessage,
   onRate,
   onReport,
-  onOpenListing,
+  onOpenMarketplace,
   onSpeak,
   speakingMessageId,
   onSelectVersion,
@@ -153,7 +154,7 @@ export function ChatView({
             onRegenerate={onRegenerate}
             onRate={onRate}
             onReport={onReport}
-            onOpenListing={onOpenListing}
+            onOpenMarketplace={onOpenMarketplace}
             onSpeak={onSpeak}
             isSpeaking={speakingMessageId === message.id}
             onSelectVersion={message === lastMessage && !isGenerating ? onSelectVersion : undefined}

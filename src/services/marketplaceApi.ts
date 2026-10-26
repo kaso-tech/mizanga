@@ -4,6 +4,8 @@
 export interface MarketAttribute {
   key: string
   label: string
+  /** Pour la comparaison : la valeur la plus haute (ou la plus basse) est la meilleure. */
+  better?: 'higher' | 'lower'
   type: 'text' | 'number' | 'select' | 'boolean'
   unit?: string
   options?: string[]
@@ -70,7 +72,26 @@ export interface SearchFilters {
   minPrice?: number
   maxPrice?: number
   condition?: string
+  /** relevance (par défaut), price_asc, price_desc ou recent. */
+  sort?: string
+  /** '1' : vendeurs vérifiés seulement. */
+  verified?: string
+  /** Caractéristiques de la catégorie (nombre = minimum, '1' = oui, ou valeur). */
+  attributes?: Record<string, string>
+  /** Annonces publiées après cette date (alertes). */
+  publishedAfter?: string
   page?: number
+}
+
+/** Paramètres d’adresse d’une recherche (les caractéristiques deviennent « a_clé »). */
+export function searchQuery(filters: SearchFilters) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) {
+    if (key === 'attributes') continue
+    if (value !== undefined && value !== '' && value !== null) params.set(key, String(value))
+  }
+  for (const [key, value] of Object.entries(filters.attributes ?? {})) if (value) params.set(`a_${key}`, value)
+  return params
 }
 
 export interface ModerationItem {
@@ -137,8 +158,7 @@ export const marketplaceApi = {
     return catalogPromise
   },
   search: (filters: SearchFilters) => {
-    const params = new URLSearchParams()
-    for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '' && value !== null) params.set(key, String(value))
+    const params = searchQuery(filters)
     return call<{ total: number; items: ListingCard[] }>(`/api/marketplace/search?${params}`)
   },
   listing: async (id: string) => (await call<{ listing: ListingDetail }>(`/api/marketplace/listings/${id}`)).listing,

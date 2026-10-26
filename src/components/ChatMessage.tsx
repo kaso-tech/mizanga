@@ -157,7 +157,8 @@ function UserMessage({ message, canEdit, onCopy, onEdit, onSavePrompt }: { messa
 
 interface ChatMessageProps {
   /** Ouvre une annonce proposée par l’assistant d’achat (dans la marketplace). */
-  onOpenListing?: (id: string) => void
+  /** Ouvre une page de la marketplace (annonce, comparaison) depuis une fiche de l’assistant. */
+  onOpenMarketplace?: (path: string) => void
   message: ChatMessageType
   copiedMessageId?: string
   canRegenerate: boolean
@@ -175,7 +176,7 @@ interface ChatMessageProps {
   onSavePrompt?: (prompt: string) => void
 }
 
-export function ChatMessage({ onOpenListing, message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt }: ChatMessageProps) {
+export function ChatMessage({ onOpenMarketplace, message, copiedMessageId, canRegenerate, canEdit, onEdit, onCopy, onRegenerate, onRate, onReport, onSpeak, isSpeaking = false, onSelectVersion, onSavePrompt }: ChatMessageProps) {
   // Le passage sélectionné dans la réponse pré-remplit le formulaire de signalement.
   const [selectedPassage, setSelectedPassage] = useState('')
 
@@ -198,7 +199,7 @@ export function ChatMessage({ onOpenListing, message, copiedMessageId, canRegene
             </Suspense>
           </div>
         )}
-        {message.listings && message.listings.length > 0 && <ShoppingResults listings={message.listings} onOpenListing={onOpenListing} />}
+        {message.listings && message.listings.length > 0 && <ShoppingResults listings={message.listings} onOpenMarketplace={onOpenMarketplace} />}
         {isDone && (message.sources || message.searchSuggestionsHtml) && <WebSources sources={message.sources} searchSuggestionsHtml={message.searchSuggestionsHtml} />}
         {message.status === 'stopped' && <p className="message-status">Génération arrêtée.</p>}
         {message.status === 'error' && <p className="message-error" role="alert">{message.errorMessage ?? 'Une erreur est survenue lors de la génération. Réessayez.'}</p>}

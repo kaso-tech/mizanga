@@ -102,10 +102,15 @@ export function validateSearch(params) {
     return Number(value)
   }
   const category = params.get('category') || null
-  if (category && !findCategory(category)) throw invalid('Catégorie inconnue.')
+  const found = category ? findCategory(category) : null
+  if (category && !found) throw invalid('Catégorie inconnue.')
   const condition = params.get('condition') || null
   if (condition && !Object.hasOwn(CONDITIONS, condition)) throw invalid('État invalide.')
+  const sort = params.get('sort') || 'relevance'
+  if (!SEARCH_SORTS.includes(sort)) throw invalid('Tri inconnu.')
   const page = Math.min(Math.max(Number.parseInt(params.get('page') ?? '1', 10) || 1, 1), 50)
+  const after = params.get('publishedAfter')
+  if (after && Number.isNaN(Date.parse(after))) throw invalid('Date invalide.')
   return {
     query: (params.get('q') ?? '').slice(0, 100) || null,
     category,
@@ -114,9 +119,44 @@ export function validateSearch(params) {
     minPrice: price('minPrice'),
     maxPrice: price('maxPrice'),
     condition,
+    sort,
+    verifiedOnly: params.get('verified') === '1',
+    attributes: searchAttributes(found ?? null, params),
+    publishedAfter: after ? new Date(after).toISOString() : null,
     limit: 24,
     offset: (page - 1) * 24,
   }
+}
+
+export const SEARCH_SORTS = ['relevance', 'price_asc', 'price_desc', 'recent']
+
+/**
+ * Filtres sur les caractéristiques de la catégorie, reçus comme « a_ram_go=4 » (au moins 4),
+ * « a_double_sim=1 » (oui) ou « a_reseau=4G » (valeur). Les autres clés sont ignorées.
+ * @param {import('./categories.mjs').Category | null} category @param {URLSearchParams} params
+ * @returns {Record<string, { min: number } | boolean | string> | null}
+ */
+export function searchAttributes(category, params) {
+  if (!category?.attributes) return null
+  /** @type {Record<string, { min: number } | boolean | string>} */
+  const wanted = {}
+  for (const attribute of category.attributes) {
+    const value = (params.get(`a_${attribute.key}`) ?? '').trim()
+    if (!value) continue
+    if (attribute.type === 'number') {
+      const number = Number(value.replace(',', '.'))
+      if (!Number.isFinite(number) || number < 0) throw invalid(`${attribute.label} : nombre invalide.`)
+      wanted[attribute.key] = { min: number }
+    } else if (attribute.type === 'boolean') {
+      if (value === '1') wanted[attribute.key] = true
+    } else if (attribute.type === 'select') {
+      if (!attribute.options?.includes(value)) throw invalid(`${attribute.label} : valeur invalide.`)
+      wanted[attribute.key] = value
+    } else {
+      wanted[attribute.key] = value.slice(0, attribute.max ?? 60)
+    }
+  }
+  return Object.keys(wanted).length ? wanted : null
 }
 
 /** @param {any} body */

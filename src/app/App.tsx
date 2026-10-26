@@ -20,6 +20,7 @@ import { addSavedPrompt, loadSavedPrompts, storeSavedPrompts, type SavedPrompt }
 import { isSpeechSupported, speak, speechRates, stopSpeaking } from './speech'
 import { useAccount } from './useAccount'
 import { useConversation } from './useConversation'
+import { useMarketAlerts } from './useMarketAlerts'
 
 // Pages secondaires chargées à la demande : l’accueil s’affiche plus vite sur réseau mobile.
 const SettingsView = lazy(() => import('../components/SettingsView').then((module) => ({ default: module.SettingsView })))
@@ -155,6 +156,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [settingsVisit, setSettingsVisit] = useState(0)
   const [marketplaceVisit, setMarketplaceVisit] = useState(0)
+  const newAlertListings = useMarketAlerts()
   const [activeView, setActiveView] = useState<AppView>(syncViewFromLocation)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -372,12 +374,11 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
     setPrintToken((token) => token + 1)
   }
 
-  /** Annonce proposée par l’assistant d’achat : ouverte dans la marketplace. */
-  const openListing = (id: string) => {
-    window.history.pushState({}, '', `/marketplace/annonce/${encodeURIComponent(id)}`)
+  /** Page de la marketplace ouverte depuis l’assistant d’achat (annonce proposée, comparaison). */
+  const openMarketplacePath = (path: string) => {
+    window.history.pushState({}, '', path)
     setMarketplaceVisit((visit) => visit + 1)
     setActiveView('marketplace')
-    setDrawerOpen(false)
   }
 
   const selectConversation = (conversationId: string) => {
@@ -581,7 +582,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
             onNewConversation={startNewConversation}
             onCopy={copyMessage}
             onRegenerate={() => conversation.regenerate()}
-            onOpenListing={openListing}
+            onOpenMarketplace={openMarketplacePath}
             onEditLastMessage={conversation.editLastUserMessage}
             onRate={rateMessage}
             speakingMessageId={speakingMessageId}
@@ -650,6 +651,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
           onToggleSidebar={toggleSidebar}
           onOpenMarketplace={() => navigate('marketplace')}
           isMarketplaceActive={activeView === 'marketplace'}
+          marketplaceAlerts={newAlertListings}
           onOpenSettings={() => navigate('settings')}
           account={accountView}
           onSignIn={() => setAccountDialogOpen(true)}

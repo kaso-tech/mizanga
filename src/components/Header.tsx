@@ -8,6 +8,8 @@ interface HeaderProps {
   /** Ouvre la marketplace (accessible depuis l’en-tête, sur toutes les pages). */
   onOpenMarketplace: () => void
   isMarketplaceActive: boolean
+  /** Nouvelles annonces trouvées par les alertes de recherche (pastille). */
+  marketplaceAlerts?: number
   onOpenSettings: () => void
   account: AccountView
   onSignIn: () => void
@@ -20,6 +22,7 @@ export function Header({
   onToggleSidebar,
   onOpenMarketplace,
   isMarketplaceActive,
+  marketplaceAlerts = 0,
   onOpenSettings,
   account,
   onSignIn,
@@ -44,12 +47,13 @@ export function Header({
         <button
           className={`icon-button ${isMarketplaceActive ? 'is-active' : ''}`}
           type="button"
-          aria-label="Marketplace"
+          aria-label={marketplaceAlerts > 0 ? `Marketplace, ${marketplaceAlerts} nouvelle${marketplaceAlerts > 1 ? 's' : ''} annonce${marketplaceAlerts > 1 ? 's' : ''} pour vos alertes` : 'Marketplace'}
           aria-current={isMarketplaceActive ? 'page' : undefined}
           title="Marketplace"
           onClick={onOpenMarketplace}
         >
           <ShoppingBag size={20} />
+          {marketplaceAlerts > 0 && <span className="icon-badge" aria-hidden="true">{marketplaceAlerts > 9 ? '9+' : marketplaceAlerts}</span>}
         </button>
         <button className="icon-button" type="button" aria-label="Paramètres" title="Paramètres" onClick={onOpenSettings}>
           <Settings size={20} />
