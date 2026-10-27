@@ -4,6 +4,7 @@
 // * Modération : clé de modération, vérifiée par la base (le serveur n’a pas de clé secrète Supabase).
 import { toBusinessError } from '../business/supabase-store.mjs'
 import { BusinessError } from '../business/validate.mjs'
+import { toPayment } from './payments.mjs'
 import { toReview } from './reviews.mjs'
 
 /**
@@ -14,7 +15,7 @@ import { toReview } from './reviews.mjs'
  * @typedef {{ title: string, description: string, category: string, subcategory: string | null, condition: string, attributes: Record<string, unknown>, photos: string[], productId: string }} ListingSubmission
  *
  * @typedef {object} MarketplaceStore
- * @property {(filters: SearchFilters) => Promise<{ total: number, items: any[] }>} search
+ * @property {(filters: SearchFilters) => Promise<{ total: number, items: any[], sponsored?: any[] }>} search
  * @property {(listingId: string) => Promise<any | null>} listing
  * @property {(businessId: string) => Promise<any | null>} seller
  * @property {(session: Session | null, listingId: string, reason: string, details: string | null) => Promise<void>} report
@@ -26,6 +27,11 @@ import { toReview } from './reviews.mjs'
  * @property {(key: string, listingId: string, revision: number, status: string, reasons: string[], by: 'auto' | 'admin') => Promise<OwnListing>} moderate
  * @property {(key: string, status: string) => Promise<any[]>} queue
  * @property {(key: string, businessId: string, verified: boolean) => Promise<void>} setSellerVerified
+ * @property {(session: Session, businessId: string, payment: ReturnType<typeof import('./payments.mjs').validatePaymentRequest>) => Promise<ReturnType<typeof toPayment>>} requestPayment
+ * @property {(key: string, status: string) => Promise<any[]>} paymentQueue
+ * @property {(key: string, paymentId: string, status: string, note: string | null) => Promise<ReturnType<typeof toPayment>>} decidePayment
+ * @property {(key: string) => Promise<any>} pricing
+ * @property {(key: string, pricing: ReturnType<typeof import('./payments.mjs').validatePricing>) => Promise<any>} savePricing
  * @property {(session: Session, businessId: string) => Promise<Review | null>} myReview Avis du compte sur ce vendeur.
  * @property {(session: Session, businessId: string, rating: number, comment: string | null) => Promise<Review>} saveReview
  * @property {(session: Session, businessId: string) => Promise<void>} deleteReview
@@ -82,6 +88,12 @@ export const toOwnListing = (row) => ({
   reasons: row.moderation_reasons ?? [],
   moderatedBy: row.moderated_by ?? null,
   updatedAt: new Date(row.updated_at).toISOString(),
+})
+
+/** Paramètres de la fonction request_payment. @param {string} businessId @param {ReturnType<typeof import('./payments.mjs').validatePaymentRequest>} payment */
+export const paymentParams = (businessId, payment) => ({
+  p_business_id: businessId, p_kind: payment.kind, p_months: payment.months, p_offer_id: payment.offerId, p_listing_id: payment.listingId,
+  p_method: payment.method, p_payer_phone: payment.payerPhone, p_reference: payment.reference,
 })
 
 /** @param {any} row @returns {SavedFavorite} */
@@ -186,6 +198,11 @@ export function createSupabaseMarketplace({ supabaseUrl, publishableKey }, { fet
     async setSellerVerified(key, businessId, verified) {
       await request('POST', 'rpc/set_seller_verified', { p_key: key, p_business_id: businessId, p_verified: verified })
     },
+    requestPayment: async (session, businessId, payment) => toPayment(await request('POST', 'rpc/request_payment', paymentParams(businessId, payment), session.token)),
+    paymentQueue: (key, status) => request('POST', 'rpc/payment_queue', { p_key: key, p_status: status }),
+    decidePayment: async (key, paymentId, status, note) => toPayment(await request('POST', 'rpc/decide_payment', { p_key: key, p_payment_id: paymentId, p_status: status, p_note: note })),
+    pricing: (key) => request('POST', 'rpc/pricing', { p_key: key }),
+    savePricing: (key, pricing) => request('POST', 'rpc/save_pricing', { p_key: key, p_pricing: pricing }),
     async myReview(session, businessId) {
       const rows = await request('GET', `seller_reviews?select=*&user_id=eq.${id(session.userId)}&business_id=eq.${id(businessId)}`, undefined, session.token)
       return rows?.[0] ? toReview(rows[0]) : null

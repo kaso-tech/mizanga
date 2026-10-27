@@ -17,12 +17,12 @@ const detail = { ...card, description: 'Neuf, garantie 6 mois.', photos: ['/phot
 const card2 = { ...card, id: 'l2', title: 'Itel A70', attributes: { ram_go: 3 }, price: 39000, sellerId: 'b2', sellerName: 'Ali Mobile', sellerVerified: false, city: 'Bobo-Dioulasso' }
 const detail2 = { ...card2, description: '', photos: [], inStock: true, seller: { id: 'b2', name: 'Ali Mobile', city: 'Bobo-Dioulasso', whatsapp: null, phone: '22676000000', verified: false, deliversEverywhere: true, deliveryCities: [], description: null } }
 
-function fakeServer({ total = 2, price = 48000 }: { total?: number; price?: number } = {}) {
+function fakeServer({ total = 2, price = 48000, sponsored = [] as unknown[] }: { total?: number; price?: number; sponsored?: unknown[] } = {}) {
   const requests: Array<{ url: string; body?: unknown }> = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined })
     if (url === '/api/marketplace/categories') return Response.json(catalog)
-    if (url.startsWith('/api/marketplace/search')) return Response.json({ total, items: url.includes('page=2') ? [{ ...card, id: 'l3', title: 'Samsung A15' }] : [card, card2] })
+    if (url.startsWith('/api/marketplace/search')) return Response.json({ total, items: url.includes('page=2') ? [{ ...card, id: 'l3', title: 'Samsung A15' }] : [card, card2], sponsored: url.includes('page=2') ? [] : sponsored })
     if (url === '/api/marketplace/listings/l1') return Response.json({ listing: { ...detail, price } })
     if (url === '/api/marketplace/listings/l2') return Response.json({ listing: detail2 })
     if (url === '/api/marketplace/listings/l1/report') return Response.json({ reported: true }, { status: 201 })
@@ -230,5 +230,15 @@ describe('marketplace publique', () => {
     render(<MarketplaceView onNotify={() => {}} account={{ signedIn: false, savedApi: null, onSignIn }} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Donner mon avis' }))
     expect(onSignIn).toHaveBeenCalled()
+  })
+
+  it('présente les annonces sponsorisées à part, marquées « Sponsorisé », sans toucher aux résultats', async () => {
+    fakeServer({ sponsored: [{ ...card2, id: 'l9', title: 'Infinix Hot 40' }] })
+    render(<MarketplaceView onNotify={() => {}} />)
+    const block = await screen.findByRole('region', { name: 'Annonces sponsorisées' })
+    expect(block).toHaveTextContent('Infinix Hot 40')
+    expect(within(block).getByText('Sponsorisé')).toBeInTheDocument()
+    expect(block).toHaveTextContent('le classement des résultats n’en tient pas compte')
+    expect(within(screen.getByRole('list', { name: 'Annonces' })).queryByText('Infinix Hot 40')).not.toBeInTheDocument()
   })
 })

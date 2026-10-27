@@ -98,9 +98,9 @@ describe('espace Business : produits et stocks', () => {
     expect((await call('jeton-alice', 'GET', `/api/business/${shop}/products`)).body.products[0]).toMatchObject({ salePrice: 18000, quantity: 14 })
   })
 
-  it('donne la formule du commerce (mode test) et limite le nombre de commerces', async () => {
+  it('donne la formule du commerce (Gratuit) et limite le nombre de commerces', async () => {
     const { body } = await call('jeton-alice', 'GET', `/api/business/${shop}/subscription`)
-    expect(body.subscription).toMatchObject({ planId: 'test', planName: 'Test (gratuit)', isTest: true, status: 'test', monthlyPrice: 0, dailyAiRequests: 50, maxBusinesses: 1 })
+    expect(body.subscription).toMatchObject({ planId: 'test', planName: 'Gratuit', isTest: false, status: 'test', monthlyPrice: 0, dailyAiRequests: 30, maxBusinesses: 1, maxListings: 5, maxPhotos: 3 })
     expect((await call('jeton-bob', 'GET', `/api/business/${shop}/subscription`)).status).toBe(403)
     expect(await call('jeton-alice', 'POST', '/api/business', { name: 'Deuxième boutique' })).toEqual({ status: 409, body: { error: 'Votre formule permet 1 commerce(s) : vous avez atteint cette limite.' } })
   })

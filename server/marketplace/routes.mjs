@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto'
 import { BusinessError, isUuid } from '../business/validate.mjs'
 import { CATEGORIES, CONDITIONS } from './categories.mjs'
+import { validatePaymentRequest, validatePricing } from './payments.mjs'
 import { checkReviewRules, validateReview } from './reviews.mjs'
 import { PHOTO_TYPES, REPORT_REASONS, validateListingInput, validateReport, validateSearch, validateSellerProfile } from './validate.mjs'
 
@@ -85,7 +86,7 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
         if (resource === 'categories' && method === 'GET') return sendJson(res, 200, { categories: CATEGORIES, conditions: CONDITIONS, reportReasons: REPORT_REASONS })
         if (resource === 'search' && method === 'GET') {
           const result = await store.search(validateSearch(new URL(req.url ?? '/', 'http://localhost').searchParams))
-          return sendJson(res, 200, { total: result.total, items: result.items.map(withPhoto) })
+          return sendJson(res, 200, { total: result.total, items: result.items.map(withPhoto), sponsored: (result.sponsored ?? []).map(withPhoto) })
         }
         if (itemId !== undefined && !isUuid(itemId)) throw new BusinessError(404, 'Introuvable.')
         if (resource === 'listings' && itemId && !action && method === 'GET') {
@@ -154,6 +155,10 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
         const moderated = await autoModerate(submitted, input.newPhotos.map(({ mimeType, data }) => ({ mimeType, data })))
         return sendJson(res, 201, { listing: ownListing(moderated), moderation: moderationKey ? 'done' : 'unavailable' })
       }
+      // Formule Pro ou sponsorisation : le commerçant déclare son paiement Mobile Money.
+      if (collection === 'payments' && !itemId && method === 'POST') {
+        return sendJson(res, 201, { payment: await store.requestPayment(session, business.id, validatePaymentRequest(await readJson(req), business.countryCode)) })
+      }
       if (collection === 'listings' && itemId && action === 'withdraw' && method === 'POST') {
         if (!isUuid(itemId)) throw new BusinessError(404, 'Annonce introuvable.')
         return sendJson(res, 200, { listing: ownListing(await store.withdrawListing(session, business.id, itemId)) })
@@ -181,6 +186,19 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
           if (moderated.status === 'published') onPublished(moderated.id)
           return sendJson(res, 200, { listing: moderated })
         }
+        if (resource === 'payments' && !itemId && method === 'GET') {
+          const status = new URL(req.url ?? '/', 'http://localhost').searchParams.get('status') ?? 'pending'
+          if (!['pending', 'confirmed', 'rejected'].includes(status)) throw new BusinessError(422, 'Statut invalide.')
+          return sendJson(res, 200, { payments: await store.paymentQueue(moderationKey, status) })
+        }
+        if (resource === 'payments' && itemId && isUuid(itemId) && method === 'POST') {
+          const body = /** @type {any} */ (await readJson(req))
+          if (!['confirmed', 'rejected'].includes(body?.status)) throw new BusinessError(422, 'Décision invalide.')
+          const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 300) : null
+          return sendJson(res, 200, { payment: await store.decidePayment(moderationKey, itemId, body.status, note) })
+        }
+        if (resource === 'pricing' && !itemId && method === 'GET') return sendJson(res, 200, { pricing: await store.pricing(moderationKey) })
+        if (resource === 'pricing' && !itemId && method === 'PUT') return sendJson(res, 200, { pricing: await store.savePricing(moderationKey, validatePricing(await readJson(req))) })
         if (resource === 'reviews' && !itemId && method === 'GET') {
           const status = new URL(req.url ?? '/', 'http://localhost').searchParams.get('status') ?? 'review'
           if (!['pending', 'review', 'published', 'hidden'].includes(status)) throw new BusinessError(422, 'Statut invalide.')

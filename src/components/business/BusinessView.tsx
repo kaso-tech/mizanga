@@ -6,7 +6,7 @@ import { formatAmount, formatQuantity, stockLevel, stockValue } from '../../app/
 import type { ConversationSummary } from '../../domain/types'
 import type { AuthClient } from '../../services/authService'
 import type { ConversationsApi } from '../../services/conversationsApi'
-import { createBusinessApi, type Business, type ListingSubmission, type OwnListing, type Product, type SellerProfile } from '../../services/businessApi'
+import { createBusinessApi, type Business, type ListingSubmission, type OwnListing, type PaymentRequest, type Product, type SellerProfile, type Subscription } from '../../services/businessApi'
 import { listingStatusLabels } from '../../app/listingStatus'
 import { ListingDialog } from './ListingDialog'
 import { SellerProfileDialog } from './SellerProfileDialog'
@@ -18,6 +18,7 @@ import { PeriodPicker } from './PeriodPicker'
 import { ProductDialog } from './ProductDialog'
 import { ResultsPanel } from './ResultsPanel'
 import { SalesPanel } from './SalesPanel'
+import { SponsorDialog } from './SponsorDialog'
 import { SubscriptionDialog } from './SubscriptionDialog'
 
 /** Pays de la zone UEMOA (franc CFA, XOF) proposés à la création ; d’autres pays suivront. */
@@ -51,6 +52,7 @@ type DialogState =
   | { type: 'subscription' }
   | { type: 'seller'; then?: Product }
   | { type: 'listing'; product: Product }
+  | { type: 'sponsor'; listing: OwnListing }
   | null
 
 interface BusinessViewProps {
@@ -117,6 +119,8 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
   // Marketplace (propriétaire seulement) : vitrine et annonces ; undefined tant que non chargées.
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null | undefined>(undefined)
   const [listings, setListings] = useState<OwnListing[]>([])
+  /** Formule du commerce (limites de photos, sponsorisations en cours). */
+  const [plan, setPlan] = useState<Subscription | null>(null)
 
   const loadProducts = useCallback(async (businessId: string) => {
     if (!api) return
@@ -146,6 +150,19 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
 
   const businessId = business?.id
   const isOwner = business?.role === 'owner'
+  const loadPlan = useCallback(() => (api && businessId ? api.subscription(businessId) : Promise.reject(new Error('Commerce indisponible.'))), [api, businessId])
+  useEffect(() => {
+    if (!businessId) return
+    let cancelled = false
+    loadPlan().then((loaded) => { if (!cancelled) setPlan(loaded) }).catch(() => { if (!cancelled) setPlan(null) })
+    return () => { cancelled = true }
+  }, [businessId, loadPlan])
+  const pay = async (payment: PaymentRequest) => {
+    if (!api || !business) return
+    await api.requestPayment(business.id, payment)
+    onNotify('Paiement déclaré : l’équipe Gilli le vérifie et active votre achat, en général dans la journée.', 'success')
+    setPlan(await api.subscription(business.id).catch(() => plan))
+  }
   useEffect(() => {
     if (!api || !businessId || !isOwner) return
     let cancelled = false
@@ -343,6 +360,9 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
           product={dialog.product}
           listing={listings.find((item) => item.productId === dialog.product.id) ?? null}
           currency={currency}
+          maxPhotos={plan?.maxPhotos}
+          sponsoredUntil={plan?.sponsorships?.find((item) => item.listingId === listings.find((own) => own.productId === dialog.product.id)?.id)?.endsAt ?? null}
+          onSponsor={plan ? (listing) => setDialog({ type: 'sponsor', listing }) : undefined}
           onClose={() => setDialog(null)}
           onSubmit={async (input: ListingSubmission) => {
             const { listing, moderation } = await api.submitListing(business.id, input)
@@ -366,7 +386,10 @@ export function BusinessView({ account, client, onSignIn, onNotify, conversation
         />
       )}
       {business && api && dialog?.type === 'subscription' && (
-        <SubscriptionDialog load={() => api.subscription(business.id)} onClose={() => setDialog(null)} />
+        <SubscriptionDialog load={loadPlan} onPay={isOwner ? pay : undefined} onClose={() => setDialog(null)} />
+      )}
+      {business && api && dialog?.type === 'sponsor' && (
+        <SponsorDialog listing={dialog.listing} load={loadPlan} onPay={pay} onClose={() => setDialog(null)} />
       )}
       {business && api && dialog?.type === 'history' && (
         <HistoryDialog product={dialog.product} currency={currency} load={() => api.listMovements(business.id, dialog.product.id)} onClose={() => setDialog(null)} />

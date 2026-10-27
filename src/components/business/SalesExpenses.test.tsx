@@ -5,6 +5,9 @@ import type { AuthClient } from '../../services/authService'
 import type { Business, Expense, Product, Sale } from '../../services/businessApi'
 import { BusinessView } from './BusinessView'
 
+/** Texte sans espaces insécables, pour comparer les montants. */
+const plain = (text: string | null) => (text ?? '').replace(/[\u00a0\u202f]/g, ' ')
+
 const client: AuthClient = {
   getUser: async () => ({ id: 'u1', email: 'awa@example.bf' }),
   onChange: () => () => {},
@@ -25,6 +28,7 @@ function fakeServer(role: Business['role'] = 'owner') {
   const sales: Sale[] = []
   const expenses: Expense[] = []
   const requests: string[] = []
+  const payments: Array<Record<string, unknown>> = []
   const json = (status: number, body: unknown) => Promise.resolve(Response.json(body, { status }))
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET'
@@ -33,7 +37,24 @@ function fakeServer(role: Business['role'] = 'owner') {
     requests.push(`${method} ${path}`)
     if (path === '') return json(200, { businesses: [business] })
     if (path === '/b1/products') return json(200, { products })
-    if (path === '/b1/subscription') return json(200, { subscription: { planId: 'test', planName: 'Test (gratuit)', isTest: true, status: 'test', monthlyPrice: 0, currency: 'XOF', dailyAiRequests: 50, maxBusinesses: 1, currentPeriodEnd: null, aiUsedToday: 3 } })
+    if (path === '/b1/subscription') {
+      return json(200, { subscription: {
+        planId: 'test', planName: 'Gratuit', isTest: false, status: 'test', monthlyPrice: 0, currency: 'XOF', dailyAiRequests: 30, maxBusinesses: 1, maxListings: 5, maxPhotos: 3, activeListings: 2, currentPeriodEnd: null, aiUsedToday: 3,
+        plans: [
+          { id: 'test', name: 'Gratuit', monthlyPrice: 0, currency: 'XOF', dailyAiRequests: 30, maxBusinesses: 1, maxListings: 5, maxPhotos: 3 },
+          { id: 'pro', name: 'Pro', monthlyPrice: 5000, currency: 'XOF', dailyAiRequests: 200, maxBusinesses: 3, maxListings: 100, maxPhotos: 5 },
+        ],
+        offers: [{ id: '7-jours', days: 7, price: 2000, currency: 'XOF' }],
+        payment: { accountName: 'KasoTech', orangeMoney: '22670000001', moovMoney: '22660000002', instructions: '' },
+        payments: payments.slice(),
+        sponsorships: [],
+      } })
+    }
+    if (path === '/b1/payments' && method === 'POST') {
+      const payment = { id: `pay${payments.length + 1}`, ...body, amount: 5000 * body.months, currency: 'XOF', status: 'pending', adminNote: null, createdAt: new Date().toISOString() }
+      payments.unshift(payment)
+      return json(201, { payment })
+    }
     if (path.startsWith('/b1/sales?')) return json(200, { sales: [...sales].reverse() })
     if (path === '/b1/sales' && method === 'POST') {
       const items = body.items.map((item: { productId: string; quantity: number; unitPrice: number }) => {
@@ -203,17 +224,32 @@ describe('espace Business : ventes, dépenses et résultats', () => {
     expect(server.requests.at(-1)).toMatch(/from=\d{4}-\d{2}-01&to=/)
   })
 
-  it('montre la formule du commerce, en mode test et sans paiement', async () => {
-    fakeServer()
+  it('montre la formule et ses limites, et déclare un paiement Mobile Money pour passer en Pro', async () => {
+    const server = fakeServer()
     renderView()
     await screen.findByText('Riz 25 kg')
     await userEvent.click(screen.getByRole('button', { name: /Formule et limites/ }))
     const dialog = screen.getByRole('dialog', { name: 'Votre formule' })
-    expect(await within(dialog).findByText('Test (gratuit)')).toBeInTheDocument()
-    expect(within(dialog).getByText('Mode test : aucun paiement')).toBeInTheDocument()
-    expect(within(dialog).getByText('Gratuit')).toBeInTheDocument()
-    expect(within(dialog).getByText('3 sur 50 aujourd’hui')).toBeInTheDocument()
-    expect(within(dialog).getByText('1 au maximum')).toBeInTheDocument()
+    expect(await within(dialog).findByText(/Formule Gratuit/)).toBeInTheDocument()
+    expect(within(dialog).getByText('2 sur 5')).toBeInTheDocument()
+    expect(within(dialog).getByText('3 sur 30 aujourd’hui')).toBeInTheDocument()
+    const pro = within(dialog).getByRole('region', { name: 'Formule Pro' })
+    expect(pro).toHaveTextContent('100 annonces en ligne')
+    expect(plain(pro.textContent)).toContain('5 000 F CFA par mois')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Passer à la formule Pro' }))
+    await userEvent.selectOptions(within(dialog).getByLabelText('Durée'), '3')
+    const steps = within(dialog).getByRole('list', { name: 'Étapes du paiement' })
+    expect(plain(steps.textContent)).toContain('Envoyez 15 000 F CFA par Orange Money au +226 70 00 00 01 (KasoTech)')
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Moov Money' }))
+    expect(plain(steps.textContent)).toContain('par Moov Money au +226 60 00 00 02')
+    await userEvent.type(within(dialog).getByLabelText('Numéro qui a payé'), '60 11 22 33')
+    await userEvent.type(within(dialog).getByLabelText('Référence de la transaction (SMS)'), 'MP251027.0001')
+    await userEvent.click(within(dialog).getByRole('button', { name: /déclarer le paiement/ }))
+    expect(plain((await within(dialog).findByText(/en cours de vérification par l’équipe Gilli/)).textContent)).toContain('Paiement de 15 000 F CFA')
+    expect(within(dialog).queryByRole('button', { name: 'Passer à la formule Pro' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Mes paiements (1)')).toBeInTheDocument()
+    expect(server.requests).toContain('POST /b1/payments')
   })
 
   it('n’offre ni annulation de vente ni suppression de dépense à un employé', async () => {

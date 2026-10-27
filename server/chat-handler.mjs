@@ -262,7 +262,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       return sendJson(res, 200, { authenticated: false })
     }
     if (!admin.isAuthenticated(req)) return sendJson(res, 401, { error: 'Connexion administrateur requise.' })
-    if (path.startsWith('/api/admin/moderation') || path.startsWith('/api/admin/sellers/') || path.startsWith('/api/admin/reviews')) {
+    if (path.startsWith('/api/admin/moderation') || path.startsWith('/api/admin/sellers/') || path.startsWith('/api/admin/reviews') || path.startsWith('/api/admin/payments') || path.startsWith('/api/admin/pricing')) {
       if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })
       return marketRoutes.handleAdmin(req, res, path)
     }

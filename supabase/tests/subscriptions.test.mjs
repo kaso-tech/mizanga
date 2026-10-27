@@ -21,11 +21,11 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('abonnements (mode test)', () => {
-  it('attribue la formule « test » à chaque nouveau commerce', async () => {
+  it('attribue la formule Gratuit à chaque nouveau commerce', async () => {
     shop = await createShop(alice, 'Boutique Awa')
-    expect(await subscriptionOf(alice, shop)).toEqual({
-      planId: 'test', planName: 'Test (gratuit)', isTest: true, status: 'test', monthlyPrice: 0, currency: 'XOF',
-      dailyAiRequests: 50, maxBusinesses: 1, currentPeriodEnd: null, aiUsedToday: 0,
+    expect(await subscriptionOf(alice, shop)).toMatchObject({
+      planId: 'test', planName: 'Gratuit', isTest: false, status: 'test', monthlyPrice: 0, currency: 'XOF',
+      dailyAiRequests: 30, maxBusinesses: 1, maxListings: 5, maxPhotos: 3, activeListings: 0, currentPeriodEnd: null, aiUsedToday: 0,
     })
   })
 

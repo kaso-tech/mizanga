@@ -1,4 +1,4 @@
-import { ImagePlus, X } from 'lucide-react'
+import { ImagePlus, Megaphone, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { prepareAttachments } from '../../app/attachments'
 import { formatAmount, formatQuantity } from '../../app/businessFormat'
@@ -16,10 +16,14 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
  * Annonce d’un produit sur la marketplace. Le prix et le stock viennent du produit ; chaque publication
  * ou modification passe par le contrôle automatique (et, en cas de doute, par une vérification humaine).
  */
-export function ListingDialog({ product, listing, currency, onSubmit, onWithdraw, onClose }: {
+export function ListingDialog({ product, listing, currency, maxPhotos = MAX_PHOTOS, sponsoredUntil = null, onSponsor, onSubmit, onWithdraw, onClose }: {
   product: Product
   listing: OwnListing | null
   currency: string
+  /** Photos permises par la formule du commerce. */
+  maxPhotos?: number
+  sponsoredUntil?: string | null
+  onSponsor?: (listing: OwnListing) => void
   onSubmit: (input: ListingSubmission) => Promise<void>
   onWithdraw?: () => Promise<void>
   onClose: () => void
@@ -46,13 +50,13 @@ export function ListingDialog({ product, listing, currency, onSubmit, onWithdraw
   const photoCount = keptPhotos.length + newPhotos.length
 
   const addPhotos = async (files: File[]) => {
-    const photos = files.filter((file) => PHOTO_TYPES.includes(file.type === 'image/jpg' ? 'image/jpeg' : file.type)).slice(0, MAX_PHOTOS - photoCount)
-    if (photos.length < files.length) setError(`Photos JPEG, PNG ou WebP seulement, ${MAX_PHOTOS} au plus.`)
+    const photos = files.filter((file) => PHOTO_TYPES.includes(file.type === 'image/jpg' ? 'image/jpeg' : file.type)).slice(0, maxPhotos - photoCount)
+    if (photos.length < files.length) setError(`Photos JPEG, PNG ou WebP seulement, ${maxPhotos} au plus avec votre formule.`)
     if (photos.length === 0) return
     const { attachments, problems } = await prepareAttachments(photos, [])
     const accepted = attachments.filter((photo) => photo.size <= MAX_PHOTO_BYTES)
     if (problems.length || accepted.length < attachments.length) setError([...problems, accepted.length < attachments.length ? 'Une photo dépasse 2 Mo.' : ''].filter(Boolean).join(' '))
-    setNewPhotos((current) => [...current, ...accepted].slice(0, MAX_PHOTOS - keptPhotos.length))
+    setNewPhotos((current) => [...current, ...accepted].slice(0, maxPhotos - keptPhotos.length))
   }
 
   const submit = async (event: FormEvent) => {
@@ -155,7 +159,7 @@ export function ListingDialog({ product, listing, currency, onSubmit, onWithdraw
         <label className="field"><span className="field-label">Description</span><textarea value={description} maxLength={4000} rows={4} onChange={(event) => setDescription(event.target.value)} placeholder="État, garantie, accessoires fournis, conditions de livraison…" /></label>
 
         <div className="listing-photos">
-          <span className="field-label">Photos ({photoCount}/{MAX_PHOTOS})</span>
+          <span className="field-label">Photos ({photoCount}/{maxPhotos})</span>
           <ul>
             {keptPhotos.map((photo) => (
               <li key={photo.path}><img src={photo.url} alt="" /><button type="button" aria-label="Retirer cette photo" onClick={() => setKeptPhotos((current) => current.filter((item) => item.path !== photo.path))}><X size={14} /></button></li>
@@ -163,7 +167,7 @@ export function ListingDialog({ product, listing, currency, onSubmit, onWithdraw
             {newPhotos.map((photo) => (
               <li key={photo.id}><img src={`data:${photo.mimeType};base64,${photo.data}`} alt="" /><button type="button" aria-label={`Retirer ${photo.name}`} onClick={() => setNewPhotos((current) => current.filter((item) => item.id !== photo.id))}><X size={14} /></button></li>
             ))}
-            {photoCount < MAX_PHOTOS && (
+            {photoCount < maxPhotos && (
               <li><button type="button" className="listing-add-photo" onClick={() => fileRef.current?.click()} aria-label="Ajouter des photos"><ImagePlus size={20} /></button></li>
             )}
           </ul>
@@ -175,6 +179,11 @@ export function ListingDialog({ product, listing, currency, onSubmit, onWithdraw
         </p>
         {error && <p className="message-error" role="alert">{error}</p>}
         <button type="submit" className="primary-button is-block" disabled={isSaving || !catalog}>{isSaving ? 'Vérification en cours…' : listing ? 'Enregistrer et soumettre' : 'Publier'}</button>
+        {listing && listing.status === 'published' && onSponsor && (
+          <button type="button" className="secondary-button is-block" disabled={isSaving} onClick={() => onSponsor(listing)}>
+            <Megaphone size={16} aria-hidden="true" /> {sponsoredUntil ? `Sponsorisée jusqu’au ${new Date(sponsoredUntil).toLocaleDateString('fr', { day: 'numeric', month: 'long' })} : prolonger` : 'Sponsoriser l’annonce'}
+          </button>
+        )}
         {listing && onWithdraw && listing.status !== 'withdrawn' && (
           <button type="button" className="secondary-button is-block" disabled={isSaving} onClick={() => { setIsSaving(true); void onWithdraw().catch((caught: unknown) => { setError(caught instanceof Error ? caught.message : 'Le retrait a échoué.'); setIsSaving(false) }) }}>Retirer l’annonce</button>
         )}

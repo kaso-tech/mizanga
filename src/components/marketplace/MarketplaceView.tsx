@@ -81,11 +81,11 @@ const detailToSaved = (item: ListingDetail): ListingLike => ({ id: item.id, titl
 /** Nombre de filtres actifs dans le panneau « Filtres » (prix, état, vendeurs vérifiés, caractéristiques). */
 const countFilters = (filters: SearchFilters) => [filters.minPrice, filters.condition, filters.verified].filter((value) => value !== undefined).length + Object.keys(filters.attributes ?? {}).length
 
-function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false }: { item: ListingCard; catalog: MarketCatalog | null; onOpen: () => void; onNotify?: (message: string, tone?: 'success' | 'info') => void; isNew?: boolean }) {
+function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false, sponsored = false }: { item: ListingCard; catalog: MarketCatalog | null; onOpen: () => void; onNotify?: (message: string, tone?: 'success' | 'info') => void; isNew?: boolean; sponsored?: boolean }) {
   return (
     <li className="market-card">
       <a href={`/marketplace/annonce/${item.id}`} onClick={(event) => { event.preventDefault(); onOpen() }}>
-        <span className="market-card-photo">{item.photo ? <img src={item.photo} alt="" loading="lazy" /> : <Store size={28} aria-hidden="true" />}{isNew && <span className="market-new">Nouveau</span>}</span>
+        <span className="market-card-photo">{item.photo ? <img src={item.photo} alt="" loading="lazy" /> : <Store size={28} aria-hidden="true" />}{isNew && <span className="market-new">Nouveau</span>}{sponsored && <span className="market-sponsored">Sponsorisé</span>}</span>
         <span className="market-card-body">
           <span className="market-card-title">{item.title}</span>
           <strong className="market-card-price">{formatPrice(item.price, item.currency)}</strong>
@@ -172,7 +172,7 @@ function HomePage({ filters, newSince, catalog, onSearch, onOpen, onNotify }: { 
   const [query, setQuery] = useState(filters.q ?? '')
   const [city, setCity] = useState(filters.city ?? '')
   const [maxPrice, setMaxPrice] = useState(filters.maxPrice ? String(filters.maxPrice) : '')
-  const [results, setResults] = useState<{ total: number; items: ListingCard[] } | null>(null)
+  const [results, setResults] = useState<{ total: number; items: ListingCard[]; sponsored?: ListingCard[] } | null>(null)
   const [page, setPage] = useState(1)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -195,7 +195,7 @@ function HomePage({ filters, newSince, catalog, onSearch, onOpen, onNotify }: { 
     setIsLoadingMore(true)
     try {
       const next = await marketplaceApi.search({ ...filters, page: page + 1 })
-      setResults((current) => current && { total: next.total, items: [...current.items, ...next.items.filter((item) => !current.items.some((known) => known.id === item.id))] })
+      setResults((current) => current && { ...current, total: next.total, items: [...current.items, ...next.items.filter((item) => !current.items.some((known) => known.id === item.id))] })
       setPage(page + 1)
     } catch (caught) {
       onNotify(caught instanceof Error ? caught.message : 'Chargement impossible.', 'info')
@@ -279,6 +279,14 @@ function HomePage({ filters, newSince, catalog, onSearch, onOpen, onNotify }: { 
             </p>
             {hasCriteria && <button type="button" className="text-button" onClick={createAlert}><Bell size={14} aria-hidden="true" /> Créer une alerte</button>}
           </div>
+          {(results.sponsored ?? []).length > 0 && (
+            <section className="market-sponsored-block" aria-label="Annonces sponsorisées">
+              <p className="market-sponsored-note">Sponsorisé · les vendeurs paient pour cette mise en avant ; le classement des résultats n’en tient pas compte.</p>
+              <ul className="market-grid">
+                {(results.sponsored ?? []).map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} sponsored />)}
+              </ul>
+            </section>
+          )}
           {results.items.length > 0 && (
             <ul className="market-grid" aria-label="Annonces">
               {results.items.map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} isNew={Boolean(newSince && Date.parse(item.publishedAt) > Date.parse(newSince))} />)}

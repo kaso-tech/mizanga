@@ -1,8 +1,9 @@
 // Marketplace pour les tests : mêmes fonctions SQL que Supabase, exécutées sur PGlite avec l’identité de
 // l’utilisateur (ou en visiteur), et photos gardées en mémoire.
-import { LISTING_COLUMNS, SELLER_COLUMNS, alertParams, searchParams, toOwnListing, toSavedAlert, toSavedFavorite, toSellerProfile } from '../../server/marketplace/store.mjs'
+import { LISTING_COLUMNS, SELLER_COLUMNS, alertParams, paymentParams, searchParams, toOwnListing, toSavedAlert, toSavedFavorite, toSellerProfile } from '../../server/marketplace/store.mjs'
 import { toBusinessError } from '../../server/business/supabase-store.mjs'
 import { toReview } from '../../server/marketplace/reviews.mjs'
+import { toPayment } from '../../server/marketplace/payments.mjs'
 import { asUser } from './database.mjs'
 
 /**
@@ -61,6 +62,14 @@ export function createPgliteMarketplace(db, { photoBaseUrl = '/photos' } = {}) {
       async setSellerVerified(key, businessId, verified) {
         await rpc('set_seller_verified', { p_key: key, p_business_id: businessId, p_verified: verified })
       },
+      async requestPayment({ userId }, businessId, payment) {
+        const params = paymentParams(businessId, payment)
+        return toPayment((await query(userId, 'select * from public.request_payment($1, $2, $3, $4, $5, $6, $7, $8)', Object.values(params)))[0])
+      },
+      paymentQueue: (key, status) => rpc('payment_queue', { p_key: key, p_status: status }),
+      decidePayment: async (key, paymentId, status, note) => toPayment((await query(null, 'select * from public.decide_payment($1, $2, $3, $4)', [key, paymentId, status, note]))[0]),
+      pricing: (key) => rpc('pricing', { p_key: key }),
+      savePricing: (key, pricing) => rpc('save_pricing', { p_key: key, p_pricing: JSON.stringify(pricing) }),
       async myReview({ userId }, businessId) {
         const [row] = await query(userId, 'select * from public.seller_reviews where business_id = $1', [businessId])
         return row ? toReview(row) : null

@@ -160,7 +160,7 @@ describe('ventes, dépenses, IA et abonnements', () => {
 
   it('montre les formules ; l’abonnement seulement aux membres de l’entreprise', async () => {
     await asUser(db, bob, async () => {
-      expect(await count('select * from public.plans')).toBe(1)
+      expect(await count('select * from public.plans')).toBe(2) // Gratuit et Pro
       expect((await db.query('select business_id from public.subscriptions')).rows).toEqual([{ business_id: bobShop }])
       expect(await errorOf(db.query("insert into public.subscriptions (business_id, plan_id) values ($1, 'test')", [bobShop]))).toMatch(/permission denied/)
     })

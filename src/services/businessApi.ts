@@ -165,6 +165,49 @@ export interface ListingSubmission {
 }
 
 /** Formule du commerce ; en mode test, aucun paiement n’est demandé. */
+export interface PlanOffer {
+  id: string
+  name: string
+  monthlyPrice: number
+  currency: string
+  dailyAiRequests: number
+  maxBusinesses: number
+  maxListings: number
+  maxPhotos: number
+}
+
+export interface SponsorOffer {
+  id: string
+  days: number
+  price: number
+  currency: string
+}
+
+/** Numéros Mobile Money où envoyer un paiement (réglés dans la console). */
+export interface PaymentSettings {
+  accountName: string
+  orangeMoney: string | null
+  moovMoney: string | null
+  instructions: string
+}
+
+export type PaymentMethod = 'orange_money' | 'moov_money'
+
+export interface Payment {
+  id: string
+  kind: 'pro' | 'sponsor'
+  months: number | null
+  offerId: string | null
+  listingId: string | null
+  amount: number
+  currency: string
+  method: PaymentMethod
+  reference: string
+  status: 'pending' | 'confirmed' | 'rejected'
+  adminNote: string | null
+  createdAt: string
+}
+
 export interface Subscription {
   planId: string
   planName: string
@@ -174,9 +217,22 @@ export interface Subscription {
   currency: string
   dailyAiRequests: number
   maxBusinesses: number
+  maxListings?: number
+  maxPhotos?: number
+  activeListings?: number
   currentPeriodEnd: string | null
   aiUsedToday: number
+  plans?: PlanOffer[] | null
+  offers?: SponsorOffer[] | null
+  payment?: PaymentSettings | null
+  payments?: Payment[] | null
+  sponsorships?: Array<{ listingId: string; startsAt: string; endsAt: string }> | null
 }
+
+/** Déclaration d’un paiement Mobile Money (le montant est calculé par Gilli). */
+export type PaymentRequest =
+  | { kind: 'pro'; months: number; method: PaymentMethod; payerPhone: string; reference: string }
+  | { kind: 'sponsor'; offerId: string; listingId: string; method: PaymentMethod; payerPhone: string; reference: string }
 
 export interface AiQuota {
   used: number
@@ -304,6 +360,7 @@ export function createBusinessApi(getToken: () => Promise<string | null>) {
     submitListing: async (businessId: string, input: ListingSubmission) => request<{ listing: OwnListing; moderation: 'done' | 'unavailable' }>('POST', `/${businessId}/listings`, input),
     withdrawListing: async (businessId: string, listingId: string) => (await request<{ listing: OwnListing }>('POST', `/${businessId}/listings/${listingId}/withdraw`)).listing,
     subscription: async (businessId: string) => (await request<{ subscription: Subscription }>('GET', `/${businessId}/subscription`)).subscription,
+    requestPayment: async (businessId: string, payment: PaymentRequest) => (await request<{ payment: Payment }>('POST', `/${businessId}/payments`, payment)).payment,
     assistantQuota: async (businessId: string) => (await request<{ quota: AiQuota }>('GET', `/${businessId}/assistant`)).quota,
     /** Pose une question à l’assistant ; la réponse arrive par fragments (`onEvent`). */
     askAssistant: (businessId: string, messages: AssistantMessage[], onEvent: (event: AssistantEvent) => void, signal?: AbortSignal) => (

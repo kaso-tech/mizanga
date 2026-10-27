@@ -1325,3 +1325,37 @@ button.account-chip:hover { opacity: .9; }
 .star-picker-label { margin-left: 8px; color: var(--muted-foreground); font-size: 14px; }
 .market-card-body .rating-badge { margin-top: -2px; }
 .market-compare .rating-badge { display: flex; margin-top: 4px; }
+
+/* Monétisation : formules, paiement Mobile Money, sponsorisation */
+.market-sponsored { position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: 999px; background: color-mix(in oklab, var(--card) 90%, transparent); color: var(--foreground); font-size: 11px; font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .18); }
+.market-sponsored-block { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--border); border-radius: 16px; }
+.market-sponsored-note { margin: 0; color: var(--muted-foreground); font-size: 12px; }
+.plan-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+.plan-card { display: grid; align-content: start; gap: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+.plan-card h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 16px; }
+.plan-card.is-pro { border-color: var(--primary); }
+.plan-card.is-current { box-shadow: inset 0 0 0 1px var(--primary); }
+.plan-card.is-current h3::after { content: "Votre formule"; margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--accent); font-size: 11px; font-weight: 500; }
+.plan-price { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+.plan-price span { color: var(--muted-foreground); font-family: inherit; font-size: 13px; font-weight: 400; }
+.plan-features { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.plan-features li { display: flex; align-items: flex-start; gap: 6px; }
+.plan-features svg { flex: 0 0 auto; margin-top: 2px; color: var(--primary); }
+.subscription-plan strong { display: inline-flex; align-items: center; gap: 6px; }
+.payment-form { display: grid; gap: 10px; margin-top: 10px; }
+.payment-steps { display: grid; gap: 6px; margin: 0; padding: 12px 14px 12px 32px; border-radius: 14px; background: var(--accent); font-size: 14px; }
+.payment-form .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.payment-history { margin-top: 12px; font-size: 14px; }
+.payment-history ul { display: grid; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.payment-history li { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.payment-status { font-size: 12px; font-weight: 600; }
+.payment-status.is-pending { color: #b45309; }
+.payment-status.is-confirmed { color: #1f8a4c; }
+.payment-status.is-rejected { color: #b91c1c; }
+.sponsor-offers { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; border: 0; }
+.sponsor-offers label { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+.sponsor-offers label.is-selected { border-color: var(--primary); background: var(--accent); }
+.sponsor-offers label strong { margin-left: auto; }
+.pricing-form { display: grid; gap: 14px; max-width: 720px; }
+.pricing-form fieldset { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; }
+.pricing-form legend { padding: 0 4px; font-weight: 600; }

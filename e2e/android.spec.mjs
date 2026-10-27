@@ -122,17 +122,17 @@ test('parcours complet du commerçant', async ({ page }, info) => {
 
   // Assistant : la réponse (moteur simulé) reprend les chiffres transmis par le serveur.
   await page.getByRole('tab', { name: 'Assistant' }).tap()
-  await expect(page.getByText('50 questions restantes aujourd’hui')).toBeVisible()
+  await expect(page.getByText('30 questions restantes aujourd’hui')).toBeVisible()
   await page.getByRole('button', { name: 'Comment se passent mes ventes ce mois-ci ?' }).tap()
   await expect(page.getByRole('article', { name: 'Réponse de Gilli' })).toContainText('chiffre d’affaires 34375')
-  await expect(page.getByText('49 questions restantes aujourd’hui')).toBeVisible()
+  await expect(page.getByText('29 questions restantes aujourd’hui')).toBeVisible()
   await expectFitsScreen(page, 'assistant')
 
-  // Formule (mode test).
+  // Formule (Gratuit).
   await page.getByRole('button', { name: /Formule et limites/ }).tap()
   const plan = page.getByRole('dialog', { name: 'Votre formule' })
-  await expect(plan).toContainText('Test (gratuit)')
-  await expect(plan).toContainText('1 sur 50 aujourd’hui')
+  await expect(plan).toContainText('Formule Gratuit')
+  await expect(plan).toContainText('1 sur 30 aujourd’hui')
   await expectFitsScreen(page, 'formule')
 })
 
@@ -319,7 +319,7 @@ async function publishListing(page, productName, title, withPhoto = true) {
   if (withPhoto) {
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
     await dialog.locator('input[type="file"]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png })
-    await expect(dialog.getByText('Photos (1/5)')).toBeVisible()
+    await expect(dialog.getByText(/^Photos \(1\/[35]\)$/)).toBeVisible()
   }
   await expectFitsScreen(page, 'publication d’une annonce')
   await dialog.getByRole('button', { name: 'Publier' }).tap()
@@ -476,6 +476,78 @@ test('confiance : un client note le vendeur, la note et les statistiques apparai
   await page.getByRole('dialog', { name: 'Donner mon avis' }).locator('.star-picker label').nth(4).tap()
   await page.getByRole('button', { name: 'Publier mon avis' }).tap()
   await expect(page.getByRole('dialog', { name: 'Donner mon avis' }).getByRole('alert')).toHaveText('Vous ne pouvez pas donner un avis sur votre propre commerce.')
+  await client.close()
+})
+
+test('monétisation : passage en Pro et sponsorisation payés par Mobile Money, confirmés dans la console', async ({ page, browser }, info) => {
+  const tag = `pro${Date.now()}${info.project.name.includes('360') ? 'a' : 'b'}`
+  // La console règle le numéro Orange Money où payer.
+  const admin = await browser.newPage({ ...info.project.use })
+  await adminSignIn(admin, 'Paiements et tarifs')
+  await admin.getByRole('tab', { name: 'Tarifs' }).tap()
+  const pricing = admin.getByRole('form', { name: 'Tarifs' })
+  await pricing.getByLabel('Titulaire des comptes').fill('KasoTech')
+  await pricing.getByLabel('Orange Money (indicatif compris)').fill('22670000001')
+  await expectFitsScreen(admin, 'tarifs')
+  await pricing.getByRole('button', { name: 'Enregistrer les tarifs' }).tap()
+  await expect(admin.locator('.toast', { hasText: 'Tarifs enregistrés.' })).toBeVisible()
+
+  // Le commerçant (formule Gratuit) passe en Pro.
+  await signInAndCreateShop(page, emailFor(info), `Boutique ${tag}`)
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
+  await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
+  await page.getByRole('button', { name: /Formule et limites/ }).tap()
+  const plan = page.getByRole('dialog', { name: 'Votre formule' })
+  await expect(plan).toContainText('1 sur 5')
+  await expect(plan.getByRole('region', { name: 'Formule Pro' })).toContainText('100 annonces en ligne')
+  await plan.getByRole('button', { name: 'Passer à la formule Pro' }).tap()
+  await expect(plan.getByRole('list', { name: 'Étapes du paiement' })).toContainText('+226 70 00 00 01 (KasoTech)')
+  await plan.getByLabel('Numéro qui a payé').fill('70 11 22 33')
+  await plan.getByLabel('Référence de la transaction (SMS)').fill(`PP.${tag}`)
+  await expectFitsScreen(page, 'paiement de la formule Pro')
+  await plan.getByRole('button', { name: /déclarer le paiement/ }).tap()
+  await expect(plan).toContainText('en cours de vérification par l’équipe Gilli')
+
+  // La console confirme.
+  await admin.getByRole('tab', { name: 'Paiements' }).tap()
+  const proPayment = admin.locator('.moderation-card', { hasText: `PP.${tag}` })
+  await expect(proPayment).toContainText('Formule Pro, 1 mois')
+  await expectFitsScreen(admin, 'paiements à vérifier')
+  await proPayment.getByRole('button', { name: 'Confirmer le paiement' }).tap()
+  await expect(proPayment).toBeHidden()
+
+  await page.reload()
+  await page.getByRole('button', { name: /Formule et limites/ }).tap()
+  await expect(page.getByRole('dialog', { name: 'Votre formule' })).toContainText('Formule Pro')
+  await expect(page.getByRole('dialog', { name: 'Votre formule' })).toContainText('Jusqu’au')
+  await page.getByRole('button', { name: 'Fermer' }).tap()
+
+  // Sponsorisation de l’annonce.
+  await page.getByRole('button', { name: 'Annonce : Tecno Spark 20' }).tap()
+  await page.getByRole('button', { name: 'Sponsoriser l’annonce' }).tap()
+  const sponsor = page.getByRole('dialog', { name: 'Sponsoriser l’annonce' })
+  await sponsor.getByText('7 jours').tap()
+  await sponsor.getByLabel('Numéro qui a payé').fill('70 11 22 33')
+  await sponsor.getByLabel('Référence de la transaction (SMS)').fill(`SP.${tag}`)
+  await expectFitsScreen(page, 'sponsorisation')
+  await sponsor.getByRole('button', { name: /déclarer le paiement/ }).tap()
+  await expect(page.locator('.toast', { hasText: 'Paiement déclaré' })).toBeVisible()
+  await admin.getByRole('radio', { name: 'Confirmés' }).check()
+  await admin.getByRole('radio', { name: 'À vérifier' }).check()
+  const sponsorPayment = admin.locator('.moderation-card', { hasText: `SP.${tag}` })
+  await expect(sponsorPayment).toContainText('Sponsorisation 7 jours')
+  await sponsorPayment.getByRole('button', { name: 'Confirmer le paiement' }).tap()
+  await expect(sponsorPayment).toBeHidden()
+  await admin.close()
+
+  // Le client voit l’annonce sponsorisée, à part.
+  const client = await browser.newPage({ ...info.project.use })
+  await client.goto(`/marketplace?q=${tag}`)
+  const block = client.getByRole('region', { name: 'Annonces sponsorisées' })
+  await expect(block).toContainText(`Tecno Spark 20 ${tag}`)
+  await expect(block.getByText('Sponsorisé', { exact: true })).toBeVisible()
+  await expect(client.getByRole('list', { name: 'Annonces' })).toContainText(`Tecno Spark 20 ${tag}`)
+  await expectFitsScreen(client, 'annonce sponsorisée')
   await client.close()
 })
 

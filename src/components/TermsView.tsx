@@ -23,6 +23,7 @@ export function TermsView() {
         <h2>3. La marketplace</h2>
         <p>Gilli met en relation des acheteurs et des vendeurs. Gilli n’est ni le vendeur, ni l’acheteur, ni un intermédiaire de paiement : la vente, le paiement, la livraison et la garantie se règlent directement entre l’acheteur et le vendeur, qui en sont seuls responsables.</p>
         <p>Le vendeur s’engage à publier des informations exactes (description, état, prix, disponibilité, photos réelles du produit) et à respecter les lois en vigueur dans son pays, notamment en matière de commerce, de consommation et de fiscalité.</p>
+        <p>Formules et sponsorisation : la formule Gratuit limite le nombre d’annonces en ligne, de photos et de questions à l’assistant ; la formule Pro, payante au mois, les élargit. Une annonce peut être sponsorisée pour une durée donnée : elle est alors présentée à part avec la mention « Sponsorisé », sans changer le classement des résultats. Ces services se paient par Mobile Money ; ils sont activés après vérification du paiement par l’équipe Gilli et ne sont pas remboursables une fois activés, sauf erreur de Gilli. Une annonce sponsorisée reste soumise aux mêmes règles que les autres et peut être retirée si elle ne les respecte pas, sans remboursement.</p>
       </section>
 
       <section>

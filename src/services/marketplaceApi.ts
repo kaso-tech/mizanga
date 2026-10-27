@@ -157,6 +157,33 @@ export interface ModerationItem {
   reports: Array<{ reason: string; details: string | null; createdAt: string }>
 }
 
+/** Paiement déclaré par un commerçant, vu par la console. */
+export interface AdminPayment {
+  id: string
+  kind: 'pro' | 'sponsor'
+  months: number | null
+  offerId: string | null
+  days: number | null
+  amount: number
+  currency: string
+  method: 'orange_money' | 'moov_money'
+  payerPhone: string
+  reference: string
+  status: 'pending' | 'confirmed' | 'rejected'
+  adminNote: string | null
+  createdAt: string
+  decidedAt: string | null
+  businessId: string
+  businessName: string
+  listingTitle: string | null
+}
+
+export interface Pricing {
+  plans: Array<{ id: 'test' | 'pro'; name: string; monthlyPrice: number; currency: string; dailyAiRequests: number; maxBusinesses: number; maxListings: number; maxPhotos: number }>
+  offers: Array<{ id: string; days: number; price: number; currency: string; active: boolean }>
+  settings: { accountName: string; orangeMoney: string | null; moovMoney: string | null; instructions: string }
+}
+
 export const reportLabels: Record<string, string> = {
   forbidden: 'Produit interdit',
   scam: 'Arnaque ou fraude',
@@ -200,7 +227,7 @@ export const marketplaceApi = {
   },
   search: (filters: SearchFilters) => {
     const params = searchQuery(filters)
-    return call<{ total: number; items: ListingCard[] }>(`/api/marketplace/search?${params}`)
+    return call<{ total: number; items: ListingCard[]; sponsored?: ListingCard[] }>(`/api/marketplace/search?${params}`)
   },
   listing: async (id: string) => (await call<{ listing: ListingDetail }>(`/api/marketplace/listings/${id}`)).listing,
   seller: (id: string) => call<{ seller: PublicSeller; listings: ListingCard[]; reviews?: SellerReview[] }>(`/api/marketplace/sellers/${id}`),
@@ -216,6 +243,12 @@ export const marketplaceApi = {
   decideReview: async (id: string, revision: number, status: 'published' | 'hidden' | 'review') => {
     await call(`/api/admin/reviews/${id}`, { ...json('POST', { revision, status }), credentials: 'same-origin' })
   },
+  paymentQueue: async (status: string) => (await call<{ payments: AdminPayment[] }>(`/api/admin/payments?status=${status}`, { credentials: 'same-origin' })).payments,
+  decidePayment: async (id: string, status: 'confirmed' | 'rejected', note?: string) => {
+    await call(`/api/admin/payments/${id}`, { ...json('POST', { status, note }), credentials: 'same-origin' })
+  },
+  pricing: async () => (await call<{ pricing: Pricing }>('/api/admin/pricing', { credentials: 'same-origin' })).pricing,
+  savePricing: async (pricing: Pricing) => (await call<{ pricing: Pricing }>('/api/admin/pricing', { ...json('PUT', pricing), credentials: 'same-origin' })).pricing,
   setSellerVerified: async (businessId: string, verified: boolean) => {
     await call(`/api/admin/sellers/${businessId}/verified`, { ...json('POST', { verified }), credentials: 'same-origin' })
   },

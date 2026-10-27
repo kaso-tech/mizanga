@@ -81,8 +81,8 @@ export function createBusinessRoutes({ store, verify, bearerToken, readJson, sen
         if (segments.length === 3 && method === 'GET') return sendJson(res, 200, { quota: await assistant.quota(session, businessId) })
         if (segments.length === 3 && method === 'POST') return await assistant.answer(req, res, session, businessId, await readJson(req))
       }
-      // Marketplace : vitrine et annonces du commerce.
-      if ((collection === 'seller' || collection === 'listings') && marketplace) {
+      // Marketplace : vitrine, annonces et paiements (formule Pro, sponsorisation) du commerce.
+      if ((collection === 'seller' || collection === 'listings' || collection === 'payments') && marketplace) {
         const business = (await store.listBusinesses(session)).find((candidate) => candidate.id === businessId)
         if (!business) throw new BusinessError(403, 'Accès refusé à cette entreprise.')
         return await marketplace.handleSeller(req, res, session, business, collection, productId, sub)

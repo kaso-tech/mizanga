@@ -7,6 +7,7 @@ import type { LinguisticPreferences } from '../domain/types'
 import { formatResetTime } from '../services/remoteAiService'
 import { EvaluationView } from './EvaluationView'
 import { ModerationPanel } from './marketplace/ModerationPanel'
+import { PaymentsPanel } from './marketplace/PaymentsPanel'
 import { adminSectionFromHash, adminSections as sections, type AdminSectionId as SectionId } from '../app/adminSections'
 
 interface Overview {
@@ -338,8 +339,9 @@ export function AdminView({ aiService, preferences, onNotify, onExit }: AdminVie
           {overview?.version && <span className="admin-version">v{overview.version.version} · {overview.version.commit}</span>}
         </header>
         <main className="admin-content" id={`admin-panel-${current.id}`}>
-          {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && activeSection !== 'moderation' && <div className="page-loading" aria-busy="true" />}
+          {!overview && activeSection !== 'evaluation' && activeSection !== 'signalements' && activeSection !== 'moderation' && activeSection !== 'paiements' && <div className="page-loading" aria-busy="true" />}
           {activeSection === 'moderation' && <ModerationPanel onNotify={onNotify} />}
+          {activeSection === 'paiements' && <PaymentsPanel onNotify={onNotify} />}
           {overview && activeSection === 'apercu' && <EnginePanel overview={overview} />}
           {overview && activeSection === 'reference' && <ReferencePanel reference={overview.reference} />}
           {activeSection === 'evaluation' && <EvaluationView aiService={aiService} preferences={preferences} onNotify={onNotify} />}

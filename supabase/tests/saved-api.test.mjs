@@ -74,6 +74,8 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`
   shop = (await call('jeton-awa', 'POST', '/api/business', { name: 'Awa Téléphones' })).body.business.id
   await call('jeton-awa', 'PUT', `/api/business/${shop}/seller`, { displayName: 'Awa Téléphones', city: 'Ouagadougou', whatsapp: '70 12 34 56' })
+  // Plusieurs annonces : formule Pro (la formule Gratuit en permet 5).
+  await db.query("update public.subscriptions set plan_id = 'pro', status = 'active', current_period_end = now() + interval '1 month' where business_id = $1", [shop])
 }, 90_000)
 afterAll(() => server.close())
 
