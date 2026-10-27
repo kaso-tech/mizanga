@@ -328,7 +328,7 @@ async function publishListing(page, productName, title, withPhoto = true) {
 }
 
 test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ page, browser }, info) => {
-  const tag = `cmp${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  const tag = `cmp${Date.now()}${info.project.name.includes('360') ? 'a' : 'b'}`
   await signInAndCreateShop(page, emailFor(info), 'Boutique Comparaison')
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
   await addProduct(page, { name: 'Itel A70', unit: 'pièce', buy: '30000', sell: '39000', quantity: '2' })
@@ -400,7 +400,7 @@ async function signInFromDialog(page, email) {
 }
 
 test('compte : favoris et alertes retrouvés sur un autre téléphone, notifications proposées', async ({ page, browser }, info) => {
-  const tag = `acc${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  const tag = `acc${Date.now()}${info.project.name.includes('360') ? 'a' : 'b'}`
   await signInAndCreateShop(page, emailFor(info), 'Boutique Compte')
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
   await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
@@ -440,7 +440,7 @@ test('compte : favoris et alertes retrouvés sur un autre téléphone, notificat
 })
 
 test('confiance : un client note le vendeur, la note et les statistiques apparaissent partout', async ({ page, browser }, info) => {
-  const tag = `avi${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  const tag = `avi${Date.now()}${info.project.name.includes('360') ? 'a' : 'b'}`
   await signInAndCreateShop(page, emailFor(info), `Boutique ${tag}`)
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
   await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
@@ -483,7 +483,7 @@ test('assistant d’achat : un client décrit son besoin, l’assistant propose 
   await signInAndCreateShop(page, emailFor(info), 'Boutique Tecno')
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
   // Mot propre à ce scénario : la base de test est partagée avec les autres scénarios.
-  const tag = `ach${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  const tag = `ach${Date.now()}${info.project.name.includes('360') ? 'a' : 'b'}`
   const title = `Tecno ${tag} Spark 20 neuf`
   await expect(await publishListing(page, 'Tecno Spark 20', title)).toHaveText('En ligne')
 
