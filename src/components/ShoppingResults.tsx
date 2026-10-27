@@ -3,6 +3,7 @@ import type { ShoppingListing } from '../domain/types'
 import { formatPrice, whatsappLink } from '../services/marketplaceApi'
 import type { MouseEvent } from 'react'
 import { SaveButtons } from './marketplace/MarketplaceLists'
+import { RatingBadge } from './marketplace/SellerTrust'
 
 const conditionLabels: Record<string, string> = { new: 'Neuf', used: 'Occasion', refurbished: 'Reconditionné' }
 
@@ -34,6 +35,7 @@ export function ShoppingResults({ listings, onOpenMarketplace }: { listings: Sho
                 <span className="shopping-seller">
                   {listing.sellerName}
                   {listing.sellerVerified && <BadgeCheck size={14} aria-label="Vendeur vérifié" />}
+                  <RatingBadge rating={listing.sellerRating} count={listing.sellerReviews} />
                   <span className="shopping-city"><MapPin size={12} aria-hidden="true" /> {listing.city}</span>
                 </span>
               </span>

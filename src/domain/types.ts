@@ -58,6 +58,9 @@ export interface ShoppingListing {
   city: string
   sellerName: string
   sellerVerified: boolean
+  /** Note du vendeur (avis publiés), et nombre d’avis. */
+  sellerRating?: number | null
+  sellerReviews?: number
   photo: string | null
   score: number
   reasons: string[]

@@ -40,9 +40,49 @@ export interface ListingCard {
   sellerId: string
   sellerName: string
   sellerVerified: boolean
+  /** Note du vendeur (avis publiés) et nombre d’avis. */
+  sellerRating?: number | null
+  sellerReviews?: number
   sameCity: boolean
   deliversToCity: boolean
   publishedAt: string
+}
+
+export interface SellerStats {
+  rating: number | null
+  reviewCount: number
+  memberSince: string
+  activeListings: number
+}
+
+export interface SellerReview {
+  id: string
+  rating: number
+  comment: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** Avis du compte connecté sur un vendeur. */
+export interface MyReview {
+  id: string
+  rating: number
+  comment: string | null
+  status: 'pending' | 'published' | 'review' | 'hidden'
+  revision: number
+  updatedAt: string
+}
+
+export interface ReviewModerationItem {
+  id: string
+  revision: number
+  rating: number
+  comment: string | null
+  status: string
+  reasons: string[]
+  updatedAt: string
+  businessId: string
+  sellerName: string
 }
 
 export interface PublicSeller {
@@ -55,6 +95,7 @@ export interface PublicSeller {
   deliversEverywhere: boolean
   deliveryCities: string[]
   description: string | null
+  stats?: SellerStats
 }
 
 export interface ListingDetail extends Omit<ListingCard, 'photo' | 'city' | 'sellerId' | 'sellerName' | 'sellerVerified' | 'sameCity' | 'deliversToCity'> {
@@ -162,7 +203,7 @@ export const marketplaceApi = {
     return call<{ total: number; items: ListingCard[] }>(`/api/marketplace/search?${params}`)
   },
   listing: async (id: string) => (await call<{ listing: ListingDetail }>(`/api/marketplace/listings/${id}`)).listing,
-  seller: (id: string) => call<{ seller: PublicSeller; listings: ListingCard[] }>(`/api/marketplace/sellers/${id}`),
+  seller: (id: string) => call<{ seller: PublicSeller; listings: ListingCard[]; reviews?: SellerReview[] }>(`/api/marketplace/sellers/${id}`),
   report: async (id: string, reason: string, details: string, token?: string | null) => {
     await call(`/api/marketplace/listings/${id}/report`, json('POST', { reason, details }, token ? { Authorization: `Bearer ${token}` } : {}))
   },
@@ -171,10 +212,20 @@ export const marketplaceApi = {
   decide: async (id: string, revision: number, status: 'published' | 'rejected' | 'hidden' | 'review', reason?: string) => {
     await call(`/api/admin/moderation/${id}`, { ...json('POST', { revision, status, reason }), credentials: 'same-origin' })
   },
+  reviewQueue: async (status: string) => (await call<{ reviews: ReviewModerationItem[] }>(`/api/admin/reviews?status=${status}`, { credentials: 'same-origin' })).reviews,
+  decideReview: async (id: string, revision: number, status: 'published' | 'hidden' | 'review') => {
+    await call(`/api/admin/reviews/${id}`, { ...json('POST', { revision, status }), credentials: 'same-origin' })
+  },
   setSellerVerified: async (businessId: string, verified: boolean) => {
     await call(`/api/admin/sellers/${businessId}/verified`, { ...json('POST', { verified }), credentials: 'same-origin' })
   },
 }
+
+/** « 4,5 » (note sur 5). */
+export const formatRating = (rating: number) => rating.toLocaleString('fr', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+/** « oct. 2026 ». */
+export const formatMonth = (date: string) => new Date(date).toLocaleDateString('fr', { month: 'short', year: 'numeric' })
 
 /** « 48 000 F CFA ». */
 export const formatPrice = (amount: number, currency = 'XOF') => new Intl.NumberFormat('fr', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)

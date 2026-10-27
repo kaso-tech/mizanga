@@ -2,6 +2,7 @@
 // l’utilisateur (ou en visiteur), et photos gardées en mémoire.
 import { LISTING_COLUMNS, SELLER_COLUMNS, alertParams, searchParams, toOwnListing, toSavedAlert, toSavedFavorite, toSellerProfile } from '../../server/marketplace/store.mjs'
 import { toBusinessError } from '../../server/business/supabase-store.mjs'
+import { toReview } from '../../server/marketplace/reviews.mjs'
 import { asUser } from './database.mjs'
 
 /**
@@ -60,6 +61,16 @@ export function createPgliteMarketplace(db, { photoBaseUrl = '/photos' } = {}) {
       async setSellerVerified(key, businessId, verified) {
         await rpc('set_seller_verified', { p_key: key, p_business_id: businessId, p_verified: verified })
       },
+      async myReview({ userId }, businessId) {
+        const [row] = await query(userId, 'select * from public.seller_reviews where business_id = $1', [businessId])
+        return row ? toReview(row) : null
+      },
+      saveReview: async ({ userId }, businessId, rating, comment) => toReview((await query(userId, 'select * from public.save_seller_review($1, $2, $3)', [businessId, rating, comment]))[0]),
+      async deleteReview({ userId }, businessId) {
+        await query(userId, 'delete from public.seller_reviews where business_id = $1', [businessId])
+      },
+      moderateReview: async (key, reviewId, revision, status, reasons, by) => toReview((await query(null, 'select * from public.moderate_review($1, $2, $3, $4, $5, $6)', [key, reviewId, revision, status, reasons, by]))[0]),
+      reviewQueue: (key, status) => rpc('review_queue', { p_key: key, p_status: status }),
       async listSaved({ userId }) {
         const favorites = await query(userId, 'select listing_id, snapshot, created_at from public.marketplace_favorites order by created_at desc')
         const alerts = await query(userId, 'select id, label, filters, seen_at, notify, created_at from public.marketplace_alerts order by created_at')

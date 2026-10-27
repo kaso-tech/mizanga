@@ -2,8 +2,9 @@ import { ArrowLeft, BadgeCheck, Bell, Flag, MapPin, MessageCircle, Phone, Search
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { suggestedCities } from '../../app/cities'
 import { addAlert, alertFilters, compareStore, describeFilters, type ListingLike } from '../../app/marketSaved'
-import { formatPhone, formatPrice, marketplaceApi, reportLabels, searchQuery, whatsappLink, type ListingCard, type ListingDetail, type MarketCatalog, type PublicSeller, type SearchFilters } from '../../services/marketplaceApi'
+import { formatPhone, formatPrice, marketplaceApi, reportLabels, searchQuery, whatsappLink, type ListingCard, type ListingDetail, type MarketCatalog, type PublicSeller, type SearchFilters, type SellerReview } from '../../services/marketplaceApi'
 import { Modal } from '../Modal'
+import { RatingBadge, ReviewsSection, SellerStatsLine } from './SellerTrust'
 import { AlertsPage, CompareBar, ComparePage, FavoritesPage, MarketTabs, SaveButtons, type MarketAccount } from './MarketplaceLists'
 
 type Route =
@@ -93,6 +94,7 @@ function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false }: { i
             {!item.sameCity && item.deliversToCity && <> · <Truck size={12} aria-hidden="true" /> livre chez vous</>}
           </span>
           <span className="market-card-seller">{item.sellerName}{item.sellerVerified && <BadgeCheck size={13} aria-label="Vendeur vérifié" />}</span>
+          <RatingBadge rating={item.sellerRating} count={item.sellerReviews} />
         </span>
       </a>
       <SaveButtons listing={cardToSaved(item)} onNotify={onNotify} compact />
@@ -376,6 +378,7 @@ function ListingPage({ id, catalog, onSeller, onNotify }: { id: string; catalog:
           {listing.seller.name}{listing.seller.verified && <span className="verified-badge"><BadgeCheck size={14} aria-hidden="true" /> Vendeur vérifié</span>}
         </button>
         <p className="market-card-meta"><MapPin size={13} aria-hidden="true" /> {listing.seller.city}{listing.seller.deliversEverywhere ? ' · livre dans tout le pays' : listing.seller.deliveryCities.length ? ` · livre aussi à ${listing.seller.deliveryCities.join(', ')}` : ''}</p>
+        <SellerStatsLine stats={listing.seller.stats} verified={listing.seller.verified} />
         <ContactButtons seller={listing.seller} listing={listing} />
       </section>
 
@@ -398,26 +401,29 @@ function ListingPage({ id, catalog, onSeller, onNotify }: { id: string; catalog:
   )
 }
 
-function SellerPage({ id, catalog, onOpen, onNotify }: { id: string; catalog: MarketCatalog | null; onOpen: (id: string) => void; onNotify: (message: string, tone?: 'success' | 'info') => void }) {
-  const [page, setPage] = useState<{ seller: PublicSeller; listings: ListingCard[] } | null>(null)
+function SellerPage({ id, catalog, onOpen, onNotify, account }: { id: string; catalog: MarketCatalog | null; onOpen: (id: string) => void; onNotify: (message: string, tone?: 'success' | 'info') => void; account?: MarketAccount }) {
+  const [page, setPage] = useState<{ seller: PublicSeller; listings: ListingCard[]; reviews?: SellerReview[] } | null>(null)
   const [error, setError] = useState('')
+  const [version, setVersion] = useState(0)
   useEffect(() => {
     let cancelled = false
     marketplaceApi.seller(id).then((found) => { if (!cancelled) setPage(found) }).catch((caught: unknown) => { if (!cancelled) setError(caught instanceof Error ? caught.message : 'Vendeur introuvable.') })
     return () => { cancelled = true }
-  }, [id])
+  }, [id, version])
   if (error) return <p className="message-error" role="alert">{error}</p>
   if (!page) return <div className="page-loading" aria-busy="true" />
   return (
     <section className="market-seller-page">
       <h1>{page.seller.name}{page.seller.verified && <span className="verified-badge"><BadgeCheck size={14} aria-hidden="true" /> Vendeur vérifié</span>}</h1>
       <p className="market-card-meta"><MapPin size={13} aria-hidden="true" /> {page.seller.city}{page.seller.deliversEverywhere ? ' · livre dans tout le pays' : page.seller.deliveryCities.length ? ` · livre aussi à ${page.seller.deliveryCities.join(', ')}` : ''}</p>
+      <SellerStatsLine stats={page.seller.stats} verified={page.seller.verified} />
       {page.seller.description && <p className="market-description">{page.seller.description}</p>}
       <ContactButtons seller={page.seller} listing={{ title: 'vos produits', price: 0, currency: 'XOF' }} />
       <h2>{page.listings.length} annonce{page.listings.length > 1 ? 's' : ''}</h2>
       <ul className="market-grid" aria-label="Annonces du vendeur">
         {page.listings.map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} />)}
       </ul>
+      <ReviewsSection sellerId={page.seller.id} sellerName={page.seller.name} reviews={page.reviews ?? []} account={account} onNotify={onNotify} onChanged={() => setVersion((value) => value + 1)} />
     </section>
   )
 }
@@ -464,7 +470,7 @@ export function MarketplaceView({ onNotify, account }: { onNotify: (message: str
         <>
           <button type="button" className="text-button market-back" onClick={() => ((window.history.state as { gilliMarket?: boolean } | null)?.gilliMarket ? window.history.back() : go({ page: 'home', filters: { city: readCity() || undefined } }))}><ArrowLeft size={16} aria-hidden="true" /> Retour</button>
           {route.page === 'listing' && <ListingPage id={route.id} catalog={catalog} onSeller={(id) => go({ page: 'seller', id })} onNotify={onNotify} />}
-          {route.page === 'seller' && <SellerPage id={route.id} catalog={catalog} onOpen={openListing} onNotify={onNotify} />}
+          {route.page === 'seller' && <SellerPage id={route.id} catalog={catalog} onOpen={openListing} onNotify={onNotify} account={account} />}
           {route.page === 'compare' && (
             <ComparePage ids={route.ids} catalog={catalog} onOpen={openListing} onRemove={(id) => {
               compareStore.set(compareStore.get().filter((item) => item.id !== id))

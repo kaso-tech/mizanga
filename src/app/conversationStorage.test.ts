@@ -88,10 +88,10 @@ describe('conversationStorage', () => {
   })
 
   it('garde les annonces proposées par l’assistant d’achat, en écartant les données douteuses', () => {
-    const listing = { rank: 1, id: 'a1', title: 'Tecno Spark 20', price: 48000, currency: 'XOF', unit: 'pièce', condition: 'new', city: 'Ouagadougou', sellerName: 'Awa', sellerVerified: true, photo: '/photos/a.png', score: 90, reasons: ['Dans votre budget'], warnings: [], overBudget: false, whatsapp: '22670123456', phone: null }
+    const listing = { rank: 1, id: 'a1', title: 'Tecno Spark 20', price: 48000, currency: 'XOF', unit: 'pièce', condition: 'new', city: 'Ouagadougou', sellerName: 'Awa', sellerVerified: true, sellerRating: 4.5, sellerReviews: 12, photo: '/photos/a.png', score: 90, reasons: ['Dans votre budget'], warnings: [], overBudget: false, whatsapp: '22670123456', phone: null }
     saveConversations([{ ...conversation, messages: [conversation.messages[0], { id: 'a1', role: 'assistant', content: 'Voici [1].', createdAt: '2026-10-20T10:00:01.000Z', status: 'complete',
-      listings: [listing, { ...listing, id: 'a2', rank: 2, photo: 'javascript:alert(1)', whatsapp: 'wa.me/x' }, { title: 'incomplète' }] as never }] }])
+      listings: [listing, { ...listing, id: 'a2', rank: 2, photo: 'javascript:alert(1)', whatsapp: 'wa.me/x', sellerRating: 9, sellerReviews: -1 }, { title: 'incomplète' }] as never }] }])
     const [restored] = loadConversations()
-    expect(restored.messages[1].listings).toEqual([listing, { ...listing, id: 'a2', rank: 2, photo: null, whatsapp: null }])
+    expect(restored.messages[1].listings).toEqual([listing, { ...listing, id: 'a2', rank: 2, photo: null, whatsapp: null, sellerRating: null, sellerReviews: 0 }])
   })
 })

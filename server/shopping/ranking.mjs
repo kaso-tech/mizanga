@@ -9,6 +9,7 @@
 // * mots recherchés (10) : l’annonce contient les mots demandés (marque, modèle…) ;
 // * ville (15) : vendeur dans la ville du client (15) ou qui y livre (10) ;
 // * vendeur vérifié (10) ;
+// * vendeur bien noté : au moins 4/5 sur 3 avis publiés ou plus (5) ;
 // * annonce récente, publiée depuis moins de 30 jours (5).
 // Les annonces dans le budget passent toujours avant celles au-dessus ; à score égal, le moins cher d’abord.
 // Au-dessus du budget, les plus proches du budget (les moins chères) d’abord.
@@ -25,7 +26,7 @@ for (const category of CATEGORIES) {
 /**
  * @typedef {{ key: string, min?: number, value?: string | boolean }} Criterion
  * @typedef {{ query: string | null, category: string | null, subcategory: string | null, city: string | null, minPrice: number | null, maxPrice: number | null, condition: string | null, criteria: Criterion[] }} ShoppingQuery
- * @typedef {{ id: string, title: string, price: number, currency: string, attributes: Record<string, unknown>, city: string, sellerVerified: boolean, sameCity?: boolean, deliversToCity?: boolean, publishedAt?: string }} Card
+ * @typedef {{ id: string, title: string, price: number, currency: string, attributes: Record<string, unknown>, city: string, sellerVerified: boolean, sellerRating?: number | null, sellerReviews?: number, sameCity?: boolean, deliversToCity?: boolean, publishedAt?: string }} Card
  */
 
 const DAY_MS = 86_400_000
@@ -99,6 +100,10 @@ export function scoreListing(card, query, { queryMatched, now }) {
   if (card.sellerVerified) {
     score += 10
     reasons.push('Vendeur vérifié')
+  }
+  if (typeof card.sellerRating === 'number' && card.sellerRating >= 4 && (card.sellerReviews ?? 0) >= 3) {
+    score += 5
+    reasons.push(`Vendeur bien noté (${String(card.sellerRating).replace('.', ',')}/5, ${card.sellerReviews} avis)`)
   }
   if (card.publishedAt && now - Date.parse(card.publishedAt) < 30 * DAY_MS) score += 5
   return { score: Math.min(score, 100), reasons, warnings, overBudget: query.maxPrice !== null && card.price > query.maxPrice }

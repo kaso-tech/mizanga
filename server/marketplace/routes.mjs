@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto'
 import { BusinessError, isUuid } from '../business/validate.mjs'
 import { CATEGORIES, CONDITIONS } from './categories.mjs'
+import { checkReviewRules, validateReview } from './reviews.mjs'
 import { PHOTO_TYPES, REPORT_REASONS, validateListingInput, validateReport, validateSearch, validateSellerProfile } from './validate.mjs'
 
 /**
@@ -59,6 +60,22 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
     }
   }
 
+  /**
+   * Contrôle automatique d’un avis soumis : publié, ou envoyé en vérification humaine. Sans clé de
+   * modération, il reste en attente (invisible) jusqu’à une décision de l’administration.
+   * @param {import('./store.mjs').Review} review
+   */
+  const autoModerateReview = async (review) => {
+    if (!moderationKey) return review
+    const { suspicious, reasons } = checkReviewRules(review.comment)
+    try {
+      return await store.moderateReview(moderationKey, review.id, review.revision, suspicious ? 'review' : 'published', reasons, 'auto')
+    } catch (error) {
+      if (error instanceof BusinessError && error.status === 409) return review
+      throw error
+    }
+  }
+
   return {
     /** @param {import('node:http').IncomingMessage} req @param {import('node:http').ServerResponse} res @param {string} path @param {import('./store.mjs').Session | null} session */
     async handlePublic(req, res, path, session) {
@@ -81,10 +98,24 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
           await store.report(session, itemId, reason, details)
           return sendJson(res, 201, { reported: true })
         }
-        if (resource === 'sellers' && itemId && method === 'GET') {
+        // Avis du compte connecté sur un vendeur : lire, donner ou modifier, supprimer.
+        if (resource === 'sellers' && itemId && action === 'review') {
+          if (!session) throw new BusinessError(401, 'Connectez-vous pour donner votre avis.')
+          if (method === 'GET') return sendJson(res, 200, { review: await store.myReview(session, itemId) })
+          if (method === 'PUT') {
+            const { rating, comment } = validateReview(await readJson(req))
+            const review = await autoModerateReview(await store.saveReview(session, itemId, rating, comment))
+            return sendJson(res, 200, { review })
+          }
+          if (method === 'DELETE') {
+            await store.deleteReview(session, itemId)
+            return sendJson(res, 200, { deleted: true })
+          }
+        }
+        if (resource === 'sellers' && itemId && !action && method === 'GET') {
           const page = await store.seller(itemId)
           if (!page) throw new BusinessError(404, 'Vendeur introuvable.')
-          return sendJson(res, 200, { seller: page.seller, listings: page.listings.map(withPhoto) })
+          return sendJson(res, 200, { seller: page.seller, listings: page.listings.map(withPhoto), reviews: page.reviews ?? [] })
         }
         throw new BusinessError(404, 'Introuvable.')
       } catch (error) {
@@ -149,6 +180,16 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
           const moderated = await store.moderate(moderationKey, itemId, body.revision, body.status, reason, 'admin')
           if (moderated.status === 'published') onPublished(moderated.id)
           return sendJson(res, 200, { listing: moderated })
+        }
+        if (resource === 'reviews' && !itemId && method === 'GET') {
+          const status = new URL(req.url ?? '/', 'http://localhost').searchParams.get('status') ?? 'review'
+          if (!['pending', 'review', 'published', 'hidden'].includes(status)) throw new BusinessError(422, 'Statut invalide.')
+          return sendJson(res, 200, { reviews: await store.reviewQueue(moderationKey, status) })
+        }
+        if (resource === 'reviews' && itemId && isUuid(itemId) && method === 'POST') {
+          const body = /** @type {any} */ (await readJson(req))
+          if (!['published', 'hidden', 'review'].includes(body?.status) || !Number.isInteger(body?.revision)) throw new BusinessError(422, 'Décision invalide.')
+          return sendJson(res, 200, { review: await store.moderateReview(moderationKey, itemId, body.revision, body.status, [], 'admin') })
         }
         if (resource === 'sellers' && itemId && isUuid(itemId) && action === 'verified' && method === 'POST') {
           const body = /** @type {any} */ (await readJson(req))

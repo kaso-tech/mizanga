@@ -9,8 +9,10 @@ const catalog = {
   conditions: { new: 'Neuf', used: 'Occasion', refurbished: 'Reconditionné' },
   reportReasons: ['forbidden', 'scam', 'counterfeit', 'wrong_info', 'other'],
 }
-const card = { id: 'l1', title: 'Tecno Spark 20', category: 'telephones', subcategory: 'smartphones', condition: 'new', attributes: { ram_go: 8 }, photo: '/photos/b1/a.png', price: 48000, currency: 'XOF', unit: 'pièce', city: 'Ouagadougou', sellerId: 'b1', sellerName: 'Awa Téléphones', sellerVerified: true, sameCity: true, deliversToCity: false, publishedAt: '2026-10-22T08:00:00Z' }
-const detail = { ...card, description: 'Neuf, garantie 6 mois.', photos: ['/photos/b1/a.png'], inStock: true, seller: { id: 'b1', name: 'Awa Téléphones', city: 'Ouagadougou', whatsapp: '22670123456', phone: null, verified: true, deliversEverywhere: false, deliveryCities: ['Koudougou'], description: null } }
+const card = { sellerRating: 4.5, sellerReviews: 2, id: 'l1', title: 'Tecno Spark 20', category: 'telephones', subcategory: 'smartphones', condition: 'new', attributes: { ram_go: 8 }, photo: '/photos/b1/a.png', price: 48000, currency: 'XOF', unit: 'pièce', city: 'Ouagadougou', sellerId: 'b1', sellerName: 'Awa Téléphones', sellerVerified: true, sameCity: true, deliversToCity: false, publishedAt: '2026-10-22T08:00:00Z' }
+const stats = { rating: 4.5, reviewCount: 2, memberSince: '2026-10-01T00:00:00Z', activeListings: 3 }
+const reviews = [{ id: 'r1', rating: 5, comment: 'Téléphone conforme, très bon accueil.', createdAt: '2026-10-20T00:00:00Z', updatedAt: '2026-10-20T00:00:00Z' }, { id: 'r2', rating: 4, comment: null, createdAt: '2026-10-21T00:00:00Z', updatedAt: '2026-10-21T00:00:00Z' }]
+const detail = { ...card, description: 'Neuf, garantie 6 mois.', photos: ['/photos/b1/a.png'], inStock: true, seller: { id: 'b1', name: 'Awa Téléphones', city: 'Ouagadougou', whatsapp: '22670123456', phone: null, verified: true, deliversEverywhere: false, deliveryCities: ['Koudougou'], description: null, stats } }
 
 const card2 = { ...card, id: 'l2', title: 'Itel A70', attributes: { ram_go: 3 }, price: 39000, sellerId: 'b2', sellerName: 'Ali Mobile', sellerVerified: false, city: 'Bobo-Dioulasso' }
 const detail2 = { ...card2, description: '', photos: [], inStock: true, seller: { id: 'b2', name: 'Ali Mobile', city: 'Bobo-Dioulasso', whatsapp: null, phone: '22676000000', verified: false, deliversEverywhere: true, deliveryCities: [], description: null } }
@@ -24,7 +26,7 @@ function fakeServer({ total = 2, price = 48000 }: { total?: number; price?: numb
     if (url === '/api/marketplace/listings/l1') return Response.json({ listing: { ...detail, price } })
     if (url === '/api/marketplace/listings/l2') return Response.json({ listing: detail2 })
     if (url === '/api/marketplace/listings/l1/report') return Response.json({ reported: true }, { status: 201 })
-    if (url === '/api/marketplace/sellers/b1') return Response.json({ seller: detail.seller, listings: [card] })
+    if (url === '/api/marketplace/sellers/b1') return Response.json({ seller: detail.seller, listings: [card], reviews })
     return Response.json({ error: 'Introuvable.' }, { status: 404 })
   }))
   return requests
@@ -185,5 +187,48 @@ describe('marketplace publique', () => {
     // Connecté, sur un navigateur sans notifications (comme ici) : il le dit.
     rerender(<MarketplaceView onNotify={() => {}} account={{ signedIn: true, savedApi: null, onSignIn }} />)
     expect(await screen.findByText(/Ce navigateur ne permet pas les notifications/)).toBeInTheDocument()
+  })
+
+  it('montre la note et les statistiques du vendeur, ses avis, et laisse donner le sien', async () => {
+    fakeServer()
+    const onNotify = vi.fn()
+    const savedApi = {
+      myReview: vi.fn(async () => null),
+      saveReview: vi.fn(async (_id: string, review: { rating: number; comment: string }) => ({ id: 'r3', ...review, status: 'review' as const, revision: 1, updatedAt: '2026-10-27T00:00:00Z' })),
+      deleteReview: vi.fn(async () => ({})),
+    }
+    window.history.replaceState({}, '', '/marketplace/vendeur/b1')
+    render(<MarketplaceView onNotify={onNotify} account={{ signedIn: true, savedApi: savedApi as never, onSignIn: () => {} }} />)
+    const facts = await screen.findByRole('list', { name: 'Le vendeur en bref' })
+    expect(facts).toHaveTextContent('4,5 · 2 avis')
+    expect(facts).toHaveTextContent('Sur Gilli depuis oct. 2026')
+    expect(facts).toHaveTextContent('3 annonces en ligne')
+    expect(facts).toHaveTextContent('Identité vérifiée par Gilli')
+    const list = screen.getByRole('list', { name: 'Avis' })
+    expect(list).toHaveTextContent('Téléphone conforme, très bon accueil.')
+    expect(within(list).getAllByText('Client Gilli')).toHaveLength(2)
+    // La fiche d’annonce du vendeur montre aussi sa note.
+    expect(screen.getByRole('list', { name: 'Annonces du vendeur' })).toHaveTextContent('4,5 (2 avis)')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Donner mon avis' }))
+    const dialog = screen.getByRole('dialog', { name: 'Donner mon avis' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Publier mon avis' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Choisissez une note de 1 à 5 étoiles.')
+    await userEvent.click(within(dialog).getByLabelText('4 étoiles : Bien'))
+    await userEvent.type(within(dialog).getByLabelText('Commentaire (facultatif)'), 'Livraison rapide.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Publier mon avis' }))
+    await waitFor(() => expect(savedApi.saveReview).toHaveBeenCalledWith('b1', { rating: 4, comment: 'Livraison rapide.' }))
+    expect(onNotify).toHaveBeenCalledWith('Merci : votre avis sera publié après vérification.', 'success')
+    expect(await screen.findByText('Votre avis sera visible après vérification par l’équipe Gilli.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Modifier mon avis' })).toBeInTheDocument()
+  })
+
+  it('déconnecté : « Donner mon avis » propose de se connecter', async () => {
+    fakeServer()
+    const onSignIn = vi.fn()
+    window.history.replaceState({}, '', '/marketplace/vendeur/b1')
+    render(<MarketplaceView onNotify={() => {}} account={{ signedIn: false, savedApi: null, onSignIn }} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Donner mon avis' }))
+    expect(onSignIn).toHaveBeenCalled()
   })
 })

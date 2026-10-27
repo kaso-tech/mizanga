@@ -59,6 +59,8 @@ function readListings(value: unknown): ShoppingListing[] {
       city: isString(listing.city) ? listing.city : '',
       sellerName: isString(listing.sellerName) ? listing.sellerName : '',
       sellerVerified: listing.sellerVerified === true,
+      sellerRating: typeof listing.sellerRating === 'number' && listing.sellerRating >= 1 && listing.sellerRating <= 5 ? listing.sellerRating : null,
+      sellerReviews: typeof listing.sellerReviews === 'number' && listing.sellerReviews >= 0 ? Math.floor(listing.sellerReviews) : 0,
       // Seules les photos servies par Gilli (adresse relative ou https) sont gardées.
       photo: isString(listing.photo) && /^(\/|https:\/\/)/.test(listing.photo) ? listing.photo : null,
       score: typeof listing.score === 'number' ? listing.score : 0,

@@ -439,6 +439,46 @@ test('compte : favoris et alertes retrouvés sur un autre téléphone, notificat
   await client.close()
 })
 
+test('confiance : un client note le vendeur, la note et les statistiques apparaissent partout', async ({ page, browser }, info) => {
+  const tag = `avi${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  await signInAndCreateShop(page, emailFor(info), `Boutique ${tag}`)
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
+  await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
+
+  const client = await browser.newPage({ ...info.project.use })
+  await client.goto(`/marketplace?q=${tag}`)
+  await client.getByRole('list', { name: 'Annonces' }).getByRole('link', { name: new RegExp(tag) }).tap()
+  await expect(client.getByRole('list', { name: 'Le vendeur en bref' })).toContainText('Pas encore d’avis')
+  await client.locator('.market-seller-name').tap()
+  await expect(client.getByRole('heading', { level: 2, name: 'Avis des clients' })).toBeVisible()
+  await client.getByRole('button', { name: 'Donner mon avis' }).tap()
+  await signInFromDialog(client, `client-${tag}@example.bf`)
+  await client.getByRole('button', { name: 'Donner mon avis' }).tap()
+  const dialog = client.getByRole('dialog', { name: 'Donner mon avis' })
+  await dialog.locator('.star-picker label').nth(4).tap()
+  await dialog.getByLabel('Commentaire (facultatif)').fill('Téléphone conforme, vendeur sérieux.')
+  await expectFitsScreen(client, 'donner un avis')
+  await dialog.getByRole('button', { name: 'Publier mon avis' }).tap()
+  await expect(client.locator('.toast', { hasText: 'votre avis est publié' })).toBeVisible()
+  await expect(client.getByRole('list', { name: 'Le vendeur en bref' })).toContainText('5,0 · 1 avis')
+  await expect(client.getByRole('list', { name: 'Avis' })).toContainText('Téléphone conforme, vendeur sérieux.')
+  await expect(client.getByRole('button', { name: 'Modifier mon avis' })).toBeVisible()
+  await expectFitsScreen(client, 'page du vendeur avec avis')
+
+  // La note suit les fiches de la recherche.
+  await client.goto(`/marketplace?q=${tag}`)
+  await expect(client.getByRole('list', { name: 'Annonces' })).toContainText('5,0 (1 avis)')
+  // Le vendeur ne peut pas se noter lui-même.
+  await page.goto(`/marketplace?q=${tag}`)
+  await page.getByRole('list', { name: 'Annonces' }).getByRole('link', { name: new RegExp(tag) }).tap()
+  await page.locator('.market-seller-name').tap()
+  await page.getByRole('button', { name: 'Donner mon avis' }).tap()
+  await page.getByRole('dialog', { name: 'Donner mon avis' }).locator('.star-picker label').nth(4).tap()
+  await page.getByRole('button', { name: 'Publier mon avis' }).tap()
+  await expect(page.getByRole('dialog', { name: 'Donner mon avis' }).getByRole('alert')).toHaveText('Vous ne pouvez pas donner un avis sur votre propre commerce.')
+  await client.close()
+})
+
 test('assistant d’achat : un client décrit son besoin, l’assistant propose les annonces de la marketplace', async ({ page, browser }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Tecno')
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })

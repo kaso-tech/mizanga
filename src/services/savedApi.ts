@@ -1,5 +1,5 @@
 // Favoris, alertes de recherche et notifications du téléphone enregistrés sur le compte.
-import type { SearchFilters } from './marketplaceApi'
+import type { MyReview, SearchFilters } from './marketplaceApi'
 import { BusinessApiError } from './businessApi'
 
 export interface RemoteFavorite {
@@ -44,6 +44,9 @@ export function createSavedApi(getToken: () => Promise<string | null>) {
     deleteFavorite: (listingId: string) => request('DELETE', `/api/saved/favorites/${encodeURIComponent(listingId)}`),
     saveAlert: (alert: { id: string; label: string; filters: SearchFilters; seenAt: string; notify: boolean }) => request('PUT', `/api/saved/alerts/${encodeURIComponent(alert.id)}`, { label: alert.label, filters: alert.filters, seenAt: alert.seenAt, notify: alert.notify }),
     deleteAlert: (id: string) => request('DELETE', `/api/saved/alerts/${encodeURIComponent(id)}`),
+    myReview: async (sellerId: string) => (await request<{ review: MyReview | null }>('GET', `/api/marketplace/sellers/${encodeURIComponent(sellerId)}/review`)).review,
+    saveReview: async (sellerId: string, review: { rating: number; comment: string }) => (await request<{ review: MyReview }>('PUT', `/api/marketplace/sellers/${encodeURIComponent(sellerId)}/review`, review)).review,
+    deleteReview: (sellerId: string) => request('DELETE', `/api/marketplace/sellers/${encodeURIComponent(sellerId)}/review`),
     subscribePush: (subscription: PushSubscriptionJSON) => request('POST', '/api/push/subscriptions', subscription),
     unsubscribePush: (endpoint: string) => request('DELETE', '/api/push/subscriptions', { endpoint }),
   }

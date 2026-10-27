@@ -17,6 +17,9 @@ function fakeApi(remote: Awaited<ReturnType<SavedApi['list']>>) {
     deleteAlert: vi.fn(async () => ({})),
     subscribePush: vi.fn(async () => ({})),
     unsubscribePush: vi.fn(async () => ({})),
+    myReview: vi.fn(async () => null),
+    saveReview: vi.fn(async () => ({ id: 'r1', rating: 5, comment: null, status: 'published' as const, revision: 1, updatedAt: '2026-10-27T00:00:00.000Z' })),
+    deleteReview: vi.fn(async () => ({})),
   } satisfies SavedApi
 }
 

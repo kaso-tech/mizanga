@@ -53,6 +53,7 @@ export function TermsView() {
       <section>
         <h2>6. Signalements</h2>
         <p>Chacun peut signaler une annonce depuis sa page. Plusieurs signalements suspendent l’annonce en attendant la vérification par l’équipe Gilli.</p>
+        <p>Avis sur les vendeurs : avec un compte, vous pouvez donner un avis (note et commentaire) sur un vendeur, un seul par vendeur, modifiable et supprimable ; un commerçant ne peut pas noter son propre commerce. Les avis sont publiés sans le nom ni l’adresse de leur auteur. Ils doivent être honnêtes et respectueux : un avis contenant des insultes, un numéro de téléphone, un lien ou un produit interdit est vérifié par l’équipe Gilli, qui peut le masquer.</p>
       </section>
 
       <section>

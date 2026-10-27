@@ -41,4 +41,14 @@ describe('classement des annonces de l’assistant d’achat', () => {
     // « hors-budget » a de meilleures caractéristiques, mais le budget passe d’abord.
     expect(ranked.map((item) => item.card.id)).toEqual(['bon-marche', 'cher', 'faible'])
   })
+
+  it('ajoute 5 points à un vendeur bien noté (au moins 4/5 sur 3 avis), avec la raison', () => {
+    const rated = scoreListing(card({ sellerRating: 4.6, sellerReviews: 12 }), query, { queryMatched: false, now })
+    const plain = scoreListing(card({}), query, { queryMatched: false, now })
+    expect(rated.score - plain.score).toBe(5)
+    expect(rated.reasons).toContain('Vendeur bien noté (4,6/5, 12 avis)')
+    // Trop peu d’avis, ou note moyenne : rien.
+    expect(scoreListing(card({ sellerRating: 5, sellerReviews: 2 }), query, { queryMatched: false, now }).score).toBe(plain.score)
+    expect(scoreListing(card({ sellerRating: 3.9, sellerReviews: 30 }), query, { queryMatched: false, now }).score).toBe(plain.score)
+  })
 })

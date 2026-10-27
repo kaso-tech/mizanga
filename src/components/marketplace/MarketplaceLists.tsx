@@ -4,6 +4,7 @@ import { markAlertSeen, removeAlert, setAlertNotify, toggleCompare, toggleFavori
 import { disablePush, enablePush, pushState, type PushState } from '../../app/pushNotifications'
 import { formatPrice, marketplaceApi, type ListingDetail, type MarketCatalog } from '../../services/marketplaceApi'
 import type { SavedApi } from '../../services/savedApi'
+import { RatingBadge } from './SellerTrust'
 
 /** Compte vu par la marketplace : favoris et alertes suivent le compte, notifications du téléphone. */
 export interface MarketAccount {
@@ -284,7 +285,7 @@ export function ComparePage({ ids, catalog, onOpen, onRemove }: { ids: string[];
             </tr>
             <tr>
               <th scope="row">Vendeur</th>
-              {listings.map((item) => <td key={item.id}>{'missing' in item ? '—' : <>{item.seller.name}{item.seller.verified && <span className="verified-badge"><BadgeCheck size={13} aria-hidden="true" /> Vérifié</span>}</>}</td>)}
+              {listings.map((item) => <td key={item.id}>{'missing' in item ? '—' : <>{item.seller.name}{item.seller.verified && <span className="verified-badge"><BadgeCheck size={13} aria-hidden="true" /> Vérifié</span>}<RatingBadge rating={item.seller.stats?.rating} count={item.seller.stats?.reviewCount} /></>}</td>)}
             </tr>
             <tr>
               <th scope="row">Ville</th>

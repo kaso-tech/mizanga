@@ -4,6 +4,7 @@
 // * Modération : clé de modération, vérifiée par la base (le serveur n’a pas de clé secrète Supabase).
 import { toBusinessError } from '../business/supabase-store.mjs'
 import { BusinessError } from '../business/validate.mjs'
+import { toReview } from './reviews.mjs'
 
 /**
  * @typedef {{ token: string, userId: string }} Session
@@ -25,6 +26,11 @@ import { BusinessError } from '../business/validate.mjs'
  * @property {(key: string, listingId: string, revision: number, status: string, reasons: string[], by: 'auto' | 'admin') => Promise<OwnListing>} moderate
  * @property {(key: string, status: string) => Promise<any[]>} queue
  * @property {(key: string, businessId: string, verified: boolean) => Promise<void>} setSellerVerified
+ * @property {(session: Session, businessId: string) => Promise<Review | null>} myReview Avis du compte sur ce vendeur.
+ * @property {(session: Session, businessId: string, rating: number, comment: string | null) => Promise<Review>} saveReview
+ * @property {(session: Session, businessId: string) => Promise<void>} deleteReview
+ * @property {(key: string, reviewId: string, revision: number, status: string, reasons: string[], by: 'auto' | 'admin') => Promise<Review>} moderateReview
+ * @property {(key: string, status: string) => Promise<any[]>} reviewQueue
  * @property {(session: Session) => Promise<{ favorites: SavedFavorite[], alerts: SavedAlert[] }>} listSaved Favoris et alertes du compte.
  * @property {(session: Session, listingId: string, snapshot: Record<string, unknown>) => Promise<void>} saveFavorite
  * @property {(session: Session, listingId: string) => Promise<void>} deleteFavorite
@@ -36,6 +42,7 @@ import { BusinessError } from '../business/validate.mjs'
  * @property {(key: string, endpoint: string) => Promise<void>} forgetPushSubscription
  * @property {(key: string, keys?: { publicKey: string, privateKey: string }) => Promise<{ publicKey: string, privateKey: string } | null>} pushKeys
  *
+ * @typedef {ReturnType<typeof toReview>} Review
  * @typedef {{ listingId: string, snapshot: Record<string, unknown>, createdAt: string }} SavedFavorite
  * @typedef {{ id: string, label: string, filters: Record<string, unknown>, seenAt: string, notify: boolean, createdAt: string }} SavedAlert
  * @typedef {{ id: string, label: string, filters: Record<string, unknown>, criteria: Record<string, unknown>, seenAt: string, notify: boolean }} AlertInput
@@ -179,6 +186,16 @@ export function createSupabaseMarketplace({ supabaseUrl, publishableKey }, { fet
     async setSellerVerified(key, businessId, verified) {
       await request('POST', 'rpc/set_seller_verified', { p_key: key, p_business_id: businessId, p_verified: verified })
     },
+    async myReview(session, businessId) {
+      const rows = await request('GET', `seller_reviews?select=*&user_id=eq.${id(session.userId)}&business_id=eq.${id(businessId)}`, undefined, session.token)
+      return rows?.[0] ? toReview(rows[0]) : null
+    },
+    saveReview: async (session, businessId, rating, comment) => toReview(await request('POST', 'rpc/save_seller_review', { p_business_id: businessId, p_rating: rating, p_comment: comment }, session.token)),
+    async deleteReview(session, businessId) {
+      await request('DELETE', `seller_reviews?user_id=eq.${id(session.userId)}&business_id=eq.${id(businessId)}`, undefined, session.token)
+    },
+    moderateReview: async (key, reviewId, revision, status, reasons, by) => toReview(await request('POST', 'rpc/moderate_review', { p_key: key, p_review_id: reviewId, p_revision: revision, p_status: status, p_reasons: reasons, p_by: by })),
+    reviewQueue: (key, status) => request('POST', 'rpc/review_queue', { p_key: key, p_status: status }),
     async listSaved(session) {
       const [favorites, alerts] = await Promise.all([
         request('GET', `marketplace_favorites?select=listing_id,snapshot,created_at&user_id=eq.${id(session.userId)}&order=created_at.desc`, undefined, session.token),

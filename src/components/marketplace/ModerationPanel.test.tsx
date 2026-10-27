@@ -37,6 +37,29 @@ describe('modération de la marketplace (console)', () => {
     await waitFor(() => expect(requests.at(-1)?.url).toBe('/api/admin/moderation?status=published'))
   })
 
+  it('modère les avis des clients signalés par le contrôle automatique', async () => {
+    const review = { id: 'r1', revision: 1, rating: 1, comment: 'Appelez-moi au 70 11 22 33', status: 'review', reasons: ['Numéro de téléphone dans le commentaire.'], updatedAt: '2026-10-27T08:00:00Z', businessId: 'b1', sellerName: 'Awa Téléphones' }
+    const requests: Array<{ url: string; body?: unknown }> = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined })
+      if (url.startsWith('/api/admin/moderation?')) return Response.json({ listings: [] })
+      if (url === '/api/admin/reviews?status=review') return Response.json({ reviews: requests.some((request) => request.url === '/api/admin/reviews/r1') ? [] : [review] })
+      if (url.startsWith('/api/admin/reviews?')) return Response.json({ reviews: [] })
+      return Response.json({ ok: true })
+    }))
+    const onNotify = vi.fn()
+    render(<ModerationPanel onNotify={onNotify} />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Avis des clients' }))
+    const list = await screen.findByRole('list', { name: 'Avis à modérer' })
+    expect(list).toHaveTextContent('Awa Téléphones')
+    expect(list).toHaveTextContent('Numéro de téléphone dans le commentaire.')
+    expect(within(list).getByRole('img', { name: '1,0 sur 5' })).toBeInTheDocument()
+    await userEvent.click(within(list).getByRole('button', { name: 'Masquer' }))
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('Avis masqué.', 'success'))
+    expect(requests.find((request) => request.url === '/api/admin/reviews/r1')?.body).toEqual({ revision: 1, status: 'hidden' })
+    expect(await screen.findByText('Aucun avis dans cette liste.')).toBeInTheDocument()
+  })
+
   it('les conditions d’utilisation listent les produits interdits', () => {
     render(<TermsView />)
     for (const text of [/armes, munitions, explosifs/, /drogues et stupéfiants/, /médicaments/, /êtres humains, les organes/, /espèces animales et végétales protégées/]) {

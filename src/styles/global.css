@@ -1298,3 +1298,30 @@ button.account-chip:hover { opacity: .9; }
 .market-push { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0; }
 .market-push > span { flex: 1 1 200px; }
 .market-push .primary-button, .market-push .secondary-button { min-height: 40px; }
+
+/* Confiance : notes, statistiques et avis des vendeurs */
+.stars { display: inline-flex; gap: 1px; color: #d97706; vertical-align: -2px; }
+.rating-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--foreground); font-size: 12px; font-weight: 600; }
+.rating-badge svg { color: #d97706; }
+.rating-count { color: var(--muted-foreground); font-weight: 400; }
+.seller-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; color: var(--muted-foreground); font-size: 13px; }
+.seller-stats li { display: inline-flex; align-items: center; gap: 5px; }
+.seller-stats svg { flex: 0 0 auto; }
+.seller-reviews { display: grid; gap: 10px; }
+.seller-reviews-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.seller-reviews-head h2 { margin: 8px 0 0; font-size: 18px; }
+.seller-reviews-head .secondary-button { min-height: 40px; }
+.review-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.review { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+.review p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.review-head { display: flex; align-items: center; gap: 8px; }
+.review-date, .review-author { color: var(--muted-foreground); font-size: 12px; }
+.star-picker { display: flex; align-items: center; gap: 2px; margin: 0 0 12px; padding: 0; border: 0; }
+.star-picker legend { margin-bottom: 6px; }
+.star-picker label { display: grid; place-items: center; width: 44px; height: 44px; color: var(--muted-foreground); cursor: pointer; }
+.star-picker label.is-on { color: #d97706; }
+.star-picker input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.star-picker label:focus-within { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 10px; }
+.star-picker-label { margin-left: 8px; color: var(--muted-foreground); font-size: 14px; }
+.market-card-body .rating-badge { margin-top: -2px; }
+.market-compare .rating-badge { display: flex; margin-top: 4px; }

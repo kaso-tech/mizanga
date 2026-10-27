@@ -219,6 +219,8 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
   // signalements limités (10 par heure et par adresse).
   const marketLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 300 })
   const reportLimit = createRateLimiter({ windowMs: 3_600_000, maxRequests: 10 })
+  // Avis sur les vendeurs : 20 envois par heure et par adresse.
+  const reviewLimit = createRateLimiter({ windowMs: 3_600_000, maxRequests: 20 })
   // Espace Business : limite par compte (jeton de connexion), car les opérateurs mobiles font souvent
   // partager une même adresse IP à de nombreux abonnés ; une limite large par adresse reste en garde-fou.
   const businessLimit = createRateLimiter({ windowMs: 60_000, maxRequests: 120 })
@@ -260,7 +262,7 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       return sendJson(res, 200, { authenticated: false })
     }
     if (!admin.isAuthenticated(req)) return sendJson(res, 401, { error: 'Connexion administrateur requise.' })
-    if (path.startsWith('/api/admin/moderation') || path.startsWith('/api/admin/sellers/')) {
+    if (path.startsWith('/api/admin/moderation') || path.startsWith('/api/admin/sellers/') || path.startsWith('/api/admin/reviews')) {
       if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })
       return marketRoutes.handleAdmin(req, res, path)
     }
@@ -324,9 +326,10 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
     if (path.startsWith('/api/marketplace/')) {
       if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })
       const isReport = req.method === 'POST' && path.endsWith('/report')
-      const blocked = (isReport ? reportLimit : marketLimit)(clientOf(req))
-      if (blocked) return sendJson(res, 429, errorBody(isReport ? 'Trop de signalements envoyés : réessayez plus tard.' : 'Trop de demandes en peu de temps.', blocked))
-      // Connexion facultative : un signalement garde l’auteur quand il est connecté.
+      const isReview = req.method === 'PUT' && path.endsWith('/review')
+      const blocked = (isReport ? reportLimit : isReview ? reviewLimit : marketLimit)(clientOf(req))
+      if (blocked) return sendJson(res, 429, errorBody(isReport ? 'Trop de signalements envoyés : réessayez plus tard.' : isReview ? 'Trop d’avis envoyés : réessayez plus tard.' : 'Trop de demandes en peu de temps.', blocked))
+      // Connexion facultative : un signalement garde l’auteur quand il est connecté ; un avis l’exige.
       const token = bearerToken(req)
       const user = token && verify ? await verify(token).catch(() => null) : null
       return marketRoutes.handlePublic(req, res, path, user ? { token, userId: user.id } : null)
