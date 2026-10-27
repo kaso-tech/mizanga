@@ -148,6 +148,7 @@ export function toBusinessError(httpStatus, body) {
   if (code === 'GL422') return new BusinessError(422, message)
   if (code === 'GL429') return new BusinessError(429, message)
   if (code === '42501' || httpStatus === 403) return new BusinessError(403, 'Accès refusé.')
+  if (code === '23503') return new BusinessError(404, 'Élément introuvable.')
   if (code === '23514' || code === '23502' || code === '22P02') return new BusinessError(422, 'Une des valeurs saisies est invalide.')
   if (code === 'PGRST301' || code === 'PGRST303' || httpStatus === 401) return new BusinessError(401, 'Votre session a expiré : reconnectez-vous.')
   return new BusinessError(502, 'La base de données est momentanément indisponible. Réessayez.')

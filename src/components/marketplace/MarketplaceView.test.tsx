@@ -173,4 +173,17 @@ describe('marketplace publique', () => {
     expect(await screen.findAllByText('Nouveau')).toHaveLength(2)
     expect(alertsStore.get()[0].newCount).toBe(0)
   })
+
+  it('propose de se connecter pour garder les alertes sur le compte et recevoir les notifications', async () => {
+    fakeServer()
+    const onSignIn = vi.fn()
+    window.history.replaceState({}, '', '/marketplace/alertes')
+    const { rerender } = render(<MarketplaceView onNotify={() => {}} account={{ signedIn: false, savedApi: null, onSignIn }} />)
+    const panel = await screen.findByRole('region', { name: 'Notifications du téléphone' })
+    await userEvent.click(within(panel).getByRole('button', { name: 'Se connecter' }))
+    expect(onSignIn).toHaveBeenCalled()
+    // Connecté, sur un navigateur sans notifications (comme ici) : il le dit.
+    rerender(<MarketplaceView onNotify={() => {}} account={{ signedIn: true, savedApi: null, onSignIn }} />)
+    expect(await screen.findByText(/Ce navigateur ne permet pas les notifications/)).toBeInTheDocument()
+  })
 })

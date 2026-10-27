@@ -1,7 +1,16 @@
-import { BadgeCheck, Bell, BellRing, GitCompareArrows, Heart, MapPin, Store, Trash2, X } from 'lucide-react'
+import { BadgeCheck, Bell, BellOff, BellRing, GitCompareArrows, Heart, MapPin, Smartphone, Store, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { markAlertSeen, removeAlert, toggleCompare, toggleFavorite, useAlerts, useCompare, useFavorites, type ListingLike, type MarketAlert } from '../../app/marketSaved'
+import { markAlertSeen, removeAlert, setAlertNotify, toggleCompare, toggleFavorite, useAlerts, useCompare, useFavorites, type ListingLike, type MarketAlert } from '../../app/marketSaved'
+import { disablePush, enablePush, pushState, type PushState } from '../../app/pushNotifications'
 import { formatPrice, marketplaceApi, type ListingDetail, type MarketCatalog } from '../../services/marketplaceApi'
+import type { SavedApi } from '../../services/savedApi'
+
+/** Compte vu par la marketplace : favoris et alertes suivent le compte, notifications du téléphone. */
+export interface MarketAccount {
+  signedIn: boolean
+  savedApi: SavedApi | null
+  onSignIn: () => void
+}
 
 type Notify = (message: string, tone?: 'success' | 'info') => void
 
@@ -77,7 +86,7 @@ export function MarketTabs({ active, onSelect }: { active: 'home' | 'favorites' 
 type FavoriteState = { status: 'loading' } | { status: 'gone' } | { status: 'ok'; price: number }
 
 /** Favoris : l’annonce telle qu’enregistrée, et son état actuel (prix changé, plus disponible). */
-export function FavoritesPage({ onOpen, onNotify }: { onOpen: (id: string) => void; onNotify: Notify }) {
+export function FavoritesPage({ onOpen, onNotify, signedIn = false }: { onOpen: (id: string) => void; onNotify: Notify; signedIn?: boolean }) {
   const favorites = useFavorites()
   const [states, setStates] = useState<Record<string, FavoriteState>>({})
   const ids = favorites.map((item) => item.id).join(',')
@@ -100,7 +109,7 @@ export function FavoritesPage({ onOpen, onNotify }: { onOpen: (id: string) => vo
   }
   return (
     <>
-      <p className="field-hint">Vos favoris sont enregistrés sur cet appareil.</p>
+      <p className="field-hint">{signedIn ? 'Vos favoris sont enregistrés sur votre compte.' : 'Vos favoris sont enregistrés sur cet appareil. Connectez-vous pour les retrouver sur tous vos appareils.'}</p>
       <ul className="market-saved-list" aria-label="Favoris">
         {favorites.map((item) => {
           const state = states[item.id]
@@ -130,14 +139,58 @@ export function FavoritesPage({ onOpen, onNotify }: { onOpen: (id: string) => vo
 }
 
 /** Alertes : recherches suivies, avec le nombre d’annonces publiées depuis la dernière visite. */
-export function AlertsPage({ onOpen }: { onOpen: (alert: MarketAlert) => void }) {
+/** Notifications du téléphone pour les alertes : activer, désactiver, ou expliquer ce qui manque. */
+function PushPanel({ account, onNotify }: { account?: MarketAccount; onNotify: Notify }) {
+  const [state, setState] = useState<PushState | null>(null)
+  const [isBusy, setIsBusy] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void pushState().then((value) => { if (!cancelled) setState(value) }).catch(() => { if (!cancelled) setState('unsupported') })
+    return () => { cancelled = true }
+  }, [])
+  if (!account || state === null) return null
+  const run = async (action: () => Promise<void>, done: string) => {
+    setIsBusy(true)
+    try {
+      await action()
+      setState(await pushState())
+      onNotify(done, 'success')
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : 'Action impossible.', 'info')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+  let content
+  if (!account.signedIn) {
+    content = <><span>Connectez-vous : vos favoris et alertes seront gardés sur votre compte, et Gilli pourra vous prévenir sur votre téléphone.</span><button type="button" className="secondary-button" onClick={account.onSignIn}>Se connecter</button></>
+  } else if (state === 'unsupported') {
+    content = <span>Ce navigateur ne permet pas les notifications. Sur iPhone, installez d’abord Gilli sur l’écran d’accueil.</span>
+  } else if (state === 'denied') {
+    content = <span>Les notifications sont bloquées pour Gilli : autorisez-les dans les réglages du navigateur.</span>
+  } else if (state === 'enabled') {
+    content = <><span>Notifications activées sur ce téléphone : vous êtes prévenu dès qu’une annonce correspond à une alerte.</span><button type="button" className="secondary-button" disabled={isBusy || !account.savedApi} onClick={() => void run(() => disablePush(account.savedApi as SavedApi), 'Notifications désactivées sur ce téléphone.')}>Désactiver</button></>
+  } else {
+    content = <><span>Recevez une notification dès qu’une nouvelle annonce correspond à vos alertes, même Gilli fermé.</span><button type="button" className="primary-button" disabled={isBusy || !account.savedApi} onClick={() => void run(() => enablePush(account.savedApi as SavedApi), 'Notifications activées sur ce téléphone.')}>Activer les notifications</button></>
+  }
+  return <div className="settings-callout market-push" role="region" aria-label="Notifications du téléphone"><Smartphone size={18} aria-hidden="true" />{content}</div>
+}
+
+/** Alertes : recherches suivies, avec le nombre d’annonces publiées depuis la dernière visite. */
+export function AlertsPage({ onOpen, account, onNotify }: { onOpen: (alert: MarketAlert) => void; account?: MarketAccount; onNotify: Notify }) {
   const alerts = useAlerts()
   if (alerts.length === 0) {
-    return <p className="market-empty"><Bell size={20} aria-hidden="true" /> Aucune alerte. Lancez une recherche, puis touchez « Créer une alerte » : Gilli vous signalera les nouvelles annonces à chaque ouverture.</p>
+    return (
+      <>
+        <p className="market-empty"><Bell size={20} aria-hidden="true" /> Aucune alerte. Lancez une recherche, puis touchez « Créer une alerte » : Gilli vous signalera les nouvelles annonces.</p>
+        <PushPanel account={account} onNotify={onNotify} />
+      </>
+    )
   }
   return (
     <>
-      <p className="field-hint">Les alertes sont vérifiées quand Gilli est ouvert sur cet appareil (pas encore de notification sur le téléphone).</p>
+      <PushPanel account={account} onNotify={onNotify} />
+      <p className="field-hint">{account?.signedIn ? 'Vos alertes sont enregistrées sur votre compte.' : 'Vos alertes sont enregistrées sur cet appareil.'} Les nouvelles annonces sont aussi comptées à chaque ouverture de Gilli.</p>
       <ul className="market-saved-list" aria-label="Alertes">
         {alerts.map((alert) => (
           <li key={alert.id} className="market-saved market-alert">
@@ -150,6 +203,11 @@ export function AlertsPage({ onOpen }: { onOpen: (alert: MarketAlert) => void })
                 </span>
               </span>
             </button>
+            {account?.signedIn && (
+              <button type="button" className={`icon-button ${alert.notify ? 'is-active' : ''}`} aria-pressed={alert.notify} aria-label={`Notifications sur le téléphone : ${alert.label}`} title={alert.notify ? 'Notifications activées pour cette alerte' : 'Notifications désactivées pour cette alerte'} onClick={() => setAlertNotify(alert.id, !alert.notify)}>
+                {alert.notify ? <Bell size={18} aria-hidden="true" /> : <BellOff size={18} aria-hidden="true" />}
+              </button>
+            )}
             <button type="button" className="icon-button" aria-label={`Supprimer l’alerte : ${alert.label}`} onClick={() => removeAlert(alert.id)}>
               <Trash2 size={18} aria-hidden="true" />
             </button>

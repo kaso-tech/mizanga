@@ -25,6 +25,21 @@ import { BusinessError } from '../business/validate.mjs'
  * @property {(key: string, listingId: string, revision: number, status: string, reasons: string[], by: 'auto' | 'admin') => Promise<OwnListing>} moderate
  * @property {(key: string, status: string) => Promise<any[]>} queue
  * @property {(key: string, businessId: string, verified: boolean) => Promise<void>} setSellerVerified
+ * @property {(session: Session) => Promise<{ favorites: SavedFavorite[], alerts: SavedAlert[] }>} listSaved Favoris et alertes du compte.
+ * @property {(session: Session, listingId: string, snapshot: Record<string, unknown>) => Promise<void>} saveFavorite
+ * @property {(session: Session, listingId: string) => Promise<void>} deleteFavorite
+ * @property {(session: Session, alert: AlertInput) => Promise<void>} saveAlert
+ * @property {(session: Session, alertId: string) => Promise<void>} deleteAlert
+ * @property {(session: Session, subscription: { endpoint: string, p256dh: string, auth: string }) => Promise<void>} savePushSubscription
+ * @property {(session: Session, endpoint: string) => Promise<void>} deletePushSubscription
+ * @property {(key: string, listingId: string) => Promise<AlertNotifications>} alertNotifications Alertes à notifier pour une annonce publiée (marquées notifiées).
+ * @property {(key: string, endpoint: string) => Promise<void>} forgetPushSubscription
+ * @property {(key: string, keys?: { publicKey: string, privateKey: string }) => Promise<{ publicKey: string, privateKey: string } | null>} pushKeys
+ *
+ * @typedef {{ listingId: string, snapshot: Record<string, unknown>, createdAt: string }} SavedFavorite
+ * @typedef {{ id: string, label: string, filters: Record<string, unknown>, seenAt: string, notify: boolean, createdAt: string }} SavedAlert
+ * @typedef {{ id: string, label: string, filters: Record<string, unknown>, criteria: Record<string, unknown>, seenAt: string, notify: boolean }} AlertInput
+ * @typedef {{ listing: { id: string, title: string, price: number, currency: string, city: string } | null, alerts: Array<{ alertId: string, label: string, subscriptions: Array<{ endpoint: string, p256dh: string, auth: string }> }> }} AlertNotifications
  *
  * @typedef {object} PhotoStore
  * @property {(session: Session, path: string, photo: { mimeType: string, bytes: Buffer }) => Promise<void>} put
@@ -61,6 +76,13 @@ export const toOwnListing = (row) => ({
   moderatedBy: row.moderated_by ?? null,
   updatedAt: new Date(row.updated_at).toISOString(),
 })
+
+/** @param {any} row @returns {SavedFavorite} */
+export const toSavedFavorite = (row) => ({ listingId: row.listing_id, snapshot: row.snapshot ?? {}, createdAt: new Date(row.created_at).toISOString() })
+/** @param {any} row @returns {SavedAlert} */
+export const toSavedAlert = (row) => ({ id: row.id, label: row.label, filters: row.filters ?? {}, seenAt: new Date(row.seen_at).toISOString(), notify: row.notify !== false, createdAt: new Date(row.created_at).toISOString() })
+/** Paramètres de la fonction save_marketplace_alert. @param {AlertInput} alert */
+export const alertParams = (alert) => ({ p_id: alert.id, p_label: alert.label, p_filters: alert.filters, p_criteria: alert.criteria, p_seen_at: alert.seenAt, p_notify: alert.notify })
 
 export const LISTING_COLUMNS = 'id,product_id,title,description,category,subcategory,condition,attributes,photos,status,revision,moderation_reasons,moderated_by,updated_at'
 export const SELLER_COLUMNS = 'business_id,display_name,city,whatsapp,phone,delivers_everywhere,delivery_cities,description,verified'
@@ -157,6 +179,36 @@ export function createSupabaseMarketplace({ supabaseUrl, publishableKey }, { fet
     async setSellerVerified(key, businessId, verified) {
       await request('POST', 'rpc/set_seller_verified', { p_key: key, p_business_id: businessId, p_verified: verified })
     },
+    async listSaved(session) {
+      const [favorites, alerts] = await Promise.all([
+        request('GET', `marketplace_favorites?select=listing_id,snapshot,created_at&user_id=eq.${id(session.userId)}&order=created_at.desc`, undefined, session.token),
+        request('GET', `marketplace_alerts?select=id,label,filters,seen_at,notify,created_at&user_id=eq.${id(session.userId)}&order=created_at`, undefined, session.token),
+      ])
+      return { favorites: favorites.map(toSavedFavorite), alerts: alerts.map(toSavedAlert) }
+    },
+    async saveFavorite(session, listingId, snapshot) {
+      await request('POST', 'rpc/save_marketplace_favorite', { p_listing_id: listingId, p_snapshot: snapshot }, session.token)
+    },
+    async deleteFavorite(session, listingId) {
+      await request('DELETE', `marketplace_favorites?user_id=eq.${id(session.userId)}&listing_id=eq.${id(listingId)}`, undefined, session.token)
+    },
+    async saveAlert(session, alert) {
+      await request('POST', 'rpc/save_marketplace_alert', alertParams(alert), session.token)
+    },
+    async deleteAlert(session, alertId) {
+      await request('DELETE', `marketplace_alerts?user_id=eq.${id(session.userId)}&id=eq.${id(alertId)}`, undefined, session.token)
+    },
+    async savePushSubscription(session, subscription) {
+      await request('POST', 'rpc/save_push_subscription', { p_endpoint: subscription.endpoint, p_p256dh: subscription.p256dh, p_auth: subscription.auth }, session.token)
+    },
+    async deletePushSubscription(session, endpoint) {
+      await request('DELETE', `push_subscriptions?user_id=eq.${id(session.userId)}&endpoint=eq.${id(endpoint)}`, undefined, session.token)
+    },
+    alertNotifications: (key, listingId) => request('POST', 'rpc/alert_notifications_for_listing', { p_key: key, p_listing_id: listingId }),
+    async forgetPushSubscription(key, endpoint) {
+      await request('POST', 'rpc/forget_push_subscription', { p_key: key, p_endpoint: endpoint })
+    },
+    pushKeys: (key, keys) => request('POST', 'rpc/push_keys', { p_key: key, p_public_key: keys?.publicKey ?? null, p_private_key: keys?.privateKey ?? null }),
   }
 
   /** @type {PhotoStore} */

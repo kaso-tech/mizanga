@@ -9,6 +9,7 @@ import { offeredResponseLanguages } from '../data/content'
 import { defaultPreferences, type AppView, type Attachment, type ChatMessage, type ConversationSummary, type LinguisticPreferences, type MessageRating } from '../domain/types'
 import type { AuthClientFactory, AuthConfig } from '../services/authService'
 import { createConversationsApi } from '../services/conversationsApi'
+import { createSavedApi } from '../services/savedApi'
 import { BusinessApiError } from '../services/businessApi'
 import { useAccountConversations } from './useAccountConversations'
 import { demoAiService } from '../services/demoAiService'
@@ -21,6 +22,7 @@ import { isSpeechSupported, speak, speechRates, stopSpeaking } from './speech'
 import { useAccount } from './useAccount'
 import { useConversation } from './useConversation'
 import { useMarketAlerts } from './useMarketAlerts'
+import { useMarketSync } from './useMarketSync'
 
 // Pages secondaires chargées à la demande : l’accueil s’affiche plus vite sur réseau mobile.
 const SettingsView = lazy(() => import('../components/SettingsView').then((module) => ({ default: module.SettingsView })))
@@ -173,6 +175,9 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
   // Conversations enregistrées sur le compte (chatbot et assistants de l’Espace Business).
   const accountClient = account.client
   const conversationsApi = useMemo(() => (accountClient ? createConversationsApi(() => accountClient.accessToken()) : null), [accountClient])
+  // Favoris et alertes de la marketplace sur le compte.
+  const savedApi = useMemo(() => (accountClient ? createSavedApi(() => accountClient.accessToken()) : null), [accountClient])
+  useMarketSync(account.status === 'signedIn' ? savedApi : null, account.status === 'signedIn' ? account.user?.id ?? null : null)
   const accountConversations = useAccountConversations({
     api: account.status === 'signedIn' ? conversationsApi : null,
     userId: account.status === 'signedIn' ? account.user?.id ?? null : null,
@@ -553,7 +558,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
           />
         )
       case 'marketplace':
-        return <MarketplaceView key={marketplaceVisit} onNotify={notify} />
+        return <MarketplaceView key={marketplaceVisit} onNotify={notify} account={{ signedIn: account.status === 'signedIn', savedApi: account.status === 'signedIn' ? savedApi : null, onSignIn: () => setAccountDialogOpen(true) }} />
       case 'terms':
         return <TermsView />
       case 'business':

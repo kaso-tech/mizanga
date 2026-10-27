@@ -16,7 +16,7 @@ const buildInfo = computeBuildInfo(fileURLToPath(new URL('.', import.meta.url)))
 function gilliApi(): Plugin {
   const handlerFor = (mode: string, root: string) => {
     const env = { ...loadEnv(mode, root, ''), ...process.env }
-    return createApiHandler({ aiProvider: env.AI_PROVIDER || undefined, apiKey: env.GEMINI_API_KEY || undefined, aiPricing: readPricing(env.AI_PRICE_USD_PER_MILLION), moderationKey: env.MODERATION_KEY || undefined, model: env.GEMINI_MODEL || undefined, liteModel: env.GEMINI_LITE_MODEL || undefined, adminEmail: env.ADMIN_EMAIL || undefined, adminPassword: env.ADMIN_PASSWORD || undefined, apiBase: env.GEMINI_API_BASE || undefined, version: buildInfo, auth: readAuthConfig(env) })
+    return createApiHandler({ aiProvider: env.AI_PROVIDER || undefined, apiKey: env.GEMINI_API_KEY || undefined, aiPricing: readPricing(env.AI_PRICE_USD_PER_MILLION), moderationKey: env.MODERATION_KEY || undefined, vapid: { publicKey: env.VAPID_PUBLIC_KEY || undefined, privateKey: env.VAPID_PRIVATE_KEY || undefined, subject: env.VAPID_SUBJECT || undefined }, model: env.GEMINI_MODEL || undefined, liteModel: env.GEMINI_LITE_MODEL || undefined, adminEmail: env.ADMIN_EMAIL || undefined, adminPassword: env.ADMIN_PASSWORD || undefined, apiBase: env.GEMINI_API_BASE || undefined, version: buildInfo, auth: readAuthConfig(env) })
   }
   return {
     name: 'gilli-api',

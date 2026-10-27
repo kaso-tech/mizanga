@@ -4,7 +4,7 @@ import { suggestedCities } from '../../app/cities'
 import { addAlert, alertFilters, compareStore, describeFilters, type ListingLike } from '../../app/marketSaved'
 import { formatPhone, formatPrice, marketplaceApi, reportLabels, searchQuery, whatsappLink, type ListingCard, type ListingDetail, type MarketCatalog, type PublicSeller, type SearchFilters } from '../../services/marketplaceApi'
 import { Modal } from '../Modal'
-import { AlertsPage, CompareBar, ComparePage, FavoritesPage, MarketTabs, SaveButtons } from './MarketplaceLists'
+import { AlertsPage, CompareBar, ComparePage, FavoritesPage, MarketTabs, SaveButtons, type MarketAccount } from './MarketplaceLists'
 
 type Route =
   | { page: 'home'; filters: SearchFilters; newSince?: string }
@@ -423,7 +423,7 @@ function SellerPage({ id, catalog, onOpen, onNotify }: { id: string; catalog: Ma
 }
 
 /** Marketplace publique : recherche, annonces et vitrines des vendeurs, sans compte. */
-export function MarketplaceView({ onNotify }: { onNotify: (message: string, tone?: 'success' | 'info') => void }) {
+export function MarketplaceView({ onNotify, account }: { onNotify: (message: string, tone?: 'success' | 'info') => void; account?: MarketAccount }) {
   const [route, setRoute] = useState<Route>(routeFromLocation)
   const [catalog, setCatalog] = useState<MarketCatalog | null>(null)
 
@@ -456,8 +456,8 @@ export function MarketplaceView({ onNotify }: { onNotify: (message: string, tone
           <p className="market-intro">Les produits des commerçants de Gilli, près de chez vous. Contactez le vendeur par WhatsApp ou par téléphone.</p>
           <MarketTabs active={route.page as 'home' | 'favorites' | 'alerts'} onSelect={selectTab} />
           {route.page === 'home' && <HomePage filters={route.filters} newSince={route.newSince} catalog={catalog} onSearch={(filters) => go({ page: 'home', filters })} onOpen={openListing} onNotify={onNotify} />}
-          {route.page === 'favorites' && <FavoritesPage onOpen={openListing} onNotify={onNotify} />}
-          {route.page === 'alerts' && <AlertsPage onOpen={(alert) => go({ page: 'home', filters: alertFilters(alert), newSince: alert.seenAt })} />}
+          {route.page === 'favorites' && <FavoritesPage onOpen={openListing} onNotify={onNotify} signedIn={account?.signedIn} />}
+          {route.page === 'alerts' && <AlertsPage account={account} onNotify={onNotify} onOpen={(alert) => go({ page: 'home', filters: alertFilters(alert), newSince: alert.seenAt })} />}
           <p className="field-hint market-terms">En utilisant la marketplace, vous acceptez les <a href="/conditions">conditions d’utilisation</a>.</p>
         </>
       ) : (

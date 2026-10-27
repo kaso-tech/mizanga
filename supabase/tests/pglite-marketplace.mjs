@@ -1,6 +1,6 @@
 // Marketplace pour les tests : mêmes fonctions SQL que Supabase, exécutées sur PGlite avec l’identité de
 // l’utilisateur (ou en visiteur), et photos gardées en mémoire.
-import { LISTING_COLUMNS, SELLER_COLUMNS, searchParams, toOwnListing, toSellerProfile } from '../../server/marketplace/store.mjs'
+import { LISTING_COLUMNS, SELLER_COLUMNS, alertParams, searchParams, toOwnListing, toSavedAlert, toSavedFavorite, toSellerProfile } from '../../server/marketplace/store.mjs'
 import { toBusinessError } from '../../server/business/supabase-store.mjs'
 import { asUser } from './database.mjs'
 
@@ -60,6 +60,35 @@ export function createPgliteMarketplace(db, { photoBaseUrl = '/photos' } = {}) {
       async setSellerVerified(key, businessId, verified) {
         await rpc('set_seller_verified', { p_key: key, p_business_id: businessId, p_verified: verified })
       },
+      async listSaved({ userId }) {
+        const favorites = await query(userId, 'select listing_id, snapshot, created_at from public.marketplace_favorites order by created_at desc')
+        const alerts = await query(userId, 'select id, label, filters, seen_at, notify, created_at from public.marketplace_alerts order by created_at')
+        return { favorites: favorites.map(toSavedFavorite), alerts: alerts.map(toSavedAlert) }
+      },
+      async saveFavorite({ userId }, listingId, snapshot) {
+        await rpc('save_marketplace_favorite', { p_listing_id: listingId, p_snapshot: JSON.stringify(snapshot) }, userId)
+      },
+      async deleteFavorite({ userId }, listingId) {
+        await query(userId, 'delete from public.marketplace_favorites where listing_id = $1', [listingId])
+      },
+      async saveAlert({ userId }, alert) {
+        const params = alertParams(alert)
+        await rpc('save_marketplace_alert', { ...params, p_filters: JSON.stringify(params.p_filters), p_criteria: JSON.stringify(params.p_criteria) }, userId)
+      },
+      async deleteAlert({ userId }, alertId) {
+        await query(userId, 'delete from public.marketplace_alerts where id = $1', [alertId])
+      },
+      async savePushSubscription({ userId }, subscription) {
+        await rpc('save_push_subscription', { p_endpoint: subscription.endpoint, p_p256dh: subscription.p256dh, p_auth: subscription.auth }, userId)
+      },
+      async deletePushSubscription({ userId }, endpoint) {
+        await query(userId, 'delete from public.push_subscriptions where endpoint = $1', [endpoint])
+      },
+      alertNotifications: (key, listingId) => rpc('alert_notifications_for_listing', { p_key: key, p_listing_id: listingId }),
+      async forgetPushSubscription(key, endpoint) {
+        await rpc('forget_push_subscription', { p_key: key, p_endpoint: endpoint })
+      },
+      pushKeys: (key, keys) => rpc('push_keys', { p_key: key, p_public_key: keys?.publicKey ?? null, p_private_key: keys?.privateKey ?? null }),
     },
     photos: {
       files,

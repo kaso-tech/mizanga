@@ -19,11 +19,12 @@ import { PHOTO_TYPES, REPORT_REASONS, validateListingInput, validateReport, vali
  *   photos: import('./store.mjs').PhotoStore,
  *   moderate: (listing: import('./moderation.mjs').ListingContent, images: Array<{ mimeType: string, data: string }>) => Promise<import('./moderation.mjs').ModerationDecision>,
  *   moderationKey?: string | null,
+ *   onPublished?: (listingId: string) => void,
  *   readJson: ReadJson,
  *   sendJson: SendJson,
  * }} deps
  */
-export function createMarketplaceRoutes({ store, photos, moderate, moderationKey = null, readJson, sendJson }) {
+export function createMarketplaceRoutes({ store, photos, moderate, moderationKey = null, onPublished = () => {}, readJson, sendJson }) {
   const photoUrl = (/** @type {string | null | undefined} */ path) => (path ? photos.url(path) : null)
   /** @param {any} card */
   const withPhoto = (card) => ({ ...card, photo: photoUrl(card.photo) })
@@ -48,7 +49,9 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
     if (!moderationKey) return listing
     const decision = await moderate(listing, images)
     try {
-      return await store.moderate(moderationKey, listing.id, listing.revision, decision.status, decision.reasons, 'auto')
+      const moderated = await store.moderate(moderationKey, listing.id, listing.revision, decision.status, decision.reasons, 'auto')
+      if (moderated.status === 'published') onPublished(moderated.id)
+      return moderated
     } catch (error) {
       // Annonce modifiée entre-temps : la nouvelle version a son propre contrôle.
       if (error instanceof BusinessError && error.status === 409) return listing
@@ -143,7 +146,9 @@ export function createMarketplaceRoutes({ store, photos, moderate, moderationKey
           const body = /** @type {any} */ (await readJson(req))
           if (!['published', 'rejected', 'hidden', 'review'].includes(body?.status) || !Number.isInteger(body?.revision)) throw new BusinessError(422, 'Décision invalide.')
           const reason = typeof body.reason === 'string' && body.reason.trim() ? [`Administration : ${body.reason.trim().slice(0, 300)}`] : []
-          return sendJson(res, 200, { listing: await store.moderate(moderationKey, itemId, body.revision, body.status, reason, 'admin') })
+          const moderated = await store.moderate(moderationKey, itemId, body.revision, body.status, reason, 'admin')
+          if (moderated.status === 'published') onPublished(moderated.id)
+          return sendJson(res, 200, { listing: moderated })
         }
         if (resource === 'sellers' && itemId && isUuid(itemId) && action === 'verified' && method === 'POST') {
           const body = /** @type {any} */ (await readJson(req))

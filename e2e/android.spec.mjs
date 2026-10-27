@@ -390,10 +390,61 @@ test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ 
   await client.close()
 })
 
+/** Connexion par code depuis la boîte de connexion déjà ouverte. @param {import('@playwright/test').Page} page @param {string} email */
+async function signInFromDialog(page, email) {
+  await page.getByRole('textbox', { name: /e-mail/i }).fill(email)
+  await page.keyboard.press('Enter')
+  await page.getByRole('button', { name: 'J’ai reçu un code' }).tap()
+  await page.locator('input[autocomplete="one-time-code"]').fill(LOGIN_CODE)
+  await page.keyboard.press('Enter')
+}
+
+test('compte : favoris et alertes retrouvés sur un autre téléphone, notifications proposées', async ({ page, browser }, info) => {
+  const tag = `acc${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  await signInAndCreateShop(page, emailFor(info), 'Boutique Compte')
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
+  await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
+
+  // Premier téléphone : favori et alerte avant connexion, puis connexion depuis l’onglet Alertes.
+  const client = await browser.newPage({ ...info.project.use })
+  const buyer = `acheteur-${tag}@example.bf`
+  await client.goto(`/marketplace?q=${tag}`)
+  await client.getByRole('button', { name: `Ajouter aux favoris : Tecno Spark 20 ${tag}` }).tap()
+  await client.getByRole('button', { name: 'Créer une alerte' }).tap()
+  await client.getByRole('tab', { name: /Alertes/ }).tap()
+  const panel = client.getByRole('region', { name: 'Notifications du téléphone' })
+  // À la connexion, le favori et l’alerte de l’appareil sont copiés sur le compte.
+  const copied = Promise.all(['favorites', 'alerts'].map((kind) => client.waitForResponse((response) => response.url().includes(`/api/saved/${kind}/`) && response.request().method() === 'PUT' && response.ok())))
+  await panel.getByRole('button', { name: 'Se connecter' }).tap()
+  await signInFromDialog(client, buyer)
+  await copied
+  // Connecté : le bouton d’activation, ou l’explication si le navigateur bloque les notifications
+  // (Chromium sans écran les bloque toujours ; l’activation est vérifiée par les tests unitaires).
+  await expect(panel).toContainText(/Recevez une notification|notifications sont bloquées/)
+  await expect(panel.getByRole('button', { name: 'Se connecter' })).toHaveCount(0)
+  await expect(client.getByText('Vos alertes sont enregistrées sur votre compte.', { exact: false })).toBeVisible()
+  await expect(client.getByRole('button', { name: `Notifications sur le téléphone : ${tag}` })).toHaveAttribute('aria-pressed', 'true')
+  await expectFitsScreen(client, 'alertes du compte')
+  // Second téléphone (autre navigateur, rien sur l’appareil) : même compte, mêmes favoris et alertes.
+  const other = await browser.newPage({ ...info.project.use })
+  await other.goto('/marketplace/favoris')
+  await expect(other.getByText(/Aucun favori pour l’instant/)).toBeVisible()
+  await other.getByRole('button', { name: 'Se connecter' }).first().tap()
+  await signInFromDialog(other, buyer)
+  await expect(other.getByRole('list', { name: 'Favoris' })).toContainText(`Tecno Spark 20 ${tag}`)
+  await expect(other.getByText('Vos favoris sont enregistrés sur votre compte.')).toBeVisible()
+  await other.getByRole('tab', { name: /Alertes/ }).tap()
+  await expect(other.getByRole('list', { name: 'Alertes' })).toContainText(tag)
+  await other.close()
+  await client.close()
+})
+
 test('assistant d’achat : un client décrit son besoin, l’assistant propose les annonces de la marketplace', async ({ page, browser }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Tecno')
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
-  const title = `Tecno Spark 20 neuf ${info.project.name}`
+  // Mot propre à ce scénario : la base de test est partagée avec les autres scénarios.
+  const tag = `ach${Date.now().toString(36)}${info.project.name.includes('360') ? 'a' : 'b'}`
+  const title = `Tecno ${tag} Spark 20 neuf`
   await expect(await publishListing(page, 'Tecno Spark 20', title)).toHaveText('En ligne')
 
   // Un client, sans compte : l’assistant est l’accueil ; la marketplace est dans l’en-tête.
@@ -402,7 +453,7 @@ test('assistant d’achat : un client décrit son besoin, l’assistant propose 
   await expect(client.getByRole('heading', { level: 1, name: 'Que cherchez-vous ?' })).toBeVisible()
   await expect(client.getByRole('combobox', { name: 'Modèle' })).toHaveCount(0)
   await expect(client.getByRole('button', { name: /Caractères/ })).toHaveCount(0)
-  await client.getByRole('textbox', { name: 'Votre message' }).fill('Je cherche un téléphone Tecno à moins de 50 000 F à Ouaga')
+  await client.getByRole('textbox', { name: 'Votre message' }).fill(`Je cherche un téléphone Tecno ${tag} à moins de 50 000 F à Ouaga`)
   await client.getByRole('button', { name: 'Envoyer' }).tap()
   const results = client.getByRole('list', { name: 'Annonces proposées' })
   const card = results.getByRole('listitem').filter({ hasText: title })

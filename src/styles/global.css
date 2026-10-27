@@ -1295,3 +1295,6 @@ button.account-chip:hover { opacity: .9; }
 .shopping-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .shopping-actions .primary-button, .shopping-actions .secondary-button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; text-decoration: none; }
 .market-saved .market-card-seller { flex-wrap: wrap; }
+.market-push { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0; }
+.market-push > span { flex: 1 1 200px; }
+.market-push .primary-button, .market-push .secondary-button { min-height: 40px; }

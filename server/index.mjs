@@ -101,6 +101,7 @@ const api = createApiHandler({
   apiKey: process.env.GEMINI_API_KEY,
   aiPricing: readPricing(process.env.AI_PRICE_USD_PER_MILLION),
   moderationKey: process.env.MODERATION_KEY || undefined,
+  vapid: { publicKey: process.env.VAPID_PUBLIC_KEY || undefined, privateKey: process.env.VAPID_PRIVATE_KEY || undefined, subject: process.env.VAPID_SUBJECT || undefined },
   model: process.env.GEMINI_MODEL || undefined,
   liteModel: process.env.GEMINI_LITE_MODEL || undefined,
   adminEmail: process.env.ADMIN_EMAIL || undefined,

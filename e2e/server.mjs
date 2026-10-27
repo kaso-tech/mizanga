@@ -96,7 +96,7 @@ createServer(async (req, res) => {
   const offersSearch = (payload.tools ?? []).some((/** @type {any} */ tool) => tool.functionDeclarations?.some((/** @type {any} */ fn) => fn.name === 'rechercher_annonces'))
   if (offersSearch && lastText.startsWith('Je cherche')) {
     const budget = Number(/moins de ([\d\s]+) ?F/.exec(lastText)?.[1]?.replace(/\s/g, '') ?? 0) || undefined
-    const call = { functionCall: { name: 'rechercher_annonces', args: { requete: 'tecno', categorie: 'telephones', budget_max: budget, ville: 'Ouagadougou', criteres: [{ caracteristique: 'ram_go', minimum: 4 }] } } }
+    const call = { functionCall: { name: 'rechercher_annonces', args: { requete: /Tecno (\w+) /.exec(lastText)?.[1] ? `tecno ${/Tecno (\w+) /.exec(lastText)?.[1]}` : 'tecno', categorie: 'telephones', budget_max: budget, ville: 'Ouagadougou', criteres: [{ caracteristique: 'ram_go', minimum: 4 }] } } }
     res.write(`data: ${JSON.stringify({ candidates: [{ content: { parts: [call] } }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 15 } })}\n\n`)
     return void res.end()
   }

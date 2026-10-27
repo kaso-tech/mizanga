@@ -10,7 +10,9 @@ import { createShoppingAssistant } from './shopping/assistant.mjs'
 import { createSupabaseBusinessStore } from './business/supabase-store.mjs'
 import { createListingModerator } from './marketplace/moderation.mjs'
 import { createMarketplaceRoutes } from './marketplace/routes.mjs'
+import { createSavedRoutes } from './marketplace/saved.mjs'
 import { createSupabaseMarketplace } from './marketplace/store.mjs'
+import { createPushNotifier } from './push/notifier.mjs'
 import { buildReferenceText, createReferenceLoader, MAX_REFERENCE_CHARS } from './moore-reference.mjs'
 
 // Garde-fous : le point d’accès est public, la clé d’API (et son quota) ne doit pas être épuisable à volonté.
@@ -180,10 +182,10 @@ function monitorProvider(ai, onError) {
  * `aiPricing` : prix du moteur pour le coût estimé de l’assistant Business (server/ai/pricing.mjs), 0 par défaut.
  * `marketplace` : données et photos de la marketplace (par défaut Supabase) ; `moderationKey` : clé de
  * modération (MODERATION_KEY), sans laquelle les annonces attendent une décision de l’administration.
- * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminEmail?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string }} config
+ * @param {{ provider?: import('./ai/provider.mjs').AiProvider, aiProvider?: string, apiKey?: string, model?: string, liteModel?: string, apiBase?: string, referenceDir?: string, adminEmail?: string, adminPassword?: string, version?: import('./build-info.mjs').BuildInfo, auth?: import('./auth/supabase-auth.mjs').AuthConfig | null, verifyToken?: (token: string) => Promise<import('./auth/supabase-auth.mjs').AuthUser | null>, businessStore?: import('./business/supabase-store.mjs').BusinessStore, rateLimit?: { windowMs: number, maxRequests: number }, aiPricing?: import('./ai/pricing.mjs').AiPricing, marketplace?: { store: import('./marketplace/store.mjs').MarketplaceStore, photos: import('./marketplace/store.mjs').PhotoStore }, moderationKey?: string, vapid?: { publicKey?: string, privateKey?: string, subject?: string }, pushSender?: Parameters<typeof createPushNotifier>[0]['send'] }} config
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next?: () => void) => Promise<void>}
  */
-export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminEmail, adminPassword, version, auth, verifyToken, businessStore, rateLimit, aiPricing, marketplace, moderationKey } = {}) {
+export function createApiHandler({ provider, aiProvider, apiKey, model, liteModel, apiBase, referenceDir, adminEmail, adminPassword, version, auth, verifyToken, businessStore, rateLimit, aiPricing, marketplace, moderationKey, vapid, pushSender } = {}) {
   const verify = verifyToken ?? (auth ? createTokenVerifier(auth) : null)
   const store = businessStore ?? (auth ? createSupabaseBusinessStore(auth) : null)
   /** Derniers refus du moteur (quota, clé…), pour la console d’administration ; jamais montrés aux utilisateurs. */
@@ -204,7 +206,13 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
   const market = marketplace ?? (auth ? createSupabaseMarketplace(auth) : null)
   // Accueil de Gilli : l’assistant d’achat, qui cherche dans la marketplace.
   const shopping = createShoppingAssistant({ ai, market })
-  const marketRoutes = market ? createMarketplaceRoutes({ ...market, moderate: createListingModerator({ ai }), moderationKey: moderationKey || null, readJson, sendJson }) : null
+  // Notifications des alertes : envoyées par le serveur (clé de modération), après la publication.
+  const push = market && moderationKey ? createPushNotifier({ store: market.store, moderationKey, vapid, ...(pushSender ? { send: pushSender } : {}) }) : null
+  const onPublished = (/** @type {string} */ listingId) => {
+    void push?.notifyListing(listingId).catch((error) => console.warn('[gilli] Notifications des alertes impossibles :', /** @type {Error} */ (error).message))
+  }
+  const marketRoutes = market ? createMarketplaceRoutes({ ...market, moderate: createListingModerator({ ai }), moderationKey: moderationKey || null, onPublished, readJson, sendJson }) : null
+  const handleSaved = verify && market ? createSavedRoutes({ store: market.store, verify, bearerToken, readJson, sendJson, push }) : null
   const handleBusiness = verify && store ? createBusinessRoutes({ store, verify, bearerToken, readJson, sendJson, assistant, marketplace: marketRoutes }) : null
   const handleConversations = verify && store ? createConversationRoutes({ store, verify, bearerToken, readJson, sendJson }) : null
   // Marketplace publique : lecture large (une adresse IP peut regrouper de nombreux abonnés mobiles),
@@ -305,6 +313,13 @@ export function createApiHandler({ provider, aiProvider, apiKey, model, liteMode
       const blocked = businessAddressLimit(clientOf(req)) ?? businessLimit(businessClient(req))
       if (blocked) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blocked))
       return handleConversations(req, res, path)
+    }
+    // Favoris, alertes et notifications du compte : même limite par compte que l’Espace Business.
+    if (path === '/api/saved' || path.startsWith('/api/saved/') || path.startsWith('/api/push/')) {
+      if (!handleSaved) return sendJson(res, 503, { error: 'Les comptes ne sont pas configurés sur ce serveur.' })
+      const blocked = businessAddressLimit(clientOf(req)) ?? businessLimit(businessClient(req))
+      if (blocked) return sendJson(res, 429, errorBody('Trop de demandes en peu de temps.', blocked))
+      return handleSaved(req, res, path)
     }
     if (path.startsWith('/api/marketplace/')) {
       if (!marketRoutes) return sendJson(res, 503, { error: 'La marketplace n’est pas configurée sur ce serveur.' })

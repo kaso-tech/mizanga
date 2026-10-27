@@ -26,6 +26,8 @@ export interface MarketAlert {
   seenAt: string
   checkedAt: string | null
   newCount: number
+  /** Notification sur le téléphone quand une annonce correspondante est publiée (compte connecté). */
+  notify: boolean
 }
 
 export const MAX_FAVORITES = 100
@@ -83,6 +85,7 @@ function readAlert(item: unknown): MarketAlert | null {
     seenAt: raw.seenAt,
     checkedAt: isDate(raw.checkedAt) ? raw.checkedAt : null,
     newCount: typeof raw.newCount === 'number' && raw.newCount >= 0 ? Math.floor(raw.newCount) : 0,
+    notify: raw.notify !== false,
   }
 }
 
@@ -184,9 +187,23 @@ export function addAlert(filters: SearchFilters, label: string): 'added' | 'exis
   if (current.some((alert) => JSON.stringify(alert.filters) === JSON.stringify(clean))) return 'exists'
   if (current.length >= MAX_ALERTS) return 'full'
   const now = new Date().toISOString()
-  alertsStore.set([...current, { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, label, filters: clean, createdAt: now, seenAt: now, checkedAt: now, newCount: 0 }])
+  alertsStore.set([...current, { id: newId(), label, filters: clean, createdAt: now, seenAt: now, checkedAt: now, newCount: 0, notify: true }])
   return 'added'
 }
+
+/** Identifiant d’alerte (UUID, comme sur le compte). */
+export function newId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+export const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+
+export const setAlertNotify = (id: string, notify: boolean) => alertsStore.set(alertsStore.get().map((alert) => (alert.id === id ? { ...alert, notify } : alert)))
 
 export const removeAlert = (id: string) => alertsStore.set(alertsStore.get().filter((alert) => alert.id !== id))
 
