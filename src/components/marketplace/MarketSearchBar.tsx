@@ -1,5 +1,5 @@
 import { Clock, LayoutGrid, Search, X } from 'lucide-react'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { suggestedCities } from '../../app/cities'
 import type { MarketCatalog } from '../../services/marketplaceApi'
 import { CATEGORY_ICONS, forgetSearches, readRecentSearches } from './marketUtils'
@@ -22,6 +22,8 @@ export function MarketSearchBar({ initial, catalog, onSearch, onCategory }: {
   const [open, setOpen] = useState(false)
   const [recent, setRecent] = useState(readRecentSearches)
   const closeTimer = useRef<number>()
+  // La barre change de page (nouvelle recherche) : le délai de fermeture des suggestions est annulé.
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
 
   const typed = plain(query.trim())
   const categories = typed.length >= 2 ? (catalog?.categories ?? []).filter((category) => plain(category.label).includes(typed) || category.subcategories.some((sub) => plain(sub.label).includes(typed))).slice(0, 4) : []
