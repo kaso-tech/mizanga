@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { alertsStore, compareStore, favoritesStore } from '../../app/marketSaved'
 import { MarketplaceView } from './MarketplaceView'
 
+/** Texte sans espaces insécables, pour comparer les montants. */
+const plain = (text: string | null) => (text ?? '').replace(/[\u00a0\u202f]/g, ' ')
+
 const catalog = {
   categories: [{ id: 'telephones', label: 'Téléphones et accessoires', subcategories: [{ id: 'smartphones', label: 'Smartphones' }], attributes: [{ key: 'ram_go', label: 'Mémoire vive (RAM)', type: 'number', unit: 'Go', better: 'higher' }, { key: 'double_sim', label: 'Double SIM', type: 'boolean' }] }],
   conditions: { new: 'Neuf', used: 'Occasion', refurbished: 'Reconditionné' },
@@ -44,7 +47,7 @@ describe('marketplace publique', () => {
     const requests = fakeServer()
     const onNotify = vi.fn()
     render(<MarketplaceView onNotify={onNotify} />)
-    expect(await screen.findByText('Tecno Spark 20')).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Nouveautés' })).toHaveTextContent('Tecno Spark 20')
     await userEvent.type(screen.getByRole('searchbox', { name: 'Que cherchez-vous ?' }), 'tecno')
     await userEvent.type(screen.getByLabelText('Ma ville'), 'Ouagadougou')
     await userEvent.type(screen.getByLabelText('Budget maximum'), '50 000')
@@ -55,7 +58,8 @@ describe('marketplace publique', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Téléphones et accessoires' }))
     await waitFor(() => expect(window.location.search).toContain('category=telephones'))
-    expect(screen.getByLabelText('Sous-catégorie')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Sous-catégories' })).toHaveTextContent('Smartphones')
+    expect(screen.getByRole('list', { name: 'Filtres actifs' })).toHaveTextContent('Téléphones et accessoires')
 
     await userEvent.click(within(screen.getByRole('list', { name: 'Annonces' })).getByRole('link', { name: /Tecno Spark 20/ }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Tecno Spark 20' })).toBeInTheDocument()
@@ -66,7 +70,9 @@ describe('marketplace publique', () => {
     expect(screen.getByRole('link', { name: 'Appeler +226 70 12 34 56' })).toHaveAttribute('href', 'tel:+22670123456')
     expect(screen.getByText('Mémoire vive (RAM)').closest('div')).toHaveTextContent('8 Go')
     expect(screen.getByText(/livre aussi à Koudougou/)).toBeInTheDocument()
-    expect(screen.getByText('Vendeur vérifié')).toBeInTheDocument()
+    expect(screen.getAllByText('Vendeur vérifié').length).toBeGreaterThan(0)
+    // Annonces similaires (d’autres vendeurs de la même catégorie).
+    expect(await screen.findByRole('region', { name: 'Annonces similaires' })).toHaveTextContent('Itel A70')
 
     await userEvent.click(screen.getByRole('button', { name: 'Signaler l’annonce' }))
     const dialog = screen.getByRole('dialog', { name: 'Signaler l’annonce' })
@@ -93,6 +99,7 @@ describe('marketplace publique', () => {
 
   it('trie, filtre par caractéristiques et vendeurs vérifiés, et charge la suite', async () => {
     const requests = fakeServer({ total: 30 })
+    window.history.replaceState({}, '', '/marketplace?sort=recent')
     render(<MarketplaceView onNotify={() => {}} />)
     await screen.findByText('Tecno Spark 20')
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Trier' }), 'price_asc')
@@ -116,6 +123,7 @@ describe('marketplace publique', () => {
   it('garde les favoris sur l’appareil et signale un prix qui a baissé', async () => {
     fakeServer({ price: 45000 })
     const onNotify = vi.fn()
+    window.history.replaceState({}, '', '/marketplace?sort=recent')
     render(<MarketplaceView onNotify={onNotify} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Ajouter aux favoris : Tecno Spark 20' }))
     expect(onNotify).toHaveBeenCalledWith('Ajouté à vos favoris.', 'success')
@@ -134,6 +142,7 @@ describe('marketplace publique', () => {
   it('compare 2 annonces : le moins cher et la meilleure caractéristique sont indiqués', async () => {
     fakeServer()
     const onNotify = vi.fn()
+    window.history.replaceState({}, '', '/marketplace?sort=recent')
     render(<MarketplaceView onNotify={onNotify} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Comparer : Tecno Spark 20' }))
     const bar = screen.getByRole('region', { name: 'Comparaison' })
@@ -234,11 +243,73 @@ describe('marketplace publique', () => {
 
   it('présente les annonces sponsorisées à part, marquées « Sponsorisé », sans toucher aux résultats', async () => {
     fakeServer({ sponsored: [{ ...card2, id: 'l9', title: 'Infinix Hot 40' }] })
+    window.history.replaceState({}, '', '/marketplace?sort=recent')
     render(<MarketplaceView onNotify={() => {}} />)
     const block = await screen.findByRole('region', { name: 'Annonces sponsorisées' })
     expect(block).toHaveTextContent('Infinix Hot 40')
     expect(within(block).getByText('Sponsorisé')).toBeInTheDocument()
     expect(block).toHaveTextContent('le classement des résultats n’en tient pas compte')
     expect(within(screen.getByRole('list', { name: 'Annonces' })).queryByText('Infinix Hot 40')).not.toBeInTheDocument()
+  })
+
+  it('vitrine : catégories en tuiles, rubriques et « Voir tout »', async () => {
+    const requests = fakeServer({ sponsored: [{ ...card2, id: 'l9', title: 'Infinix Hot 40' }] })
+    render(<MarketplaceView onNotify={() => {}} />)
+    expect(await screen.findByRole('region', { name: 'Sponsorisé' })).toHaveTextContent('Infinix Hot 40')
+    expect(screen.getByRole('region', { name: 'Vendeurs vérifiés' })).toHaveTextContent('Tecno Spark 20')
+    expect(screen.getByRole('region', { name: 'Petits prix' })).toBeInTheDocument()
+    await waitFor(() => expect(requests.map((request) => request.url)).toEqual(expect.arrayContaining(['/api/marketplace/search?verified=1', '/api/marketplace/search?sort=price_asc'])))
+    await userEvent.click(within(screen.getByRole('region', { name: 'Petits prix' })).getByRole('button', { name: /Voir tout/ }))
+    expect(window.location.search).toBe('?sort=price_asc')
+    expect(await screen.findByRole('list', { name: 'Annonces' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Accueil de la marketplace/ }))
+    await userEvent.click(within(await screen.findByRole('navigation', { name: 'Catégories' })).getByRole('button', { name: 'Téléphones et accessoires' }))
+    expect(window.location.search).toBe('?category=telephones')
+  })
+
+  it('suggère les catégories et les recherches récentes ; affiche en liste ; retire un filtre d’un toucher', async () => {
+    fakeServer()
+    render(<MarketplaceView onNotify={() => {}} />)
+    const box = await screen.findByRole('searchbox', { name: 'Que cherchez-vous ?' })
+    await userEvent.type(box, 'smartph')
+    await userEvent.click(within(screen.getByRole('list', { name: 'Catégories suggérées' })).getByRole('button', { name: /Téléphones et accessoires/ }))
+    expect(window.location.search).toBe('?category=telephones')
+
+    const search = await screen.findByRole('searchbox', { name: 'Que cherchez-vous ?' })
+    await userEvent.type(search, 'tecno{Enter}')
+    await waitFor(() => expect(window.location.search).toBe('?q=tecno&category=telephones'))
+    expect(JSON.parse(localStorage.getItem('gilli.marketplace.recent') ?? '[]')).toEqual(['tecno'])
+    await userEvent.clear(await screen.findByRole('searchbox', { name: 'Que cherchez-vous ?' }))
+    expect(within(screen.getByRole('list', { name: 'Recherches récentes' })).getByRole('button', { name: /tecno/ })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Affichage en liste' }))
+    expect(screen.getByRole('list', { name: 'Annonces' })).toHaveClass('market-list')
+    expect(localStorage.getItem('gilli.marketplace.view')).toBe('list')
+
+    await userEvent.click(within(screen.getByRole('list', { name: 'Filtres actifs' })).getByRole('button', { name: 'Retirer le filtre : « tecno »' }))
+    expect(window.location.search).toBe('?category=telephones')
+  })
+
+  it('page annonce : galerie plein écran, partage et barre de contact fixée en bas', async () => {
+    fakeServer()
+    const onNotify = vi.fn()
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    window.history.replaceState({}, '', '/marketplace/annonce/l1')
+    render(<MarketplaceView onNotify={onNotify} />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tecno Spark 20' })).toBeInTheDocument()
+    const bar = screen.getByRole('region', { name: 'Contacter le vendeur' })
+    expect(within(bar).getByRole('link', { name: /WhatsApp/ })).toBeInTheDocument()
+    expect(plain(bar.textContent)).toContain('48 000 F CFA')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Voir les photos en plein écran' }))
+    const viewer = screen.getByRole('dialog', { name: 'Photos : Tecno Spark 20' })
+    expect(within(viewer).getByRole('img', { name: 'Photo 1 sur 1' })).toHaveAttribute('src', '/photos/b1/a.png')
+    await userEvent.click(within(viewer).getByRole('button', { name: 'Fermer' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Partager l’annonce' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/marketplace/annonce/l1')))
+    expect(onNotify).toHaveBeenCalledWith('Lien de l’annonce copié.', 'success')
   })
 })

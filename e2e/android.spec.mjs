@@ -16,7 +16,7 @@ const emailFor = (info) => `commercant-${info.project.name.replace(/\W+/g, '-')}
 async function expectFitsScreen(page, screen) {
   const overflowing = await page.evaluate(() => {
     const width = window.innerWidth
-    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .market-tabs, .market-compare-scroll, .settings-nav, .moderation-photos, pre, .katex-display')
+    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .market-tabs, .market-compare-scroll, .market-row, .market-photos, .market-category-grid, .settings-nav, .moderation-photos, pre, .katex-display')
     return [...document.querySelectorAll('body *')]
       .filter((element) => {
         const box = element.getBoundingClientRect()
@@ -385,7 +385,7 @@ test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ 
   await client.getByRole('tab', { name: /Alertes/ }).tap()
   await client.getByRole('list', { name: 'Alertes' }).getByRole('button', { name: /2 nouvelles annonces/ }).tap()
   await expect(client.getByRole('list', { name: 'Annonces' }).getByText('Nouveau')).toHaveCount(2)
-  await expect(client.getByRole('button', { name: 'Marketplace' })).toBeVisible()
+  await expect(client.getByRole('button', { name: 'Marketplace', exact: true })).toBeVisible()
   await expectFitsScreen(client, 'alerte ouverte')
   await client.close()
 })
@@ -551,6 +551,54 @@ test('monétisation : passage en Pro et sponsorisation payés par Mobile Money, 
   await client.close()
 })
 
+test('marketplace refondue : vitrine, suggestions, liste et page annonce avec contact toujours accessible', async ({ page, browser }, info) => {
+  const tag = `vit${Date.now()}${info.project.name.includes('360') ? 'a' : 'b'}`
+  await signInAndCreateShop(page, emailFor(info), `Boutique ${tag}`)
+  await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
+  await addProduct(page, { name: 'Itel A70', unit: 'pièce', buy: '30000', sell: '39000', quantity: '2' })
+  await expect(await publishListing(page, 'Tecno Spark 20', `Tecno Spark 20 ${tag}`)).toHaveText('En ligne')
+  await expect(await publishListing(page, 'Itel A70', `Itel A70 ${tag}`)).toHaveText('En ligne')
+
+  const client = await browser.newPage({ ...info.project.use })
+  await client.goto('/marketplace')
+  // Vitrine : catégories en tuiles et rubriques.
+  const tiles = client.getByRole('navigation', { name: 'Catégories' })
+  await expect(tiles.getByRole('button', { name: 'Téléphones et accessoires' })).toBeVisible()
+  await expect(client.getByRole('region', { name: /^Nouveautés/ })).toBeVisible()
+  await expectFitsScreen(client, 'vitrine de la marketplace')
+  if (process.env.GILLI_SHOTS) await client.screenshot({ path: `${process.env.GILLI_SHOTS}/vitrine-${info.project.name.includes('360') ? 360 : 412}.png` })
+
+  // Suggestions pendant la frappe.
+  await client.getByRole('searchbox', { name: 'Que cherchez-vous ?' }).fill('smartph')
+  await client.getByRole('list', { name: 'Catégories suggérées' }).getByRole('button', { name: /Téléphones/ }).tap()
+  await expect(client).toHaveURL(/category=telephones/)
+  await client.getByRole('searchbox', { name: 'Que cherchez-vous ?' }).fill(tag)
+  await client.getByRole('button', { name: 'Rechercher' }).tap()
+  const results = client.getByRole('list', { name: 'Annonces' })
+  await expect(results.getByRole('listitem')).toHaveCount(2)
+  await expect(client.getByRole('list', { name: 'Filtres actifs' })).toContainText('Téléphones et accessoires')
+  await client.getByRole('button', { name: 'Affichage en liste' }).tap()
+  await expect(results).toHaveClass(/market-list/)
+  await expectFitsScreen(client, 'résultats en liste')
+  if (process.env.GILLI_SHOTS) await client.screenshot({ path: `${process.env.GILLI_SHOTS}/resultats-${info.project.name.includes('360') ? 360 : 412}.png` })
+
+  // Page annonce : galerie, contact fixé en bas, même vendeur.
+  await results.getByRole('link', { name: new RegExp(`Tecno Spark 20 ${tag}`) }).tap()
+  await expect(client.getByRole('heading', { level: 1, name: `Tecno Spark 20 ${tag}` })).toBeVisible()
+  const bar = client.getByRole('region', { name: 'Contacter le vendeur' })
+  await expect(bar.getByRole('link', { name: /WhatsApp/ })).toBeInViewport()
+  await expect(client.getByRole('region', { name: 'Du même vendeur' })).toContainText(`Itel A70 ${tag}`)
+  await client.getByRole('button', { name: 'Voir les photos en plein écran' }).tap()
+  await expect(client.getByRole('dialog', { name: `Photos : Tecno Spark 20 ${tag}` })).toBeVisible()
+  await client.getByRole('dialog').getByRole('button', { name: 'Fermer' }).tap()
+  await expectFitsScreen(client, 'page annonce refondue')
+  if (process.env.GILLI_SHOTS) await client.screenshot({ path: `${process.env.GILLI_SHOTS}/annonce-${info.project.name.includes('360') ? 360 : 412}.png` })
+  // Toujours accessible en bas de l’écran, même après défilement.
+  await client.getByRole('region', { name: 'Du même vendeur' }).scrollIntoViewIfNeeded()
+  await expect(bar.getByRole('link', { name: /WhatsApp/ })).toBeInViewport()
+  await client.close()
+})
+
 test('assistant d’achat : un client décrit son besoin, l’assistant propose les annonces de la marketplace', async ({ page, browser }, info) => {
   await signInAndCreateShop(page, emailFor(info), 'Boutique Tecno')
   await addProduct(page, { name: 'Tecno Spark 20', unit: 'pièce', buy: '40000', sell: '48000', quantity: '3' })
@@ -581,7 +629,7 @@ test('assistant d’achat : un client décrit son besoin, l’assistant propose 
   await card.getByRole('link', { name: 'Voir l’annonce', exact: true }).tap()
   await expect(client.getByRole('heading', { level: 1, name: title })).toBeVisible()
   expect(new URL(client.url()).pathname).toMatch(/^\/marketplace\/annonce\//)
-  await client.getByRole('button', { name: 'Marketplace' }).tap()
+  await client.getByRole('button', { name: 'Marketplace', exact: true }).tap()
   expect(new URL(client.url()).pathname).toBe('/marketplace')
   await client.close()
 })

@@ -124,11 +124,13 @@ export interface SearchFilters {
   page?: number
 }
 
-/** Paramètres d’adresse d’une recherche (les caractéristiques deviennent « a_clé »). */
+const SEARCH_KEYS = ['q', 'category', 'subcategory', 'city', 'minPrice', 'maxPrice', 'condition', 'sort', 'verified', 'publishedAfter', 'page'] as const
+
+/** Paramètres d’adresse d’une recherche, toujours dans le même ordre (les caractéristiques deviennent « a_clé »). */
 export function searchQuery(filters: SearchFilters) {
   const params = new URLSearchParams()
-  for (const [key, value] of Object.entries(filters)) {
-    if (key === 'attributes') continue
+  for (const key of SEARCH_KEYS) {
+    const value = filters[key]
     if (value !== undefined && value !== '' && value !== null) params.set(key, String(value))
   }
   for (const [key, value] of Object.entries(filters.attributes ?? {})) if (value) params.set(`a_${key}`, value)
