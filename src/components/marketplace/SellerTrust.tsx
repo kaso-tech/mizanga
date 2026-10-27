@@ -155,3 +155,33 @@ export function ReviewsSection({ sellerId, sellerName, reviews, account, onNotif
     </section>
   )
 }
+
+/**
+ * Note moyenne et répartition des notes (5 à 1 étoiles). La moyenne vient de Gilli (tous les avis
+ * publiés) ; la répartition est calculée sur les avis affichés.
+ */
+export function RatingSummary({ stats, reviews }: { stats?: SellerStats; reviews: SellerReview[] }) {
+  if (!stats || stats.rating === null || stats.reviewCount === 0) return null
+  const counts = [5, 4, 3, 2, 1].map((value) => ({ value, count: reviews.filter((review) => review.rating === value).length }))
+  const total = Math.max(reviews.length, 1)
+  return (
+    <div className="rating-summary">
+      <div className="rating-summary-score">
+        <strong>{formatRating(stats.rating)}</strong>
+        <Stars rating={stats.rating} size={16} />
+        <span>{stats.reviewCount} avis</span>
+      </div>
+      <ul className="rating-bars" aria-label="Répartition des notes">
+        {counts.map(({ value, count }) => (
+          <li key={value}>
+            <span>{value} <Star size={11} aria-hidden="true" fill="currentColor" /></span>
+            <span className="rating-bar" aria-hidden="true"><span style={{ width: `${Math.round((count / total) * 100)}%` }} /></span>
+            <span className="rating-bar-count">{count}</span>
+            <span className="visually-hidden">{value} étoile{value > 1 ? 's' : ''} : {count} avis</span>
+          </li>
+        ))}
+      </ul>
+      {reviews.length < stats.reviewCount && <p className="field-hint">Répartition calculée sur les {reviews.length} avis les plus récents.</p>}
+    </div>
+  )
+}

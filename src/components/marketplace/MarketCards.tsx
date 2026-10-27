@@ -1,9 +1,30 @@
 // Fiches d’annonce (grille, liste ou rangée) et squelettes de chargement de la marketplace.
 import { BadgeCheck, MapPin, Store, Truck } from 'lucide-react'
+import { useState } from 'react'
 import { formatPrice, type ListingCard, type MarketCatalog } from '../../services/marketplaceApi'
 import { cardToSaved, type Notify } from './marketUtils'
 import { SaveButtons } from './MarketplaceLists'
 import { RatingBadge } from './SellerTrust'
+
+/**
+ * Photo qui apparaît en fondu une fois chargée (sur un réseau lent, la forme grise reste visible
+ * jusque-là). Une photo déjà en cache s’affiche aussitôt.
+ */
+export function FadeImage({ src, alt = '', eager = false }: { src: string; alt?: string; eager?: boolean }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <img
+      ref={(element) => { if (element?.complete && element.naturalWidth > 0 && !loaded) setLoaded(true) }}
+      src={src}
+      alt={alt}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      className={`fade-image ${loaded ? 'is-loaded' : ''}`}
+      onLoad={() => setLoaded(true)}
+      onError={() => setLoaded(true)}
+    />
+  )
+}
 
 /** Fiche d’une annonce : photo, prix, pastilles (état, livraison), vendeur et sa note ; favori et comparaison. */
 export function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false, sponsored = false }: {
@@ -18,7 +39,7 @@ export function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false
     <li className="market-card">
       <a href={`/marketplace/annonce/${item.id}`} onClick={(event) => { event.preventDefault(); onOpen() }}>
         <span className="market-card-photo">
-          {item.photo ? <img src={item.photo} alt="" loading="lazy" decoding="async" /> : <Store size={28} aria-hidden="true" />}
+          {item.photo ? <FadeImage src={item.photo} /> : <Store size={28} aria-hidden="true" />}
           {isNew && <span className="market-new">Nouveau</span>}
           {sponsored && <span className="market-sponsored">Sponsorisé</span>}
         </span>

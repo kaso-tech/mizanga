@@ -213,11 +213,14 @@ describe('marketplace publique', () => {
     expect(facts).toHaveTextContent('Sur Gilli depuis oct. 2026')
     expect(facts).toHaveTextContent('3 annonces en ligne')
     expect(facts).toHaveTextContent('Identité vérifiée par Gilli')
+    // La fiche d’annonce du vendeur montre aussi sa note.
+    expect(screen.getByRole('list', { name: 'Annonces du vendeur' })).toHaveTextContent('4,5 (2 avis)')
+    await userEvent.click(screen.getByRole('tab', { name: /Avis/ }))
+    expect(window.location.search).toBe('?onglet=avis')
+    expect(screen.getByRole('list', { name: 'Répartition des notes' })).toHaveTextContent('5 étoiles : 1 avis')
     const list = screen.getByRole('list', { name: 'Avis' })
     expect(list).toHaveTextContent('Téléphone conforme, très bon accueil.')
     expect(within(list).getAllByText('Client Gilli')).toHaveLength(2)
-    // La fiche d’annonce du vendeur montre aussi sa note.
-    expect(screen.getByRole('list', { name: 'Annonces du vendeur' })).toHaveTextContent('4,5 (2 avis)')
 
     await userEvent.click(screen.getByRole('button', { name: 'Donner mon avis' }))
     const dialog = screen.getByRole('dialog', { name: 'Donner mon avis' })
@@ -235,7 +238,7 @@ describe('marketplace publique', () => {
   it('déconnecté : « Donner mon avis » propose de se connecter', async () => {
     fakeServer()
     const onSignIn = vi.fn()
-    window.history.replaceState({}, '', '/marketplace/vendeur/b1')
+    window.history.replaceState({}, '', '/marketplace/vendeur/b1?onglet=avis')
     render(<MarketplaceView onNotify={() => {}} account={{ signedIn: false, savedApi: null, onSignIn }} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Donner mon avis' }))
     expect(onSignIn).toHaveBeenCalled()
@@ -311,5 +314,39 @@ describe('marketplace publique', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Partager l’annonce' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/marketplace/annonce/l1')))
     expect(onNotify).toHaveBeenCalledWith('Lien de l’annonce copié.', 'success')
+  })
+
+  it('boutique : bannière, recherche et tri dans la boutique, onglet À propos, partage', async () => {
+    const third = { ...card, id: 'l7', title: 'Chargeur rapide 33 W', category: 'telephones', price: 5000, publishedAt: '2026-10-25T08:00:00Z' }
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/marketplace/categories') return Response.json(catalog)
+      if (url === '/api/marketplace/sellers/b1') return Response.json({ seller: detail.seller, listings: [card, { ...card2, sellerId: 'b1', category: 'informatique' }, third], reviews })
+      return Response.json({ error: 'Introuvable.' }, { status: 404 })
+    }))
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const onNotify = vi.fn()
+    window.history.replaceState({}, '', '/marketplace/vendeur/b1')
+    render(<MarketplaceView onNotify={onNotify} />)
+    expect(await screen.findByRole('heading', { level: 1, name: /Awa Téléphones/ })).toBeInTheDocument()
+    const titles = () => within(screen.getByRole('list', { name: 'Annonces du vendeur' })).getAllByRole('link').map((link) => link.getAttribute('href'))
+    // Les plus récentes d’abord, puis par prix.
+    expect(titles()).toEqual(['/marketplace/annonce/l7', '/marketplace/annonce/l1', '/marketplace/annonce/l2'])
+    await userEvent.selectOptions(screen.getByLabelText('Trier les annonces de la boutique'), 'price_asc')
+    expect(titles()).toEqual(['/marketplace/annonce/l7', '/marketplace/annonce/l2', '/marketplace/annonce/l1'])
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Rechercher dans la boutique' }), 'chargeur')
+    expect(titles()).toEqual(['/marketplace/annonce/l7'])
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Rechercher dans la boutique' }))
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Catégories de la boutique' })).getByRole('button', { name: /^informatique \(1\)/ }))
+    expect(titles()).toEqual(['/marketplace/annonce/l2'])
+
+    await userEvent.click(screen.getByRole('tab', { name: 'À propos' }))
+    expect(screen.getByText('Livre aussi à Koudougou')).toBeInTheDocument()
+    expect(screen.getByText(/a vérifié l’identité de ce vendeur/)).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Contacter le vendeur' })).getByRole('link', { name: /WhatsApp/ })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Partager la boutique' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/marketplace/vendeur/b1')))
+    expect(onNotify).toHaveBeenCalledWith('Lien de la boutique copié.', 'success')
   })
 })

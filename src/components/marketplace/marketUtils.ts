@@ -87,3 +87,22 @@ export function useWideLayout() {
 export const cardToSaved = (item: ListingCard): ListingLike => ({ id: item.id, title: item.title, price: item.price, currency: item.currency, photo: item.photo, city: item.city, sellerName: item.sellerName, sellerVerified: item.sellerVerified, condition: item.condition })
 export const detailToSaved = (item: ListingDetail): ListingLike => ({ id: item.id, title: item.title, price: item.price, currency: item.currency, photo: item.photos[0] ?? null, city: item.seller.city, sellerName: item.seller.name, sellerVerified: item.seller.verified, condition: item.condition })
 
+
+/**
+ * Partage d’une page de la marketplace : menu de partage du téléphone, sinon lien copié. Renvoie
+ * « copied » quand le lien a été copié, « shared » ou « cancelled » sinon ; lève une erreur si rien n’est possible.
+ */
+export async function sharePage({ title, text, path }: { title: string; text: string; path: string }): Promise<'shared' | 'copied' | 'cancelled'> {
+  const url = `${window.location.origin}${path}`
+  try {
+    if (typeof navigator.share === 'function') {
+      await navigator.share({ title, text, url })
+      return 'shared'
+    }
+    await navigator.clipboard.writeText(`${text} ${url}`)
+    return 'copied'
+  } catch (error) {
+    if ((error as { name?: string }).name === 'AbortError') return 'cancelled'
+    throw error
+  }
+}

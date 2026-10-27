@@ -4,7 +4,7 @@ import { formatPhone, formatPrice, marketplaceApi, reportLabels, whatsappLink, t
 import { Modal } from '../Modal'
 import { SaveButtons } from './MarketplaceLists'
 import { CardSkeletons, ListingCardView } from './MarketCards'
-import { detailToSaved, useWideLayout, type Notify } from './marketUtils'
+import { detailToSaved, sharePage, useWideLayout, type Notify } from './marketUtils'
 import { SellerStatsLine } from './SellerTrust'
 
 /** Boutons WhatsApp (message prêt) et appel. `compact` : libellés courts, pour la barre fixée en bas. */
@@ -122,17 +122,11 @@ function Gallery({ photos, title }: { photos: string[]; title: string }) {
 
 /** Partage de l’annonce : menu de partage du téléphone, sinon lien copié. */
 async function share(listing: ListingDetail, onNotify: Notify) {
-  const url = `${window.location.origin}/marketplace/annonce/${listing.id}`
-  const text = `${listing.title} — ${formatPrice(listing.price, listing.currency)} sur Gilli`
   try {
-    if (typeof navigator.share === 'function') {
-      await navigator.share({ title: listing.title, text, url })
-      return
-    }
-    await navigator.clipboard.writeText(`${text} ${url}`)
-    onNotify('Lien de l’annonce copié.', 'success')
-  } catch (error) {
-    if ((error as { name?: string }).name !== 'AbortError') onNotify('Partage impossible sur cet appareil.', 'info')
+    const result = await sharePage({ title: listing.title, text: `${listing.title} — ${formatPrice(listing.price, listing.currency)} sur Gilli`, path: `/marketplace/annonce/${listing.id}` })
+    if (result === 'copied') onNotify('Lien de l’annonce copié.', 'success')
+  } catch {
+    onNotify('Partage impossible sur cet appareil.', 'info')
   }
 }
 
