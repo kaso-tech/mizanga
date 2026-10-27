@@ -1515,3 +1515,111 @@ button.account-chip:hover { opacity: .9; }
 .rating-bar-count { color: var(--muted-foreground); text-align: right; }
 .rating-summary .field-hint { flex-basis: 100%; margin: 0; }
 .market-sticky-price.is-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+
+/* Marketplace compacte : en-tête sur une ligne et fiches sobres, pour voir les produits dès l’ouverture. */
+.market-view.page-view { padding-top: 0; }
+.market-view > * + * { margin-top: 12px; }
+.market-view > .visually-hidden + .market-search { margin-top: 0; }
+.market-search { gap: 0; padding: 8px 16px; }
+.market-search-main { align-items: center; gap: 4px; }
+.market-search-back { flex: 0 0 auto; width: 40px; height: 40px; margin-left: -6px; }
+.market-search-query { border-radius: 12px; background: var(--card); }
+.market-search-query input { min-height: 42px; padding: 0 4px 0 14px; font-size: 15px; }
+.market-search-clear { width: 32px; height: 32px; margin-right: 0; }
+.market-search-submit { display: grid; flex: 0 0 auto; place-items: center; width: 36px; height: 36px; margin: 3px; padding: 0; border: 0; border-radius: 10px; background: var(--primary); color: var(--primary-foreground); cursor: pointer; }
+.market-search-submit:active { transform: scale(.96); }
+.market-shortcuts { display: flex; flex: 0 0 auto; gap: 0; margin-right: -6px; }
+.market-shortcut { width: 40px; height: 40px; color: var(--foreground); }
+.market-shortcut.is-active { color: var(--primary); }
+.market-shortcut-count { position: absolute; top: 3px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--foreground); color: var(--background); font-size: 10px; font-weight: 700; line-height: 17px; text-align: center; }
+.market-shortcut-count.is-fresh { background: var(--primary); color: var(--primary-foreground); }
+.market-page-head { display: flex; align-items: center; gap: 4px; padding-top: 10px; }
+.market-page-head h1 { flex: 1 1 auto; min-width: 0; font-size: 22px; }
+.market-page-head > .icon-button { margin-left: -6px; }
+.market-home-bar { display: flex; align-items: center; }
+.market-city-chip { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; max-width: 100%; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.market-city-chip > span { overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.market-city-chip svg { flex: 0 0 auto; color: var(--muted-foreground); }
+.market-city-chip.is-active svg:first-child { color: var(--primary); }
+.market-home-bar .market-city-chip { min-height: 30px; padding: 0 4px; border: 0; background: transparent; font-weight: 500; }
+.market-city-dialog form { display: grid; gap: 10px; }
+
+/* Catégories de la vitrine : une seule rangée d’icônes. */
+.market-category-grid button { border: 0; background: transparent; min-height: 0; padding: 4px 2px; gap: 6px; }
+.market-category-grid button:hover .market-category-icon, .market-category-grid button:focus-visible .market-category-icon { box-shadow: 0 0 0 2px var(--primary); }
+.market-category-icon { border-radius: 999px; }
+.market-category-label { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 11.5px; }
+@media (max-width: 719px) {
+  .market-category-grid { grid-template-rows: auto; grid-auto-columns: 70px; gap: 4px; padding: 0 16px 2px; }
+  .market-category-grid button { min-height: 0; padding: 2px; }
+  .market-category-icon { width: 46px; height: 46px; }
+}
+.market-shelf { gap: 8px; }
+.market-shelf-head h2 { font-size: 16px; }
+.market-shelf-head .text-button { min-height: 34px; font-size: 13px; }
+
+/* Résultats : outils, catégories et filtres actifs, chacun sur une ligne qui défile. */
+.market-results, .market-results-main { gap: 10px; }
+.market-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin: 0 -16px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+.market-toolbar::-webkit-scrollbar, .market-categories::-webkit-scrollbar, .market-chips::-webkit-scrollbar { display: none; }
+.market-tool { position: relative; display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 34px; margin: 0; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.market-tool.is-active { border-color: var(--primary); background: var(--accent); }
+.market-tool svg { flex: 0 0 auto; color: var(--muted-foreground); }
+.market-sort { padding-right: 4px; }
+.market-sort select { min-height: 32px; width: auto; max-width: 160px; padding: 0 22px 0 0; border: 0; background-color: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 500; }
+.market-categories { margin: 0 -16px; padding: 0 16px; gap: 6px; scrollbar-width: none; }
+.market-categories .saved-prompt-chip { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.market-categories .saved-prompt-chip.is-parent { gap: 4px; padding-right: 10px; }
+.market-chips { flex-wrap: nowrap; margin: 0 -16px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+.market-chips > li { flex: 0 0 auto; }
+.market-chip { white-space: nowrap; }
+.market-count-row { flex-wrap: nowrap; gap: 8px; }
+.market-count { flex: 1 1 auto; min-width: 0; font-size: 13px; }
+.market-count-row .text-button { min-height: 34px; font-size: 13px; white-space: nowrap; }
+.market-count-row .market-view-toggle { flex: 0 0 auto; margin-left: 0; padding: 1px; border-radius: 10px; }
+.market-count-row .market-view-toggle .icon-button { width: 32px; height: 32px; border-radius: 8px; }
+@media (min-width: 720px) {
+  .market-toolbar, .market-categories, .market-chips { margin: 0; padding: 0; }
+}
+
+/* Fiches : photo arrondie, favori discret, prix net, une ligne d’informations. */
+.market-grid { gap: 16px 10px; }
+.market-row { grid-auto-columns: minmax(140px, 42%); }
+.market-card a, .market-card a:hover { gap: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+.market-card-photo { overflow: hidden; border-radius: 12px; background: var(--muted); }
+.market-card a:hover .market-card-photo img { transform: scale(1.03); }
+.market-card-photo img { transition: transform .25s ease; }
+.market-card a:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 12px; }
+.market-card-body { gap: 2px; padding: 8px 2px 0; }
+.market-card-price { font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.market-card-title { min-height: calc(2 * 1.35em); color: var(--foreground); font-size: 13px; }
+.market-card-meta { flex-wrap: nowrap; gap: 4px; overflow: hidden; margin-top: 2px; white-space: nowrap; }
+.market-card-meta .is-new { color: #1f8a4c; font-weight: 500; }
+.market-card-city { overflow: hidden; text-overflow: ellipsis; }
+.market-card-delivery { display: inline-flex; align-items: center; gap: 4px; color: #1f8a4c; font-size: 12px; }
+.market-card-seller { flex-wrap: nowrap; min-width: 0; overflow: hidden; white-space: nowrap; }
+.market-card-seller-name { overflow: hidden; text-overflow: ellipsis; }
+.market-card-seller .rating-badge { flex: 0 0 auto; margin: 0 0 0 2px; font-size: 12px; }
+.market-card-seller .rating-count { display: none; }
+.market-card-badges { position: absolute; left: 6px; top: 6px; display: flex; gap: 4px; }
+.market-new, .market-sponsored { position: static; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .01em; box-shadow: none; }
+.market-sponsored { background: color-mix(in oklab, var(--foreground) 72%, transparent); color: var(--background); }
+.market-save.is-compact { top: 6px; right: 6px; }
+.market-save.is-compact .market-save-button { width: 32px; height: 32px; background: color-mix(in oklab, var(--card) 92%, transparent); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.market-save.is-compact .market-save-button svg { width: 16px; height: 16px; }
+.market-card.is-skeleton { border: 0; background: transparent; }
+.market-card.is-skeleton .market-card-photo { border-radius: 12px; }
+/* Liste : photo à gauche, comparaison possible. */
+.market-list { gap: 0; }
+.market-list > .market-card { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.market-list .market-card a { grid-template-columns: 112px minmax(0, 1fr); gap: 12px; }
+.market-list .market-card-photo { aspect-ratio: 1; height: auto; min-height: 0; }
+.market-list .market-card-body { padding: 0 44px 0 0; align-content: start; }
+.market-list .market-save.is-compact { top: 10px; bottom: auto; right: 0; flex-direction: column; }
+.market-list .market-save.is-compact .market-save-button { background: transparent; box-shadow: none; }
+/* Petits boutons ronds des fiches : visuellement discrets, zone tactile gardée à 44 px. */
+@media (pointer: coarse) {
+  .market-save.is-compact .market-save-button, .market-count-row .market-view-toggle .icon-button { min-width: 0; min-height: 0; }
+  .market-save.is-compact .market-save-button::after, .market-count-row .market-view-toggle .icon-button::after { content: ''; position: absolute; inset: -6px; }
+}
+.market-home-bar + * { margin-top: 4px; }

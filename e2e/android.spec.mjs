@@ -16,7 +16,7 @@ const emailFor = (info) => `commercant-${info.project.name.replace(/\W+/g, '-')}
 async function expectFitsScreen(page, screen) {
   const overflowing = await page.evaluate(() => {
     const width = window.innerWidth
-    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .market-tabs, .market-compare-scroll, .market-row, .market-photos, .market-category-grid, .settings-nav, .moderation-photos, pre, .katex-display')
+    const scrollable = (/** @type {Element} */ element) => element.closest('.table-scroll, .business-tabs, .market-categories, .market-tabs, .market-compare-scroll, .market-row, .market-photos, .market-category-grid, .market-toolbar, .market-chips, .settings-nav, .moderation-photos, pre, .katex-display')
     return [...document.querySelectorAll('body *')]
       .filter((element) => {
         const box = element.getBoundingClientRect()
@@ -354,6 +354,9 @@ test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ 
 
   // Favori et comparaison.
   await client.getByRole('button', { name: `Ajouter aux favoris : Tecno Spark 20 ${tag}` }).tap()
+  // La comparaison se fait depuis l’affichage en liste (la grille ne garde que le favori).
+  await expect(client.getByRole('button', { name: `Comparer : Tecno Spark 20 ${tag}` })).toHaveCount(0)
+  await client.getByRole('button', { name: 'Affichage en liste' }).tap()
   await client.getByRole('button', { name: `Comparer : Tecno Spark 20 ${tag}` }).tap()
   await client.getByRole('button', { name: `Comparer : Itel A70 ${tag}` }).tap()
   const bar = client.getByRole('region', { name: 'Comparaison' })
@@ -367,7 +370,7 @@ test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ 
   await expect(table.getByRole('row', { name: /^Mémoire vive/ })).toContainText('8 Go')
   await expectFitsScreen(client, 'comparaison')
   await client.getByRole('button', { name: 'Retour' }).tap()
-  await client.getByRole('tab', { name: /Favoris/ }).tap()
+  await client.getByRole('button', { name: /^Favoris/ }).tap()
   await expect(client.getByRole('list', { name: 'Favoris' })).toContainText(`Tecno Spark 20 ${tag}`)
   await expectFitsScreen(client, 'favoris')
 
@@ -382,7 +385,7 @@ test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ 
   await client.goto('/')
   await expect(client.getByRole('button', { name: 'Marketplace, 2 nouvelles annonces pour vos alertes' })).toBeVisible()
   await client.getByRole('button', { name: /^Marketplace/ }).tap()
-  await client.getByRole('tab', { name: /Alertes/ }).tap()
+  await client.getByRole('button', { name: /^Alertes/ }).tap()
   await client.getByRole('list', { name: 'Alertes' }).getByRole('button', { name: /2 nouvelles annonces/ }).tap()
   await expect(client.getByRole('list', { name: 'Annonces' }).getByText('Nouveau')).toHaveCount(2)
   await expect(client.getByRole('button', { name: 'Marketplace', exact: true })).toBeVisible()
@@ -411,7 +414,7 @@ test('compte : favoris et alertes retrouvés sur un autre téléphone, notificat
   await client.goto(`/marketplace?q=${tag}`)
   await client.getByRole('button', { name: `Ajouter aux favoris : Tecno Spark 20 ${tag}` }).tap()
   await client.getByRole('button', { name: 'Créer une alerte' }).tap()
-  await client.getByRole('tab', { name: /Alertes/ }).tap()
+  await client.getByRole('button', { name: /^Alertes/ }).tap()
   const panel = client.getByRole('region', { name: 'Notifications du téléphone' })
   // À la connexion, le favori et l’alerte de l’appareil sont copiés sur le compte.
   const copied = Promise.all(['favorites', 'alerts'].map((kind) => client.waitForResponse((response) => response.url().includes(`/api/saved/${kind}/`) && response.request().method() === 'PUT' && response.ok())))
@@ -433,7 +436,7 @@ test('compte : favoris et alertes retrouvés sur un autre téléphone, notificat
   await signInFromDialog(other, buyer)
   await expect(other.getByRole('list', { name: 'Favoris' })).toContainText(`Tecno Spark 20 ${tag}`)
   await expect(other.getByText('Vos favoris sont enregistrés sur votre compte.')).toBeVisible()
-  await other.getByRole('tab', { name: /Alertes/ }).tap()
+  await other.getByRole('button', { name: /^Alertes/ }).tap()
   await expect(other.getByRole('list', { name: 'Alertes' })).toContainText(tag)
   await other.close()
   await client.close()
@@ -567,6 +570,8 @@ test('marketplace refondue : vitrine, suggestions, liste et page annonce avec co
   const tiles = client.getByRole('navigation', { name: 'Catégories' })
   await expect(tiles.getByRole('button', { name: 'Téléphones et accessoires' })).toBeVisible()
   await expect(client.getByRole('region', { name: /^Nouveautés/ })).toBeVisible()
+  // En-tête compact : les premières annonces apparaissent dès l’ouverture, sans défiler.
+  await expect(client.locator('.market-card-price').first()).toBeInViewport()
   await expectFitsScreen(client, 'vitrine de la marketplace')
   if (process.env.GILLI_SHOTS) await client.screenshot({ path: `${process.env.GILLI_SHOTS}/vitrine-${info.project.name.includes('360') ? 360 : 412}.png` })
 
@@ -578,7 +583,7 @@ test('marketplace refondue : vitrine, suggestions, liste et page annonce avec co
   await client.getByRole('button', { name: 'Rechercher' }).tap()
   const results = client.getByRole('list', { name: 'Annonces' })
   await expect(results.getByRole('listitem')).toHaveCount(2)
-  await expect(client.getByRole('list', { name: 'Filtres actifs' })).toContainText('Téléphones et accessoires')
+  await expect(client.getByRole('navigation', { name: 'Sous-catégories' }).getByRole('button', { name: 'Retirer la catégorie : Téléphones et accessoires' })).toBeVisible()
   await client.getByRole('button', { name: 'Affichage en liste' }).tap()
   await expect(results).toHaveClass(/market-list/)
   await expectFitsScreen(client, 'résultats en liste')
@@ -677,9 +682,13 @@ test('marketplace : un vendeur publie, un visiteur trouve l’annonce et contact
   const visitor = await browser.newPage({ ...info.project.use })
   await visitor.goto('/marketplace')
   await visitor.getByRole('searchbox', { name: 'Que cherchez-vous ?' }).fill(`tecno spark 20 neuf ${info.project.name.includes('360') ? 'A' : 'B'}`)
-  await visitor.getByLabel('Ma ville').fill('Ouagadougou')
-  await visitor.getByLabel('Budget maximum').fill('50000')
   await visitor.getByRole('button', { name: 'Rechercher' }).tap()
+  await visitor.getByRole('button', { name: /^Ville :/ }).tap()
+  await visitor.getByLabel('Ma ville').fill('Ouagadougou')
+  await visitor.getByRole('button', { name: 'Valider' }).tap()
+  await visitor.getByRole('button', { name: /^Filtres/ }).tap()
+  await visitor.getByLabel('Prix maximum (F)').fill('50000')
+  await visitor.getByRole('button', { name: 'Appliquer' }).tap()
   const card = visitor.locator('.market-card').first()
   await expect(card).toContainText('48 000')
   await expectFitsScreen(visitor, 'résultats de la marketplace')

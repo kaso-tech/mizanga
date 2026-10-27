@@ -77,7 +77,7 @@ export function MarketHome({ catalog, city, onSearch, onOpen, onNotify }: {
       {!shelves && !error && <CardSkeletons count={4} row />}
       {shelves && (
         <>
-          <Row title="Sponsorisé" icon={<Megaphone size={18} aria-hidden="true" />} items={shelves.latest.sponsored} sponsored note="Les vendeurs paient pour cette mise en avant ; le classement des résultats n’en tient pas compte." {...rowProps} />
+          <Row title="Sponsorisé" icon={<Megaphone size={18} aria-hidden="true" />} items={shelves.latest.sponsored} sponsored note="Payé par les vendeurs ; n’influence pas le classement." {...rowProps} />
           <Row title={city ? `Nouveautés près de ${city}` : 'Nouveautés'} icon={<Sparkles size={18} aria-hidden="true" />} items={shelves.latest.items} onSeeAll={() => onSearch({ city, sort: 'recent' })} {...rowProps} />
           <Row title="Vendeurs vérifiés" icon={<BadgeCheck size={18} aria-hidden="true" />} items={shelves.verified.items} onSeeAll={() => onSearch({ city, verified: '1' })} {...rowProps} />
           <Row title="Petits prix" icon={<Tag size={18} aria-hidden="true" />} items={shelves.cheap.items} onSeeAll={() => onSearch({ city, sort: 'price_asc' })} {...rowProps} />

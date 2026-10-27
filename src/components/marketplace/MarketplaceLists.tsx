@@ -66,21 +66,19 @@ export function CompareBar({ onOpen }: { onOpen: (ids: string[]) => void }) {
   )
 }
 
-/** Onglets de l’accueil de la marketplace. */
-export function MarketTabs({ active, onSelect }: { active: 'home' | 'favorites' | 'alerts'; onSelect: (page: 'home' | 'favorites' | 'alerts') => void }) {
+/** Raccourcis de la marketplace, en icônes dans la barre de recherche : favoris et alertes, avec leurs compteurs. */
+export function MarketShortcuts({ active, onSelect }: { active?: 'favorites' | 'alerts'; onSelect: (page: 'favorites' | 'alerts') => void }) {
   const favorites = useFavorites().length
   const fresh = useAlerts().reduce((sum, alert) => sum + alert.newCount, 0)
-  const tab = (page: 'home' | 'favorites' | 'alerts', label: string, extra?: string) => (
-    <button type="button" role="tab" aria-selected={active === page} className={`market-tab ${active === page ? 'is-active' : ''}`} onClick={() => onSelect(page)}>
-      {label}{extra && <span className="market-tab-count">{extra}</span>}
-    </button>
-  )
   return (
-    <div className="market-tabs" role="tablist" aria-label="Marketplace">
-      {tab('home', 'Annonces')}
-      {tab('favorites', 'Favoris', favorites ? String(favorites) : undefined)}
-      {tab('alerts', 'Alertes', fresh ? `${fresh} nouv.` : undefined)}
-    </div>
+    <nav className="market-shortcuts" aria-label="Mes listes">
+      <button type="button" className={`icon-button market-shortcut ${active === 'favorites' ? 'is-active' : ''}`} aria-current={active === 'favorites' ? 'page' : undefined} aria-label={favorites ? `Favoris, ${favorites} enregistré${favorites > 1 ? 's' : ''}` : 'Favoris'} onClick={() => onSelect('favorites')}>
+        <Heart size={20} aria-hidden="true" />{favorites > 0 && <span className="market-shortcut-count" aria-hidden="true">{favorites > 99 ? '99+' : favorites}</span>}
+      </button>
+      <button type="button" className={`icon-button market-shortcut ${active === 'alerts' ? 'is-active' : ''}`} aria-current={active === 'alerts' ? 'page' : undefined} aria-label={fresh ? `Alertes, ${fresh} nouvelle${fresh > 1 ? 's' : ''} annonce${fresh > 1 ? 's' : ''}` : 'Alertes'} onClick={() => onSelect('alerts')}>
+        <Bell size={20} aria-hidden="true" />{fresh > 0 && <span className="market-shortcut-count is-fresh" aria-hidden="true">{fresh > 99 ? '99+' : fresh}</span>}
+      </button>
+    </nav>
   )
 }
 

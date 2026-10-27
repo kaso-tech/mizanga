@@ -1,5 +1,5 @@
 // Fiches d’annonce (grille, liste ou rangée) et squelettes de chargement de la marketplace.
-import { BadgeCheck, MapPin, Store, Truck } from 'lucide-react'
+import { BadgeCheck, Store, Truck } from 'lucide-react'
 import { useState } from 'react'
 import { formatPrice, type ListingCard, type MarketCatalog } from '../../services/marketplaceApi'
 import { cardToSaved, type Notify } from './marketUtils'
@@ -26,36 +26,43 @@ export function FadeImage({ src, alt = '', eager = false }: { src: string; alt?:
   )
 }
 
-/** Fiche d’une annonce : photo, prix, pastilles (état, livraison), vendeur et sa note ; favori et comparaison. */
-export function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false, sponsored = false }: {
+/**
+ * Fiche d’une annonce, sobre : photo avec le favori, prix, titre, une ligne discrète (état, ville,
+ * livraison) et le vendeur avec sa note. La comparaison s’ajoute en affichage liste et sur la page annonce.
+ */
+export function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false, sponsored = false, showCompare = false }: {
   item: ListingCard
   catalog: MarketCatalog | null
   onOpen: () => void
   onNotify?: Notify
   isNew?: boolean
   sponsored?: boolean
+  showCompare?: boolean
 }) {
   return (
     <li className="market-card">
       <a href={`/marketplace/annonce/${item.id}`} onClick={(event) => { event.preventDefault(); onOpen() }}>
         <span className="market-card-photo">
           {item.photo ? <FadeImage src={item.photo} /> : <Store size={28} aria-hidden="true" />}
-          {isNew && <span className="market-new">Nouveau</span>}
-          {sponsored && <span className="market-sponsored">Sponsorisé</span>}
+          {(isNew || sponsored) && <span className="market-card-badges">{isNew && <span className="market-new">Nouveau</span>}{sponsored && <span className="market-sponsored">Sponsorisé</span>}</span>}
         </span>
         <span className="market-card-body">
           <strong className="market-card-price">{formatPrice(item.price, item.currency)}</strong>
           <span className="market-card-title">{item.title}</span>
-          <span className="market-pills">
-            <span className={`market-pill ${item.condition === 'new' ? 'is-new' : ''}`}>{catalog?.conditions[item.condition] ?? item.condition}</span>
-            {!item.sameCity && item.deliversToCity && <span className="market-pill"><Truck size={11} aria-hidden="true" /> Livre chez vous</span>}
+          <span className="market-card-meta">
+            <span className={item.condition === 'new' ? 'is-new' : undefined}>{catalog?.conditions[item.condition] ?? item.condition}</span>
+            <span aria-hidden="true">·</span>
+            <span className="market-card-city">{item.city}</span>
           </span>
-          <span className="market-card-meta"><MapPin size={12} aria-hidden="true" /> {item.city}</span>
-          <span className="market-card-seller">{item.sellerName}{item.sellerVerified && <BadgeCheck size={13} aria-label="Vendeur vérifié" />}</span>
-          <RatingBadge rating={item.sellerRating} count={item.sellerReviews} />
+          {!item.sameCity && item.deliversToCity && <span className="market-card-delivery"><Truck size={12} aria-hidden="true" /> Livre chez vous</span>}
+          <span className="market-card-seller">
+            <span className="market-card-seller-name">{item.sellerName}</span>
+            {item.sellerVerified && <BadgeCheck size={13} aria-label="Vendeur vérifié" />}
+            <RatingBadge rating={item.sellerRating} count={item.sellerReviews} />
+          </span>
         </span>
       </a>
-      <SaveButtons listing={cardToSaved(item)} onNotify={onNotify} compact />
+      <SaveButtons listing={cardToSaved(item)} onNotify={onNotify} compact showCompare={showCompare} />
     </li>
   )
 }

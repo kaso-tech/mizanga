@@ -5,9 +5,9 @@ import { marketplaceApi, searchQuery, type MarketCatalog, type SearchFilters } f
 import { ListingPage } from './ListingPage'
 import { hasCriteria, readCity, rememberSearch, saveCity, type Notify } from './marketUtils'
 import { MarketHome } from './MarketHome'
-import { AlertsPage, CompareBar, ComparePage, FavoritesPage, MarketTabs, type MarketAccount } from './MarketplaceLists'
+import { AlertsPage, CompareBar, ComparePage, FavoritesPage, MarketShortcuts, type MarketAccount } from './MarketplaceLists'
 import { MarketResults } from './MarketResults'
-import { MarketSearchBar } from './MarketSearchBar'
+import { CityButton, MarketSearchBar } from './MarketSearchBar'
 import { SellerPage } from './SellerPage'
 
 type Route =
@@ -87,7 +87,11 @@ export function MarketplaceView({ onNotify, account }: { onNotify: Notify; accou
   const openListing = (id: string) => go({ page: 'listing', id })
   const search = (filters: SearchFilters) => go({ page: 'home', filters })
   const home = () => go({ page: 'home', filters: { city: readCity() || undefined } })
-  const selectTab = (page: 'home' | 'favorites' | 'alerts') => (page === 'home' ? home() : go({ page }))
+  const openList = (page: 'favorites' | 'alerts') => go({ page })
+  const changeCity = (filters: SearchFilters, city: string | undefined) => {
+    saveCity(city ?? '')
+    search({ ...filters, city })
+  }
   const isHome = route.page === 'home' || route.page === 'favorites' || route.page === 'alerts'
   const filters = route.page === 'home' ? route.filters : null
   const showResults = Boolean(filters && hasCriteria(filters))
@@ -96,31 +100,38 @@ export function MarketplaceView({ onNotify, account }: { onNotify: Notify; accou
     <div className="page-view market-view">
       {isHome ? (
         <>
-          <div className="market-hero">
-            <h1>Marketplace</h1>
-            {!showResults && route.page === 'home' && <p className="market-intro">Les produits des commerçants près de chez vous, à contacter par WhatsApp ou par téléphone.</p>}
-          </div>
-          {filters && (
-            <MarketSearchBar
-              key={pathFor(route)}
-              initial={filters}
-              catalog={catalog}
-              onSearch={({ q, city, maxPrice }) => {
-                saveCity(city ?? '')
-                if (q) rememberSearch(q)
-                search({ ...filters, q, city, maxPrice })
-              }}
-              onCategory={(category) => search({ city: filters.city, category })}
-            />
-          )}
-          <MarketTabs active={route.page as 'home' | 'favorites' | 'alerts'} onSelect={selectTab} />
-          {filters && showResults && (
+          {filters ? (
             <>
-              <button type="button" className="text-button market-back" onClick={home}><ArrowLeft size={16} aria-hidden="true" /> Accueil de la marketplace</button>
-              <MarketResults filters={filters} newSince={route.page === 'home' ? route.newSince : undefined} catalog={catalog} onSearch={search} onOpen={openListing} onNotify={onNotify} />
+              <h1 className="visually-hidden">Marketplace</h1>
+              <MarketSearchBar
+                key={pathFor(route)}
+                initial={filters}
+                catalog={catalog}
+                onBack={showResults ? home : undefined}
+                onSearch={({ q }) => {
+                  if (q) rememberSearch(q)
+                  search({ ...filters, q })
+                }}
+                onCategory={(category) => search({ city: filters.city, category })}
+              >
+                <MarketShortcuts onSelect={openList} />
+              </MarketSearchBar>
+              {showResults ? (
+                <MarketResults filters={filters} newSince={route.page === 'home' ? route.newSince : undefined} catalog={catalog} onSearch={search} onCity={(city) => changeCity(filters, city)} onOpen={openListing} onNotify={onNotify} />
+              ) : (
+                <>
+                  <div className="market-home-bar"><CityButton city={filters.city} onChange={(city) => changeCity(filters, city)} /></div>
+                  <MarketHome catalog={catalog} city={filters.city} onSearch={search} onOpen={openListing} onNotify={onNotify} />
+                </>
+              )}
             </>
+          ) : (
+            <div className="market-page-head">
+              <button type="button" className="icon-button" aria-label="Retour aux annonces" onClick={home}><ArrowLeft size={20} /></button>
+              <h1>{route.page === 'favorites' ? 'Favoris' : 'Alertes'}</h1>
+              <MarketShortcuts active={route.page as 'favorites' | 'alerts'} onSelect={openList} />
+            </div>
           )}
-          {filters && !showResults && <MarketHome catalog={catalog} city={filters.city} onSearch={search} onOpen={openListing} onNotify={onNotify} />}
           {route.page === 'favorites' && <FavoritesPage onOpen={openListing} onNotify={onNotify} signedIn={account?.signedIn} />}
           {route.page === 'alerts' && <AlertsPage account={account} onNotify={onNotify} onOpen={(alert) => go({ page: 'home', filters: alertFilters(alert), newSince: alert.seenAt })} />}
           <p className="field-hint market-terms">En utilisant la marketplace, vous acceptez les <a href="/conditions">conditions d’utilisation</a>.</p>
