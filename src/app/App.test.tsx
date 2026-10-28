@@ -54,8 +54,10 @@ describe('App', () => {
     renderApp()
     await userEvent.type(screen.getByRole('textbox', { name: 'Votre message' }), 'Bonjour{Enter}')
     await screen.findByText('Réponse de test')
-    // En-tête et barre latérale proposent chacun un accès aux paramètres.
-    await userEvent.click(screen.getAllByRole('button', { name: 'Paramètres' })[0])
+    // Les paramètres ne s’ouvrent que depuis le menu du profil (ni bouton dans l’en-tête, ni dans le menu latéral).
+    expect(screen.queryByRole('button', { name: 'Paramètres' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Profil' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Paramètres' }))
 
     const general = screen.getByRole('tab', { name: 'Général' })
     general.focus()

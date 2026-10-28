@@ -1,4 +1,4 @@
-import { Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Settings, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
+import { Download, Info, LogIn, MessageSquare, MessageSquarePlus, MoreHorizontal, Pencil, Printer, Search, Star, Store, Trash2, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { accountInitial, type AccountView } from '../app/accountView'
 import { Brand } from './Brand'
@@ -174,9 +174,6 @@ export function Sidebar({
         <div className="sidebar-foot">
           <button type="button" className={`nav-item ${activeView === 'business' ? 'is-active' : ''}`} aria-current={activeView === 'business' ? 'page' : undefined} onClick={() => onNavigate('business')}>
             <Store size={16} aria-hidden="true" /> Espace vendeur
-          </button>
-          <button type="button" className={`nav-item ${activeView === 'settings' ? 'is-active' : ''}`} onClick={() => onNavigate('settings')}>
-            <Settings size={16} aria-hidden="true" /> Paramètres
           </button>
           <button type="button" className={`nav-item ${activeView === 'about' ? 'is-active' : ''}`} onClick={() => onNavigate('about')}>
             <Info size={16} aria-hidden="true" /> À propos du projet
