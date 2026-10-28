@@ -398,9 +398,10 @@ describe('App', () => {
     window.history.replaceState({}, '', '/')
     render(<App aiService={instantService} authConfig={{ supabaseUrl: 'https://projet.supabase.co', publishableKey: 'sb_publishable_test' }} createAuthClient={async () => client} />)
 
-    // L’en-tête et le menu latéral proposent tous deux la connexion, une fois la session lue.
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Se connecter' })).toHaveLength(2))
-    await userEvent.click(screen.getAllByRole('button', { name: 'Se connecter' })[1])
+    // Le menu latéral et le menu du bouton profil (en-tête) proposent la connexion, une fois la session lue.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Se connecter' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Profil' }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Profil' })).getByRole('menuitem', { name: 'Se connecter' }))
     const dialog = await screen.findByRole('dialog', { name: 'Se connecter à Gilli' })
     await userEvent.type(within(dialog).getByLabelText('Adresse e-mail'), 'awa@example.bf{Enter}')
     expect(sent).toEqual(['awa@example.bf'])
@@ -415,15 +416,27 @@ describe('App', () => {
     expect(await screen.findByText('Vous êtes connecté.')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Se connecter à Gilli' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Compte : awa@example.bf' }))
+    const menu = screen.getByRole('menu', { name: 'Profil' })
+    expect(menu).toHaveTextContent('awa@example.bf')
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Mon compte' }))
     expect(await screen.findByText('awa@example.bf', { selector: '.setting-label' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    // Déconnexion directement depuis le menu du profil.
+    await userEvent.click(screen.getByRole('button', { name: 'Compte : awa@example.bf' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Se déconnecter' }))
     expect(await screen.findByText('Vous êtes déconnecté.')).toBeInTheDocument()
     expect(screen.getByText('Invité')).toBeInTheDocument()
   })
 
-  it('laisse la connexion indisponible quand les comptes ne sont pas configurés', () => {
+  it('laisse la connexion indisponible quand les comptes ne sont pas configurés ; paramètres dans le menu du profil', async () => {
     renderApp()
-    expect(screen.getByRole('button', { name: 'Connexion (bientôt disponible)' })).toBeDisabled()
+    // Un seul bouton profil dans l’en-tête : les paramètres sont dans son menu.
+    expect(within(document.querySelector('.topbar') as HTMLElement).queryByRole('button', { name: 'Paramètres' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Profil' }))
+    expect(screen.getByRole('menuitem', { name: 'Connexion (bientôt disponible)' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Paramètres' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Paramètres' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/parametres')
   })
 
   it('ferme la fenêtre quand le lien est ouvert dans un autre onglet, et annonce le résultat d’un lien', async () => {
@@ -441,8 +454,8 @@ describe('App', () => {
     render(<App aiService={instantService} authConfig={{ supabaseUrl: 'https://projet.supabase.co', publishableKey: 'sb_publishable_test' }} createAuthClient={async () => client} />)
     expect(await screen.findByText(/Ce lien de connexion a expiré ou a déjà servi/)).toBeInTheDocument()
 
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Se connecter' })).toHaveLength(2))
-    await userEvent.click(screen.getAllByRole('button', { name: 'Se connecter' })[1])
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Se connecter' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Se connecter' }))
     const dialog = await screen.findByRole('dialog', { name: 'Se connecter à Gilli' })
     await userEvent.type(within(dialog).getByLabelText('Adresse e-mail'), 'awa@example.bf{Enter}')
     await within(dialog).findByText(/Ouvrez le lien qu’il contient/)

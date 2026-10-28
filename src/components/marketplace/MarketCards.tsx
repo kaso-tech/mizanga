@@ -28,9 +28,9 @@ export function FadeImage({ src, alt = '', eager = false }: { src: string; alt?:
 
 /**
  * Fiche d’une annonce, sobre : photo avec le favori, prix, titre, une ligne discrète (état, ville,
- * livraison) et le vendeur avec sa note. La comparaison s’ajoute en affichage liste et sur la page annonce.
+ * livraison) et le vendeur avec sa note ; favori et comparaison en petits boutons sur la photo.
  */
-export function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false, sponsored = false, showCompare = false }: {
+export function ListingCardView({ item, catalog, onOpen, onNotify, isNew = false, sponsored = false, showCompare = true }: {
   item: ListingCard
   catalog: MarketCatalog | null
   onOpen: () => void

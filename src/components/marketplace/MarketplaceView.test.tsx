@@ -158,10 +158,6 @@ describe('marketplace publique', () => {
     const onNotify = vi.fn()
     window.history.replaceState({}, '', '/marketplace?sort=recent')
     render(<MarketplaceView onNotify={onNotify} />)
-    // En grille, la fiche ne garde que le favori ; la comparaison se fait en liste.
-    expect(await screen.findByRole('button', { name: 'Ajouter aux favoris : Tecno Spark 20' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Comparer : Tecno Spark 20' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Affichage en liste' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Comparer : Tecno Spark 20' }))
     const bar = screen.getByRole('region', { name: 'Comparaison' })
     expect(within(bar).getByRole('button', { name: 'Comparer' })).toBeDisabled()

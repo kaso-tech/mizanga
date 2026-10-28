@@ -354,9 +354,6 @@ test('marketplace : tri, favoris, comparaison et alerte de recherche', async ({ 
 
   // Favori et comparaison.
   await client.getByRole('button', { name: `Ajouter aux favoris : Tecno Spark 20 ${tag}` }).tap()
-  // La comparaison se fait depuis l’affichage en liste (la grille ne garde que le favori).
-  await expect(client.getByRole('button', { name: `Comparer : Tecno Spark 20 ${tag}` })).toHaveCount(0)
-  await client.getByRole('button', { name: 'Affichage en liste' }).tap()
   await client.getByRole('button', { name: `Comparer : Tecno Spark 20 ${tag}` }).tap()
   await client.getByRole('button', { name: `Comparer : Itel A70 ${tag}` }).tap()
   const bar = client.getByRole('region', { name: 'Comparaison' })
@@ -432,7 +429,11 @@ test('compte : favoris et alertes retrouvés sur un autre téléphone, notificat
   const other = await browser.newPage({ ...info.project.use })
   await other.goto('/marketplace/favoris')
   await expect(other.getByText(/Aucun favori pour l’instant/)).toBeVisible()
-  await other.getByRole('button', { name: 'Se connecter' }).first().tap()
+  await other.getByRole('button', { name: 'Profil' }).tap()
+  await expect(other.getByRole('menuitem', { name: 'Paramètres' })).toBeInViewport()
+  await expectFitsScreen(other, 'menu du profil')
+  if (process.env.GILLI_SHOTS) await other.screenshot({ path: `${process.env.GILLI_SHOTS}/profil-${info.project.name.includes('360') ? 360 : 412}.png` })
+  await other.getByRole('menuitem', { name: 'Se connecter' }).tap()
   await signInFromDialog(other, buyer)
   await expect(other.getByRole('list', { name: 'Favoris' })).toContainText(`Tecno Spark 20 ${tag}`)
   await expect(other.getByText('Vos favoris sont enregistrés sur votre compte.')).toBeVisible()

@@ -219,13 +219,13 @@ export function MarketResults({ filters, newSince, catalog, onSearch, onCity, on
               <section className="market-sponsored-block" aria-label="Annonces sponsorisées">
                 <p className="market-sponsored-note">Sponsorisé · les vendeurs paient pour cette mise en avant ; le classement des résultats n’en tient pas compte.</p>
                 <ul className={view === 'list' ? 'market-list' : 'market-grid'}>
-                  {(results.sponsored ?? []).map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} sponsored showCompare={view === 'list'} />)}
+                  {(results.sponsored ?? []).map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} sponsored />)}
                 </ul>
               </section>
             )}
             {results.items.length > 0 ? (
               <ul className={view === 'list' ? 'market-list' : 'market-grid'} aria-label="Annonces">
-                {results.items.map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} isNew={Boolean(newSince && Date.parse(item.publishedAt) > Date.parse(newSince))} showCompare={view === 'list'} />)}
+                {results.items.map((item) => <ListingCardView key={item.id} item={item} catalog={catalog} onOpen={() => onOpen(item.id)} onNotify={onNotify} isNew={Boolean(newSince && Date.parse(item.publishedAt) > Date.parse(newSince))} />)}
               </ul>
             ) : (
               <p className="market-empty"><PackageSearch size={20} aria-hidden="true" /> Essayez avec moins de filtres, un autre mot ou un budget plus large. Vous pouvez aussi créer une alerte : Gilli vous préviendra dès qu’une annonce correspond.</p>

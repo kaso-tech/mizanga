@@ -1623,3 +1623,17 @@ button.account-chip:hover { opacity: .9; }
   .market-save.is-compact .market-save-button::after, .market-count-row .market-view-toggle .icon-button::after { content: ''; position: absolute; inset: -6px; }
 }
 .market-home-bar + * { margin-top: 4px; }
+/* Menu du bouton profil (en-tête) : compte, paramètres, déconnexion. */
+.profile-menu { position: relative; display: inline-flex; }
+.profile-menu-panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; display: grid; min-width: 220px; max-width: calc(100vw - 24px); padding: 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: 0 10px 30px rgb(0 0 0 / .14); }
+.profile-menu-panel button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--foreground); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.profile-menu-panel button:hover, .profile-menu-panel button:focus-visible { background: var(--accent); outline: none; }
+.profile-menu-panel button:disabled { opacity: .55; cursor: default; }
+.profile-menu-panel svg { flex: 0 0 auto; color: var(--muted-foreground); }
+.profile-menu-email { overflow: hidden; margin: 0; padding: 8px 12px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; color: var(--muted-foreground); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+/* Grille : favori et comparaison côte à côte sur la photo. */
+.market-save.is-compact { gap: 6px; }
+/* L’en-tête (et le menu du profil) passe au-dessus de la recherche fixée de la marketplace. */
+.topbar { position: relative; z-index: 30; }
+/* Étiquettes « Nouveau » / « Sponsorisé » en bas de la photo, loin des boutons. */
+.market-card-badges { top: auto; bottom: 6px; }

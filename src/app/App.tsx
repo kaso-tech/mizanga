@@ -661,6 +661,7 @@ export function App({ aiService = demoAiService, authConfig, createAuthClient }:
           account={accountView}
           onSignIn={() => setAccountDialogOpen(true)}
           onOpenAccount={openAccountSettings}
+          onSignOut={() => void signOut()}
         />
         <div className="content-scroll"><div className="content-frame"><Suspense fallback={<div className="page-loading" aria-busy="true" />}>{renderView()}</Suspense></div></div>
         {/* Zone de saisie toujours en bas, dès l’accueil, comme dans les applications de messagerie. */}
