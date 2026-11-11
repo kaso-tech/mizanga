@@ -37,7 +37,9 @@ jobs:
 
       # Parcours sur téléphone Android émulé (Chromium) : écran 360 et 412 px, tactile, réseau lent,
       # hors connexion, bouton « retour ». Base PostgreSQL en mémoire et services simulés.
-      - run: pnpm exec playwright install --with-deps chromium
+      # Navigateur seul, sans « --with-deps » : l’image ubuntu-24.04 a déjà les bibliothèques de Chrome,
+      # et l’installation des paquets système (apt) restait bloquée sur les dépôts Ubuntu.
+      - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
