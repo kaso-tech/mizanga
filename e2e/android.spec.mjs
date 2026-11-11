@@ -574,7 +574,7 @@ test('marketplace refondue : vitrine, suggestions, liste et page annonce avec co
   // En-tête compact : les premières annonces apparaissent dès l’ouverture, sans défiler.
   await expect(client.locator('.market-card-price').first()).toBeInViewport()
   await expectFitsScreen(client, 'vitrine de la marketplace')
-  if (process.env.GILLI_SHOTS) await client.screenshot({ path: `${process.env.GILLI_SHOTS}/vitrine-${info.project.name.includes('360') ? 360 : 412}.png` })
+  if (process.env.GILLI_SHOTS) await client.screenshot({ animations: 'disabled', path: `${process.env.GILLI_SHOTS}/vitrine-${info.project.name.includes('360') ? 360 : 412}.png` })
 
   // Suggestions pendant la frappe.
   await client.getByRole('searchbox', { name: 'Que cherchez-vous ?' }).fill('smartph')

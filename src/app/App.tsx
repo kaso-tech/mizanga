@@ -63,8 +63,8 @@ const titleByView: Record<AppView, string> = {
 }
 
 const themeColorByTheme: Record<'light' | 'dark', string> = {
-  light: '#fcf9f3',
-  dark: '#1a120e',
+  light: '#f5f8fb',
+  dark: '#0b1520',
 }
 
 function getViewFromPath(pathname: string): AppView {

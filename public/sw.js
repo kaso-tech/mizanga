@@ -1,7 +1,7 @@
 // Service worker de Gilli : rend l’application installable et utilisable hors connexion
 // pour son interface. Les échanges avec le moteur d’IA (/api/*) ne sont jamais mis en cache.
 // Il affiche aussi les notifications des alertes de recherche (Web Push).
-const CACHE = 'gilli-v3'
+const CACHE = 'gilli-v4'
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.png', '/brand/mark.png', '/icons/icon-192.png']
 
 // Met en cache l’interface et les fichiers compilés qu’elle référence (script et feuille de style à empreinte),
